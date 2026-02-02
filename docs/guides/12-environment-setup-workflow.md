@@ -455,7 +455,7 @@ project-root/
 | 항목 | 값 | 설명 |
 |------|-----|------|
 | **mode** | `subagent` | 다른 Agent에서 호출 |
-| **model** | `opencode/gpt-oss-120b` | 사용 모델 |
+| **model** | `qwen/qwen3-coder-30b` | Tool calling 특화 모델 |
 | **color** | `#95A5A6` | UI 표시 색상 |
 
 ### 7.3 권한 매트릭스
@@ -478,7 +478,7 @@ project-root/
 ---
 description: 개발 환경 감지 및 설정 전문가
 mode: subagent
-model: opencode/gpt-oss-120b
+model: qwen/qwen3-coder-30b
 color: "#95A5A6"
 tools:
   "*": false
@@ -750,19 +750,59 @@ Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
 
 ### 8.5 Phase별 Agent 호출
 
-| Phase | Agent | 역할 | 실행 환경 |
-|-------|-------|------|-----------|
-| -1 | `@env-setup` | 환경 설정 | 호스트 |
-| 0 | `@git-input` | Git diff 추출 | 호스트 |
-| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | 호스트 |
-| 2 | `@code-reviewer` | 심층 코드 분석 | 호스트 |
-| 3 | `@code-fixer` | 이슈 수정 | 호스트 |
-| 4 | `@quality-checker` | 품질 검사 (≥70%) | 호스트 |
-| 5 | `@build-tester` | 빌드 테스트 | **Sandbox (기본)** |
-| 6 | `@function-tester` | 기능 테스트 | **Sandbox (기본)** |
-| 7 | `@git-committer` | 커밋/amend | 호스트 |
-| 8 | `@summary-reporter` | 결과 리포트 | 호스트 |
-| 9 | `@git-pusher` | Push & PR (사용자 확인) | 호스트 |
+| Phase | Agent | 역할 | 모델 | 실행 환경 |
+|-------|-------|------|------|-----------|
+| -1 | `@env-setup` | 환경 설정 | Qwen3-Coder | 호스트 |
+| 0 | `@git-input` | Git diff 추출 | Qwen3-Coder | 호스트 |
+| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | Qwen3-Coder | 호스트 |
+| 2 | `@code-reviewer` | 심층 코드 분석 | **GPT-OSS-120B** | 호스트 |
+| 3 | `@code-fixer` | 이슈 수정 | Qwen3-Coder | 호스트 |
+| 4 | `@quality-checker` | 품질 검사 (≥70%) | Qwen3-Coder | 호스트 |
+| 5 | `@build-tester` | 빌드 테스트 | Qwen3-Coder | **Sandbox (기본)** |
+| 6 | `@function-tester` | 기능 테스트 | Qwen3-Coder | **Sandbox (기본)** |
+| 7 | `@git-committer` | 커밋/amend | Qwen3-Coder | 호스트 |
+| 8 | `@summary-reporter` | 결과 리포트 | **GPT-OSS-120B** | 호스트 |
+| 9 | `@git-pusher` | Push & PR (사용자 확인) | Qwen3-Coder | 호스트 |
+
+### 8.6 모델 배분 전략
+
+#### 모델 특성
+
+| 모델 | 총 파라미터 | 활성 파라미터 | 특화 영역 |
+|------|------------|--------------|-----------|
+| **GPT-OSS-120B** | 117B | 5.1B/token | Reasoning, Chain-of-Thought |
+| **Qwen3-Coder-30B** | 30B | 3.3B/token | Agentic Coding, Tool Calling |
+
+#### 배분 근거
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              모델 배분 근거                                               │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  Qwen3-Coder-30B (9개 Agent - 82%)                                                      │
+│  ─────────────────────────────────                                                      │
+│  • SWE-Bench 오픈소스 SOTA - 실제 코드 수정에 최적화                                      │
+│  • Agent RL 학습 - 멀티턴 상호작용, 도구 사용, 피드백 기반                                │
+│  • Tool/Function Calling 특화                                                           │
+│  • 256K 컨텍스트 (1M 확장 가능)                                                          │
+│  • 3.3B 활성 파라미터 → 빠르고 효율적                                                    │
+│                                                                                          │
+│  GPT-OSS-120B (2개 Agent - 18%)                                                         │
+│  ─────────────────────────────                                                          │
+│  • Full Chain-of-Thought 지원                                                           │
+│  • Reasoning effort 조절 가능 (low/medium/high)                                         │
+│  • 복잡한 분석 및 종합 판단에 적합                                                        │
+│  • Competition Coding, MMLU에서 강력한 성능                                              │
+│                                                                                          │
+│  ═══════════════════════════════════════════════════════════════════════════════════    │
+│                                                                                          │
+│  @code-reviewer → GPT-OSS-120B (CoT로 깊은 코드 분석)                                   │
+│  @code-fixer    → Qwen3-Coder   (SWE-Bench SOTA, Agent RL)                             │
+│  @summary-reporter → GPT-OSS-120B (CoT로 결과 종합)                                     │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 

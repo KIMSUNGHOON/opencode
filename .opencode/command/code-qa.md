@@ -14,6 +14,24 @@ MAX_RETRY = 3
 QUALITY_THRESHOLD = 70
 ```
 
+## 모델 배분
+
+| Agent | 모델 | 근거 |
+|-------|------|------|
+| @env-setup | Qwen3-Coder | Tool calling |
+| @git-input | Qwen3-Coder | Tool calling |
+| @pre-checker | Qwen3-Coder | Tool calling |
+| @code-reviewer | **GPT-OSS-120B** | CoT 분석 |
+| @code-fixer | Qwen3-Coder | SWE-Bench SOTA |
+| @quality-checker | Qwen3-Coder | Tool calling |
+| @build-tester | Qwen3-Coder | Agentic |
+| @function-tester | Qwen3-Coder | Agentic |
+| @git-committer | Qwen3-Coder | Tool calling |
+| @summary-reporter | **GPT-OSS-120B** | CoT 종합 |
+| @git-pusher | Qwen3-Coder | Tool calling |
+
+---
+
 ## 입력 옵션
 
 ### Git 옵션
@@ -31,7 +49,7 @@ QUALITY_THRESHOLD = 70
 
 ## Phase -1: Environment Setup
 
-**먼저 @env-setup을 호출하여 실행 환경을 확인합니다.**
+**먼저 @env-setup을 호출하여 실행 환경을 확인합니다.** (Qwen3-Coder)
 
 @env-setup에게 다음을 요청:
 1. Shell 확인 (zsh/bash/sh)
@@ -45,7 +63,7 @@ QUALITY_THRESHOLD = 70
 
 ## Phase 0: Git Input
 
-@git-input을 호출하여:
+@git-input을 호출하여: (Qwen3-Coder)
 1. 입력 모드 파싱 ($ARGUMENTS에서)
 2. 변경 파일 추출
 3. 검사 대상 목록 생성
@@ -56,15 +74,15 @@ QUALITY_THRESHOLD = 70
 
 순차적으로 호출 (호스트에서 실행):
 
-1. **@pre-checker** - 자동 수정 (lint --fix, format)
-2. **@code-reviewer** - 심층 코드 분석
-3. **@code-fixer** - 발견된 이슈 수정
+1. **@pre-checker** (Qwen3-Coder) - 자동 수정 (lint --fix, format)
+2. **@code-reviewer** (GPT-OSS-120B) - 심층 코드 분석 (Chain-of-Thought)
+3. **@code-fixer** (Qwen3-Coder) - 발견된 이슈 수정 (SWE-Bench SOTA)
 
 ---
 
 ## Phase 4: Quality Check
 
-**@quality-checker** - 품질 점수 검사 (≥70% 필요)
+**@quality-checker** (Qwen3-Coder) - 품질 점수 검사 (≥70% 필요)
 
 ---
 
@@ -74,8 +92,8 @@ QUALITY_THRESHOLD = 70
 
 Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
 
-5. **@build-tester** - Docker 컨테이너에서 빌드 테스트
-6. **@function-tester** - Docker 컨테이너에서 기능 테스트
+5. **@build-tester** (Qwen3-Coder) - Docker 컨테이너에서 빌드 테스트
+6. **@function-tester** (Qwen3-Coder) - Docker 컨테이너에서 기능 테스트
 
 #### Sandbox 실행 방법
 
@@ -100,8 +118,8 @@ docker run --gpus all --rm \
 
 ### `--no-sandbox` 플래그가 있는 경우 (호스트 실행)
 
-5. **@build-tester --no-sandbox** - 호스트에서 빌드 테스트
-6. **@function-tester --no-sandbox** - 호스트에서 기능 테스트
+5. **@build-tester --no-sandbox** (Qwen3-Coder) - 호스트에서 빌드 테스트
+6. **@function-tester --no-sandbox** (Qwen3-Coder) - 호스트에서 기능 테스트
 
 #### Sandbox 설정 (env-config.yaml)
 
@@ -128,7 +146,7 @@ sandbox:
 
 ## Phase 7: Commit
 
-@git-committer를 호출하여:
+@git-committer를 호출하여: (Qwen3-Coder)
 1. 수정 여부 확인 (`git status --porcelain`)
 2. 수정 있으면:
    - 커밋 전 모드 (`--working`/`--staged`) → 새 커밋
@@ -138,7 +156,7 @@ sandbox:
 
 ## Phase 8: Summary Report
 
-@summary-reporter를 호출하여:
+@summary-reporter를 호출하여: (GPT-OSS-120B - Chain-of-Thought)
 1. 전체 QA 결과 수집
 2. Markdown 형식 리포트 생성
 3. 사용자에게 출력
@@ -147,7 +165,7 @@ sandbox:
 
 ## Phase 9: Push & PR
 
-@git-pusher를 호출하여:
+@git-pusher를 호출하여: (Qwen3-Coder)
 1. **사용자에게 Push 여부 확인** (필수)
 2. Push 승인 시:
    - amend면 `--force-with-lease`

@@ -1,7 +1,7 @@
 ---
 description: 개발 환경 감지 및 설정 전문가
 mode: subagent
-model: opencode/gpt-oss-120b
+model: qwen/qwen3-coder-30b
 color: "#95A5A6"
 tools:
   "*": false

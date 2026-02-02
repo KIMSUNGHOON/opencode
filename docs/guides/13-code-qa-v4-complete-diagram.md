@@ -72,19 +72,62 @@
 
 ## 2. Phase 요약 테이블
 
-| Phase | Agent | 역할 | 실행 환경 | 사용자 확인 |
-|-------|-------|------|-----------|-------------|
-| **-1** | `@env-setup` | Shell/conda/venv 환경 감지 | 호스트 | 환경 선택 시 |
-| **0** | `@git-input` | Git diff 추출, 변경 파일 목록 | 호스트 | ❌ |
-| **1** | `@pre-checker` | 자동 수정 (lint --fix, format) | 호스트 | ❌ |
-| **2** | `@code-reviewer` | 심층 코드 분석, 이슈 발견 | 호스트 | ❌ |
-| **3** | `@code-fixer` | 발견된 이슈 수정 | 호스트 | ❌ |
-| **4** | `@quality-checker` | 품질 점수 검사 (≥70%) | 호스트 | ❌ |
-| **5** | `@build-tester` | 빌드 테스트 (GPU) | **Sandbox** | ❌ |
-| **6** | `@function-tester` | 기능 테스트 (GPU) | **Sandbox** | ❌ |
-| **7** | `@git-committer` | Commit 또는 Amend | 호스트 | ❌ |
-| **8** | `@summary-reporter` | Markdown 결과 리포트 | 호스트 | ❌ |
-| **9** | `@git-pusher` | Push & PR 생성 | 호스트 | ✅ **필수** |
+| Phase | Agent | 모델 | 역할 | 실행 환경 |
+|-------|-------|------|------|-----------|
+| **-1** | `@env-setup` | Qwen3-Coder | Shell/conda/venv 환경 감지 | 호스트 |
+| **0** | `@git-input` | Qwen3-Coder | Git diff 추출, 변경 파일 목록 | 호스트 |
+| **1** | `@pre-checker` | Qwen3-Coder | 자동 수정 (lint --fix, format) | 호스트 |
+| **2** | `@code-reviewer` | **GPT-OSS-120B** | 심층 코드 분석, 이슈 발견 | 호스트 |
+| **3** | `@code-fixer` | Qwen3-Coder | 발견된 이슈 수정 (SWE-Bench SOTA) | 호스트 |
+| **4** | `@quality-checker` | Qwen3-Coder | 품질 점수 검사 (≥70%) | 호스트 |
+| **5** | `@build-tester` | Qwen3-Coder | 빌드 테스트 (GPU) | **Sandbox** |
+| **6** | `@function-tester` | Qwen3-Coder | 기능 테스트 (GPU) | **Sandbox** |
+| **7** | `@git-committer` | Qwen3-Coder | Commit 또는 Amend | 호스트 |
+| **8** | `@summary-reporter` | **GPT-OSS-120B** | Markdown 결과 리포트 (CoT) | 호스트 |
+| **9** | `@git-pusher` | Qwen3-Coder | Push & PR 생성 | 호스트 |
+
+### 2.1 모델 배분 다이어그램
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              모델 배분 전략                                               │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  Qwen3-Coder-30B (9개 Agent - 82%)                                              │   │
+│  │  ─────────────────────────────────                                              │   │
+│  │  • SWE-Bench 오픈소스 SOTA                                                       │   │
+│  │  • Agent RL 학습 (멀티턴, 도구 사용)                                              │   │
+│  │  • Tool/Function Calling 특화                                                   │   │
+│  │  • 3.3B 활성 파라미터 → 빠르고 효율적                                            │   │
+│  │                                                                                  │   │
+│  │  적용: env-setup, git-input, pre-checker, code-fixer, quality-checker,          │   │
+│  │        build-tester, function-tester, git-committer, git-pusher                 │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  GPT-OSS-120B (2개 Agent - 18%)                                                 │   │
+│  │  ─────────────────────────────                                                  │   │
+│  │  • Full Chain-of-Thought 지원                                                   │   │
+│  │  • Reasoning effort 조절 가능                                                   │   │
+│  │  • 복잡한 분석/종합 판단에 적합                                                  │   │
+│  │  • 5.1B 활성 파라미터                                                           │   │
+│  │                                                                                  │   │
+│  │  적용: code-reviewer (깊은 분석), summary-reporter (결과 종합)                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+│  ═══════════════════════════════════════════════════════════════════════════════════   │
+│                                                                                          │
+│   Phase -1  Phase 0   Phase 1   Phase 2   Phase 3   Phase 4   Phase 5-6   Phase 7-9   │
+│   ┌─────┐  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌───────┐   ┌───────┐   │
+│   │Qwen3│  │Qwen3│   │Qwen3│   │ GPT │   │Qwen3│   │Qwen3│   │ Qwen3 │   │Qwen3+ │   │
+│   │     │→ │     │ → │     │ → │ OSS │ → │     │ → │     │ → │       │ → │  GPT  │   │
+│   └─────┘  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘   └───────┘   └───────┘   │
+│    env      git       pre      review     fix      quality   build/test  commit/     │
+│   setup    input     check      (CoT)    (SOTA)    check      (agent)    summary     │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
