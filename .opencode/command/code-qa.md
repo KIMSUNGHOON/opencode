@@ -1,6 +1,6 @@
 ---
 description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
-model: opencode/gpt-oss-120b
+model: gpt-oss/gpt-oss-120b
 ---
 
 # Code QA Workflow v4
