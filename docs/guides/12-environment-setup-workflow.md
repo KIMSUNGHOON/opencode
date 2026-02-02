@@ -52,6 +52,7 @@ OpenCode TUI에서 build/function test를 수행하기 위해 올바른 실행 �
 4. [사용자 인터랙션](#4-사용자-인터랙션)
 5. [환경 리포트](#5-환경-리포트)
 6. [다이어그램](#6-다이어그램)
+7. [Agent 정의](#7-agent-정의)
 
 ---
 
@@ -432,6 +433,143 @@ flowchart LR
     style PHASE_NEG1 fill:#95A5A622,stroke:#95A5A6
     style PHASE_0_5 fill:#3498DB22,stroke:#3498DB
     style PHASE_6_8 fill:#27AE6022,stroke:#27AE60
+```
+
+---
+
+## 7. Agent 정의
+
+### 7.1 파일 위치
+
+```
+project-root/
+└── .opencode/
+    └── agent/
+        └── env-setup.md      # Environment Setup Agent
+```
+
+### 7.2 Agent 설정
+
+| 항목 | 값 | 설명 |
+|------|-----|------|
+| **mode** | `subagent` | 다른 Agent에서 호출 |
+| **model** | `opencode/gpt-oss-120b` | 사용 모델 |
+| **color** | `#95A5A6` | UI 표시 색상 |
+
+### 7.3 권한 매트릭스
+
+| 명령어 유형 | 권한 | 예시 |
+|-------------|------|------|
+| Shell 감지 | `allow` | `echo $SHELL`, `echo $0` |
+| 환경 관리자 감지 | `allow` | `conda env list`, `which conda` |
+| Python 감지 | `allow` | `python --version`, `python -c "..."` |
+| GPU/CUDA 감지 | `allow` | `nvidia-smi`, `nvcc --version` |
+| 환경 활성화 | `ask` | `conda activate`, `source */activate` |
+| 파일 삭제 | `deny` | `rm *` |
+| 패키지 삭제 | `deny` | `conda remove`, `pip uninstall` |
+
+### 7.4 Agent 전체 코드
+
+`.opencode/agent/env-setup.md`:
+
+```markdown
+---
+description: 개발 환경 감지 및 설정 전문가
+mode: subagent
+model: opencode/gpt-oss-120b
+color: "#95A5A6"
+tools:
+  "*": false
+  "Bash": true
+  "Read": true
+  "Glob": true
+  "Grep": true
+permission:
+  bash:
+    # Shell 감지
+    "echo $SHELL": allow
+    "echo $0": allow
+    "*sh --version": allow
+    # 환경 관리자 감지
+    "which *": allow
+    "conda --version": allow
+    "conda info *": allow
+    "conda env list": allow
+    "conda list *": allow
+    "conda run *": allow
+    "uv --version": allow
+    # Python 감지
+    "python --version": allow
+    "python3 --version": allow
+    "python -c *": allow
+    "python3 -c *": allow
+    # GPU/CUDA 감지
+    "nvidia-smi *": allow
+    "nvcc --version": allow
+    # 환경 활성화 (사용자 확인)
+    "conda activate *": ask
+    "source *": ask
+    # 위험한 명령 차단
+    "rm *": deny
+    "conda remove *": deny
+    "pip uninstall *": deny
+    "*": deny
+  read: allow
+  edit: deny
+  glob: allow
+  grep: allow
+---
+
+# Environment Setup Agent
+
+당신은 개발 환경 감지 및 설정 전문가입니다.
+Code QA 워크플로우 시작 전에 올바른 실행 환경을 확인하고 설정합니다.
+
+## 역할
+
+1. **Shell 확인** - 사용자의 Shell 종류와 RC 파일 확인
+2. **환경 감지** - 현재 활성화된 conda/venv 환경 확인
+3. **환경 선택** - 사용자에게 환경 선택 요청 (필요 시)
+4. **더블 체크** - Python, CUDA, PyTorch 버전 확인
+
+## 실행 단계
+
+### STEP 1: Shell 확인
+\`\`\`bash
+echo $SHELL
+\`\`\`
+
+### STEP 2: 현재 환경 확인
+\`\`\`bash
+echo $CONDA_DEFAULT_ENV
+echo $VIRTUAL_ENV
+conda env list
+\`\`\`
+
+### STEP 3: 사용자 확인
+- 환경이 있으면: "이 환경을 사용할까요?"
+- 환경이 없으면: "어떤 환경을 사용할까요?"
+
+### STEP 4: 더블 체크
+\`\`\`bash
+python --version
+python -c "import torch; print(torch.version.cuda)"
+python -c "import torch; print(torch.__version__)"
+\`\`\`
+
+### STEP 5: 환경 리포트 출력
+```
+
+### 7.5 호출 방법
+
+다른 Agent나 Command에서 호출:
+
+```markdown
+# Code QA Command에서 호출
+@env-setup을 호출하여 환경 설정
+
+# 또는 직접 호출
+@env-setup 환경을 확인해주세요.
 ```
 
 ---
