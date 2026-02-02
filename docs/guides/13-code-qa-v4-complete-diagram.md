@@ -92,14 +92,14 @@
 
 ```mermaid
 flowchart TB
-    START(["/code-qa --last"]) --> ENV_SETUP
+    START(["code-qa --last"]) --> ENV_SETUP
 
     subgraph PHASE_NEG1["Phase -1: Environment Setup"]
-        ENV_SETUP["🔧 @env-setup"]
-        SHELL["Shell 확인<br/>zsh/bash/sh"]
-        ENV_CHECK["환경 확인<br/>conda/venv/uv"]
-        ENV_SELECT{{"환경 선택"}}
-        DOUBLE_CHECK["더블 체크<br/>Python/CUDA/PyTorch"]
+        ENV_SETUP["env-setup"]
+        SHELL["Shell 확인"]
+        ENV_CHECK["환경 확인"]
+        ENV_SELECT{"환경 선택"}
+        DOUBLE_CHECK["더블 체크"]
 
         ENV_SETUP --> SHELL --> ENV_CHECK --> ENV_SELECT --> DOUBLE_CHECK
     end
@@ -107,9 +107,9 @@ flowchart TB
     DOUBLE_CHECK --> GIT_INPUT
 
     subgraph PHASE_0["Phase 0: Git Input"]
-        GIT_INPUT["📂 @git-input"]
-        PARSE_MODE["모드 파싱<br/>--working/--staged/--last"]
-        EXTRACT_FILES["변경 파일 추출<br/>git diff --name-only"]
+        GIT_INPUT["git-input"]
+        PARSE_MODE["모드 파싱"]
+        EXTRACT_FILES["변경 파일 추출"]
 
         GIT_INPUT --> PARSE_MODE --> EXTRACT_FILES
     end
@@ -117,29 +117,29 @@ flowchart TB
     EXTRACT_FILES --> PRE_CHECK
 
     subgraph HOST_QA["Phase 1-4: 호스트 QA"]
-        PRE_CHECK["⚡ @pre-checker<br/>자동 수정"]
-        CODE_REVIEW["🔍 @code-reviewer<br/>심층 분석"]
-        CODE_FIX["🔧 @code-fixer<br/>이슈 수정"]
-        QUALITY["📋 @quality-checker<br/>품질 검사"]
+        PRE_CHECK["pre-checker"]
+        CODE_REVIEW["code-reviewer"]
+        CODE_FIX["code-fixer"]
+        QUALITY["quality-checker"]
 
         PRE_CHECK --> CODE_REVIEW --> CODE_FIX --> QUALITY
     end
 
-    QUALITY --> Q_CHECK{{"≥70%?"}}
-    Q_CHECK -->|No| RETRY_Q{{"회귀<3?"}}
+    QUALITY --> Q_CHECK{"70% 이상?"}
+    Q_CHECK -->|No| RETRY_Q{"회귀 3회 미만?"}
     RETRY_Q -->|Yes| CODE_FIX
-    RETRY_Q -->|No| HUMAN[/"사용자 개입"/]
+    RETRY_Q -->|No| HUMAN["사용자 개입"]
     HUMAN --> BUILD_TEST
 
     Q_CHECK -->|Yes| BUILD_TEST
 
-    subgraph SANDBOX["Phase 5-6: Docker Sandbox (GPU)"]
-        BUILD_TEST["🏗️ @build-tester"]
-        FUNC_TEST["🧪 @function-tester"]
+    subgraph SANDBOX["Phase 5-6: Docker Sandbox"]
+        BUILD_TEST["build-tester"]
+        FUNC_TEST["function-tester"]
 
-        BUILD_TEST --> B_CHECK{{"성공?"}}
+        BUILD_TEST --> B_CHECK{"성공?"}
         B_CHECK -->|Yes| FUNC_TEST
-        FUNC_TEST --> T_CHECK{{"통과?"}}
+        FUNC_TEST --> T_CHECK{"통과?"}
     end
 
     B_CHECK -->|No| CODE_FIX
@@ -148,32 +148,32 @@ flowchart TB
     T_CHECK -->|Yes| COMMIT
 
     subgraph HOST_GIT["Phase 7-9: Git 작업"]
-        COMMIT["📝 @git-committer"]
-        SUMMARY["📊 @summary-reporter"]
-        PUSH_PR["📤🔀 @git-pusher"]
+        COMMIT["git-committer"]
+        SUMMARY["summary-reporter"]
+        PUSH_PR["git-pusher"]
 
-        COMMIT --> HAS_CHANGE{{"수정?"}}
+        COMMIT --> HAS_CHANGE{"수정 있음?"}
         HAS_CHANGE -->|No| SUMMARY
-        HAS_CHANGE -->|Yes| COMMIT_MODE{{"입력모드?"}}
+        HAS_CHANGE -->|Yes| COMMIT_MODE{"입력 모드?"}
 
-        COMMIT_MODE -->|"커밋 전"| NEW_COMMIT["git commit -m"]
-        COMMIT_MODE -->|"커밋 후"| AMEND["git commit --amend"]
+        COMMIT_MODE -->|커밋전| NEW_COMMIT["새 커밋"]
+        COMMIT_MODE -->|커밋후| AMEND["amend"]
 
         NEW_COMMIT --> SUMMARY
         AMEND --> SUMMARY
         SUMMARY --> PUSH_PR
     end
 
-    PUSH_PR --> PUSH_ASK[/"❓ Push?""/]
-    PUSH_ASK --> PUSH_CHOICE{{"선택"}}
-    PUSH_CHOICE -->|No| DONE_LOCAL([✅ 완료<br/>로컬만])
+    PUSH_PR --> PUSH_ASK["Push 할까요?"]
+    PUSH_ASK --> PUSH_CHOICE{"선택"}
+    PUSH_CHOICE -->|No| DONE_LOCAL(["완료 - 로컬만"])
     PUSH_CHOICE -->|Yes| DO_PUSH["git push"]
 
-    DO_PUSH --> PR_ASK[/"❓ PR 생성?"/]
-    PR_ASK --> PR_CHOICE{{"선택"}}
-    PR_CHOICE -->|No| DONE_PUSH([✅ 완료<br/>Push만])
+    DO_PUSH --> PR_ASK["PR 생성할까요?"]
+    PR_ASK --> PR_CHOICE{"선택"}
+    PR_CHOICE -->|No| DONE_PUSH(["완료 - Push만"])
     PR_CHOICE -->|Yes| CREATE_PR["PR 생성"]
-    CREATE_PR --> DONE([🎉 완료!])
+    CREATE_PR --> DONE(["완료!"])
 
     style PHASE_NEG1 fill:#95A5A622,stroke:#95A5A6
     style PHASE_0 fill:#34495E22,stroke:#34495E
@@ -190,51 +190,51 @@ flowchart TB
 sequenceDiagram
     autonumber
 
-    actor User as 👤 User
-    participant CMD as /code-qa
-    participant ENV as 🔧 env-setup
-    participant GIT as 📂 git-input
-    participant QA as 호스트 QA
-    participant SANDBOX as 🐳 Docker Sandbox
-    participant COMMIT as 📝 git-committer
-    participant REPORT as 📊 summary-reporter
-    participant PUSH as 📤 git-pusher
+    actor User
+    participant CMD as code-qa
+    participant ENV as env-setup
+    participant GIT as git-input
+    participant QA as Host QA
+    participant SANDBOX as Docker Sandbox
+    participant COMMIT as git-committer
+    participant REPORT as summary-reporter
+    participant PUSH as git-pusher
 
     User->>CMD: /code-qa --last
 
     rect rgb(149, 165, 166, 0.2)
         Note over ENV: Phase -1
         CMD->>ENV: 환경 확인 요청
-        ENV->>ENV: Shell 감지 (zsh)
+        ENV->>ENV: Shell 감지
         ENV->>ENV: conda env 확인
-        ENV-->>User: 현재 환경(ml-dev) 사용?
+        ENV-->>User: 환경 사용 확인
         User->>ENV: Yes
-        ENV->>ENV: 더블 체크 (Python/CUDA)
+        ENV->>ENV: 더블 체크
         ENV-->>CMD: 환경 리포트
     end
 
     rect rgb(52, 73, 94, 0.2)
         Note over GIT: Phase 0
         CMD->>GIT: Git diff 추출
-        GIT->>GIT: git diff HEAD~1 --name-only
+        GIT->>GIT: git diff HEAD~1
         GIT-->>CMD: 변경 파일 5개
     end
 
     rect rgb(52, 152, 219, 0.2)
         Note over QA: Phase 1-4
         CMD->>QA: QA 시작
-        QA->>QA: Pre-Check (자동 수정)
-        QA->>QA: Code Review (분석)
-        QA->>QA: Code Fix (수정)
-        QA->>QA: Quality Check (85%)
+        QA->>QA: Pre-Check
+        QA->>QA: Code Review
+        QA->>QA: Code Fix
+        QA->>QA: Quality Check
         QA-->>CMD: QA 완료
     end
 
     rect rgb(230, 126, 34, 0.2)
-        Note over SANDBOX: Phase 5-6 (GPU)
+        Note over SANDBOX: Phase 5-6
         CMD->>SANDBOX: docker run --gpus all
-        SANDBOX->>SANDBOX: Build Test ✅
-        SANDBOX->>SANDBOX: Function Test ✅
+        SANDBOX->>SANDBOX: Build Test
+        SANDBOX->>SANDBOX: Function Test
         SANDBOX-->>CMD: 테스트 통과
     end
 
@@ -250,15 +250,15 @@ sequenceDiagram
     rect rgb(142, 68, 173, 0.2)
         Note over PUSH: Phase 9
         CMD->>PUSH: Push 요청
-        PUSH-->>User: ❓ Push 할까요?
+        PUSH-->>User: Push 할까요?
         User->>PUSH: Yes
-        PUSH->>PUSH: git push --force-with-lease
-        PUSH-->>User: ❓ PR 생성할까요?
+        PUSH->>PUSH: git push
+        PUSH-->>User: PR 생성할까요?
         User->>PUSH: Yes
-        PUSH-->>User: PR 생성 완료!
+        PUSH-->>User: PR 생성 완료
     end
 
-    CMD-->>User: 🎉 Code QA 완료!
+    CMD-->>User: Code QA 완료
 ```
 
 ---
