@@ -638,13 +638,33 @@ project-root/
 
 ```markdown
 ---
-description: "Code QA 워크플로우 v4 (Environment + Git 통합)"
+description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
 model: opencode/gpt-oss-120b
 ---
 
 # Code QA Workflow v4
 
 $ARGUMENTS
+
+## 설정
+
+MAX_RETRY = 3
+QUALITY_THRESHOLD = 70
+
+## 입력 옵션
+
+### Git 옵션
+- (기본값): `--working` (git diff)
+- `--staged`: staged 변경만
+- `--last`: 마지막 커밋
+- `--branch`: 브랜치 전체
+- `--range <a>..<b>`: 특정 범위
+
+### Sandbox 옵션
+- (기본값): Docker Sandbox에서 Build/Test 실행 (GPU 지원)
+- `--no-sandbox`: 호스트에서 직접 Build/Test 실행
+
+---
 
 ## Phase -1: Environment Setup
 
@@ -656,38 +676,93 @@ $ARGUMENTS
 3. 환경이 없으면 사용자에게 선택 요청
 4. Python, CUDA, PyTorch 버전 더블 체크
 
-## Phase 0-5: QA 파이프라인
+## Phase 0: Git Input
 
-순차적으로 호출:
-1. @pre-checker - 자동 수정
-2. @code-reviewer - 심층 분석
-3. @code-fixer - 이슈 수정
-4. @quality-checker - 품질 검사
-5. @build-tester - 빌드 테스트
-6. @function-tester - 기능 테스트
+@git-input을 호출하여:
+1. 입력 모드 파싱 ($ARGUMENTS에서)
+2. 변경 파일 추출
+3. 검사 대상 목록 생성
 
-## Phase 6-8: Commit & Push
+## Phase 1-3: 코드 분석 및 수정
 
-1. @git-committer - 커밋/amend
-2. @summary-reporter - 결과 리포트
-3. @git-pusher - Push & PR (사용자 확인 필수)
+순차적으로 호출 (호스트에서 실행):
+
+1. **@pre-checker** - 자동 수정 (lint --fix, format)
+2. **@code-reviewer** - 심층 코드 분석
+3. **@code-fixer** - 발견된 이슈 수정
+
+## Phase 4: Quality Check
+
+**@quality-checker** - 품질 점수 검사 (≥70% 필요)
+
+## Phase 5-6: Build & Test
+
+### 기본값 (Docker Sandbox 실행)
+
+Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
+
+5. **@build-tester** - Docker 컨테이너에서 빌드 테스트
+6. **@function-tester** - Docker 컨테이너에서 기능 테스트
+
+### `--no-sandbox` 플래그가 있는 경우 (호스트 실행)
+
+5. **@build-tester --no-sandbox** - 호스트에서 빌드 테스트
+6. **@function-tester --no-sandbox** - 호스트에서 기능 테스트
+
+## 회귀 조건
+
+- Quality Check < 70% → @code-fixer로 회귀 (최대 3회)
+- Build 실패 → @code-fixer로 회귀
+- Test 실패 → @code-fixer로 회귀
+
+## Phase 7: Commit
+
+@git-committer를 호출하여:
+1. 수정 여부 확인 (`git status --porcelain`)
+2. 수정 있으면:
+   - 커밋 전 모드 (`--working`/`--staged`) → 새 커밋
+   - 커밋 후 모드 (`--last`/`--branch`) → amend
+
+## Phase 8: Summary Report
+
+@summary-reporter를 호출하여:
+1. 전체 QA 결과 수집
+2. Markdown 형식 리포트 생성
+3. 사용자에게 출력
+
+## Phase 9: Push & PR
+
+@git-pusher를 호출하여:
+1. **사용자에게 Push 여부 확인** (필수)
+2. Push 승인 시 실행
+3. **사용자에게 PR 생성 여부 확인**
+4. PR 승인 시 PR 정보 수집 및 생성
+
+## 중요 규칙
+
+1. **Phase -1은 항상 먼저 실행** - 환경 설정 없이 QA 진행 금지
+2. **Phase 9의 모든 remote 작업은 사용자 확인 필수**
+3. **강제 푸시 시 경고 표시**
+4. **회귀 최대 3회**
+5. **Build/Test는 기본적으로 Docker Sandbox에서 실행** (nvidia-docker 필요)
+6. **호스트에서 실행하려면 `--no-sandbox` 플래그 사용**
 ```
 
 ### 8.5 Phase별 Agent 호출
 
-| Phase | Agent | 역할 |
-|-------|-------|------|
-| -1 | `@env-setup` | 환경 설정 |
-| 0 | `@git-input` | Git diff 추출 |
-| 1 | `@pre-checker` | 자동 수정 |
-| 2 | `@code-reviewer` | 심층 분석 |
-| 3 | `@code-fixer` | 이슈 수정 |
-| 4 | `@quality-checker` | 품질 검사 |
-| 5 | `@build-tester` | 빌드 테스트 |
-| 6 | `@function-tester` | 기능 테스트 |
-| 7 | `@git-committer` | 커밋 |
-| 8 | `@summary-reporter` | 결과 리포트 |
-| 9 | `@git-pusher` | Push & PR |
+| Phase | Agent | 역할 | 실행 환경 |
+|-------|-------|------|-----------|
+| -1 | `@env-setup` | 환경 설정 | 호스트 |
+| 0 | `@git-input` | Git diff 추출 | 호스트 |
+| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | 호스트 |
+| 2 | `@code-reviewer` | 심층 코드 분석 | 호스트 |
+| 3 | `@code-fixer` | 이슈 수정 | 호스트 |
+| 4 | `@quality-checker` | 품질 검사 (≥70%) | 호스트 |
+| 5 | `@build-tester` | 빌드 테스트 | **Sandbox (기본)** |
+| 6 | `@function-tester` | 기능 테스트 | **Sandbox (기본)** |
+| 7 | `@git-committer` | 커밋/amend | 호스트 |
+| 8 | `@summary-reporter` | 결과 리포트 | 호스트 |
+| 9 | `@git-pusher` | Push & PR (사용자 확인) | 호스트 |
 
 ---
 
@@ -707,11 +782,15 @@ Docker Sandbox는 Build와 Test를 격리된 Docker 컨테이너에서 실행하
 ### 9.2 사용법
 
 ```bash
-# Docker Sandbox에서 실행 (기본값)
+# Docker Sandbox에서 Build/Test 실행 (기본값)
 > /code-qa --last
 
-# 호스트에서 직접 실행
+# 호스트에서 직접 Build/Test 실행 (Sandbox 비활성화)
 > /code-qa --last --no-sandbox
+
+# 다른 Git 옵션과 함께 사용
+> /code-qa --staged              # Sandbox (기본)
+> /code-qa --branch --no-sandbox # 호스트 실행
 ```
 
 ### 9.3 파일 구조
@@ -786,7 +865,7 @@ sandbox:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         /code-qa --last --sandbox                                │
+│                         /code-qa --last (Sandbox 기본값)                         │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
 │  Phase -1 ~ 4: 호스트에서 실행                                                   │
