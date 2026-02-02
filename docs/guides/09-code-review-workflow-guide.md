@@ -1,5 +1,15 @@
 # Code Review 워크플로우 가이드
 
+> ⚠️ **참고:** 이 문서는 Code QA v2 기준입니다.
+> 최신 버전은 [Code QA v4 (Environment + Sandbox)](./12-environment-setup-workflow.md)를 참조하세요.
+>
+> **v4 주요 변경사항:**
+> - **Phase -1: Environment Setup** - Shell/conda/venv 환경 자동 감지
+> - **Docker Sandbox** - Build/Test를 격리된 컨테이너에서 실행 (기본값)
+> - **Git 통합** - diff/commit 기반 입력, 자동 amend, Push/PR 지원
+
+---
+
 ## 개요
 
 이 가이드는 OpenCode Agent를 활용하여 **Code Review → Code Fix → Quality Check → Build Test → Function Test** 파이프라인을 구성하는 방법을 설명합니다.
@@ -1041,6 +1051,8 @@ permission:
 
 ## 관련 문서
 
+- [Code QA v3 (Git 통합)](./11-code-qa-workflow-v3-git-integrated.md)
+- [**Code QA v4 (Environment + Sandbox)** ⭐](./12-environment-setup-workflow.md)
 - [Custom Agent 가이드](./02-custom-agent-guide.md)
 - [Git Rebase 워크플로우](./04-git-rebase-porting-workflow.md)
 - [통합 설정 가이드](./05-integrated-configuration.md)

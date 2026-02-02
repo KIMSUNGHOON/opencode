@@ -1,5 +1,15 @@
 # Code QA 워크플로우 v3 (Git 통합)
 
+> ⚠️ **최신 버전 안내:** v4가 출시되었습니다.
+> [Code QA v4 (Environment + Sandbox)](./12-environment-setup-workflow.md)를 참조하세요.
+>
+> **v3 → v4 개선사항:**
+> - **Phase -1: Environment Setup** - Shell/conda/venv 환경 자동 감지
+> - **Docker Sandbox** - Build/Test를 격리된 컨테이너에서 실행 (기본값)
+> - **env-config.yaml** - 환경 설정 파일 지원
+
+---
+
 ## 개요
 
 이 문서는 **Git 기반 Code QA 워크플로우**의 완전한 버전을 설명합니다. Git diff/commit을 입력으로 받아 QA를 수행하고, 수정 후 자동으로 커밋을 amend하며, 사용자 확인 후 Push/PR까지 지원합니다.
@@ -1018,6 +1028,7 @@ sequenceDiagram
 
 ## 관련 문서
 
+- [**Code QA v4 (Environment + Sandbox)** ⭐](./12-environment-setup-workflow.md)
 - [Code QA 워크플로우 v2](./10-code-qa-workflow-v2.md)
 - [Git Rebase 워크플로우](./04-git-rebase-porting-workflow.md)
 - [Custom Agent 가이드](./02-custom-agent-guide.md)
