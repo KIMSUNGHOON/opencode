@@ -1,7 +1,7 @@
 ---
 description: 코드 품질 점수 검사
 mode: subagent
-model: opencode/qwen3-coder-30b
+model: qwen/qwen3-coder-30b
 color: "#F39C12"
 tools:
   "*": false

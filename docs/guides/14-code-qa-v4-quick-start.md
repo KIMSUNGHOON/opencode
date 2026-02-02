@@ -7,7 +7,7 @@
 1. [개요](#1-개요)
 2. [설치](#2-설치)
 3. [글로벌 설정](#3-글로벌-설정)
-4. [프로젝트 설정](#4-프로젝트-설정)
+4. [환경 설정](#4-환경-설정-선택)
 5. [Agent 파일](#5-agent-파일)
 6. [사용 방법](#6-사용-방법)
 7. [문제 해결](#7-문제-해결)
@@ -40,11 +40,10 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 ```
 ~/.config/opencode/
-└── opencode.json              # 글로벌 설정 (Provider, Model 정의)
+└── opencode.json              # 글로벌 설정 (Provider, Model, Agent 포함)
 
 your-project/
 ├── .opencode/
-│   ├── opencode.json          # 프로젝트 설정 (Agent 오버라이드)
 │   ├── env-config.yaml        # 환경 설정 (선택)
 │   ├── agent/
 │   │   ├── env-setup.md       # Phase -1
@@ -84,22 +83,23 @@ nvidia-docker --version  # GPU 사용 시
 ## 3. 글로벌 설정
 
 글로벌 설정 파일을 `~/.config/opencode/opencode.json`에 생성합니다.
+Provider, Model, Agent 설정을 모두 포함합니다.
 
 ### 3.1 글로벌 설정 파일 (복사해서 사용)
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/gpt-oss-120b",
-  "small_model": "opencode/qwen3-coder-30b",
+  "model": "gpt-oss/gpt-oss-120b",
+  "small_model": "qwen/qwen3-coder-30b",
   "provider": {
-    "opencode": {
-      "name": "OpenCode LLM Server",
+    "gpt-oss": {
+      "name": "GPT-OSS-120B Server",
       "npm": "@ai-sdk/openai-compatible",
-      "api": "http://localhost:30000/v1",
+      "api": "http://localhost:8000/v1",
       "options": {
         "apiKey": "dummy",
-        "baseURL": "http://localhost:30000/v1",
+        "baseURL": "http://localhost:8000/v1",
         "timeout": 300000
       },
       "models": {
@@ -113,10 +113,22 @@ nvidia-docker --version  # GPU 사용 시
             "context": 131072,
             "output": 8192
           }
-        },
+        }
+      }
+    },
+    "qwen": {
+      "name": "Qwen3-Coder-30B Server",
+      "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8001/v1",
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8001/v1",
+        "timeout": 300000
+      },
+      "models": {
         "qwen3-coder-30b": {
           "name": "Qwen3-Coder-30B (Agentic)",
-          "id": "qwen3-coder-30b-a3b-instruct",
+          "id": "qwen3-coder-30b",
           "tool_call": true,
           "temperature": true,
           "reasoning": false,
@@ -127,6 +139,19 @@ nvidia-docker --version  # GPU 사용 시
         }
       }
     }
+  },
+  "agents": {
+    "env-setup": { "model": "qwen/qwen3-coder-30b" },
+    "git-input": { "model": "qwen/qwen3-coder-30b" },
+    "pre-checker": { "model": "qwen/qwen3-coder-30b" },
+    "code-reviewer": { "model": "gpt-oss/gpt-oss-120b" },
+    "code-fixer": { "model": "qwen/qwen3-coder-30b" },
+    "quality-checker": { "model": "qwen/qwen3-coder-30b" },
+    "build-tester": { "model": "qwen/qwen3-coder-30b" },
+    "function-tester": { "model": "qwen/qwen3-coder-30b" },
+    "git-committer": { "model": "qwen/qwen3-coder-30b" },
+    "summary-reporter": { "model": "gpt-oss/gpt-oss-120b" },
+    "git-pusher": { "model": "qwen/qwen3-coder-30b" }
   }
 }
 ```
@@ -140,13 +165,23 @@ nvidia-docker --version  # GPU 사용 시
 | `provider.{name}.api` | LLM 서버 API 엔드포인트 |
 | `provider.{name}.options` | API 연결 옵션 |
 | `provider.{name}.models` | 사용 가능한 모델 목록 |
+| `agents.{name}.model` | Agent별 모델 오버라이드 |
 
-### 3.3 모델 설정 상세
+### 3.3 Provider 설정
+
+두 모델이 별도 포트로 서빙되므로 Provider를 분리합니다:
+
+| Provider | 모델 | 포트 | 용도 |
+|----------|------|------|------|
+| `gpt-oss` | GPT-OSS-120B | 8000 | CoT 추론 (code-reviewer, summary-reporter) |
+| `qwen` | Qwen3-Coder-30B | 8001 | Agentic/Tool Calling (나머지 9개) |
+
+### 3.4 모델 설정 상세
 
 ```json
 "gpt-oss-120b": {
   "name": "GPT-OSS-120B (Reasoning)",  // 표시 이름
-  "id": "gpt-oss-120b",                 // 서버에서 사용하는 모델 ID
+  "id": "gpt-oss-120b",                 // SGLang 서버의 모델 ID
   "tool_call": true,                    // Tool/Function Calling 지원
   "temperature": true,                  // Temperature 조절 지원
   "reasoning": true,                    // Chain-of-Thought 지원
@@ -159,55 +194,7 @@ nvidia-docker --version  # GPU 사용 시
 
 ---
 
-## 4. 프로젝트 설정
-
-프로젝트별 설정은 `.opencode/opencode.json`에 생성합니다.
-
-### 4.1 프로젝트 설정 파일 (복사해서 사용)
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "extends": "~/.config/opencode/opencode.json",
-  "agents": {
-    "env-setup": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "git-input": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "pre-checker": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "code-reviewer": {
-      "model": "opencode/gpt-oss-120b"
-    },
-    "code-fixer": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "quality-checker": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "build-tester": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "function-tester": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "git-committer": {
-      "model": "opencode/qwen3-coder-30b"
-    },
-    "summary-reporter": {
-      "model": "opencode/gpt-oss-120b"
-    },
-    "git-pusher": {
-      "model": "opencode/qwen3-coder-30b"
-    }
-  }
-}
-```
-
-### 4.2 환경 설정 파일 (선택)
+## 4. 환경 설정 (선택)
 
 `.opencode/env-config.yaml`:
 
@@ -267,7 +254,7 @@ Agent 파일들은 `.opencode/agent/` 디렉토리에 위치합니다.
 ---
 description: Agent 설명
 mode: subagent
-model: opencode/qwen3-coder-30b
+model: qwen/qwen3-coder-30b
 color: "#3498DB"
 tools:
   "*": false
@@ -286,6 +273,8 @@ permission:
 
 역할 및 실행 단계 설명...
 ```
+
+> **Note**: Agent 파일의 `model` 필드는 글로벌 설정의 `agents` 섹션으로 오버라이드됩니다.
 
 ### 5.3 Permission 규칙
 
@@ -391,9 +380,15 @@ Error: Failed to connect to model server
 ```
 
 **해결:**
-1. LLM 서버 상태 확인: `curl http://localhost:30000/v1/models`
-2. 글로벌 설정의 `api` URL 확인
-3. 방화벽 설정 확인
+```bash
+# GPT-OSS-120B 서버 확인
+curl http://localhost:8000/v1/models
+
+# Qwen3-Coder-30B 서버 확인
+curl http://localhost:8001/v1/models
+```
+- 글로벌 설정의 `api` URL 확인 (8000, 8001 포트)
+- 방화벽 설정 확인
 
 ### 7.2 Docker Sandbox 실패
 

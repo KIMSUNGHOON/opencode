@@ -1,7 +1,7 @@
 ---
 description: 기능 테스트 전문가 (Docker Sandbox)
 mode: subagent
-model: opencode/qwen3-coder-30b
+model: qwen/qwen3-coder-30b
 color: "#3498DB"
 tools:
   "*": false

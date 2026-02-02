@@ -1,7 +1,7 @@
 ---
 description: 심층 코드 분석 전문가 (Chain-of-Thought)
 mode: subagent
-model: opencode/gpt-oss-120b
+model: gpt-oss/gpt-oss-120b
 color: "#E74C3C"
 tools:
   "*": false

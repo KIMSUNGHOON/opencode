@@ -1,7 +1,7 @@
 ---
 description: QA 결과 종합 리포터 (Chain-of-Thought)
 mode: subagent
-model: opencode/gpt-oss-120b
+model: gpt-oss/gpt-oss-120b
 color: "#9B59B6"
 tools:
   "*": false
