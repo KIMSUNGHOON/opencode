@@ -53,6 +53,7 @@ OpenCode TUI에서 build/function test를 수행하기 위해 올바른 실행 �
 5. [환경 리포트](#5-환경-리포트)
 6. [다이어그램](#6-다이어그램)
 7. [Agent 정의](#7-agent-정의)
+8. [Command 통합](#8-command-통합)
 
 ---
 
@@ -571,6 +572,121 @@ python -c "import torch; print(torch.__version__)"
 # 또는 직접 호출
 @env-setup 환경을 확인해주세요.
 ```
+
+---
+
+## 8. Command 통합
+
+### 8.1 파일 위치
+
+```
+project-root/
+└── .opencode/
+    └── command/
+        └── code-qa.md      # Code QA v4 Command
+```
+
+### 8.2 사용법
+
+```bash
+# 기본 (working 변경사항)
+> /code-qa
+
+# staged 변경만
+> /code-qa --staged
+
+# 마지막 커밋
+> /code-qa --last
+
+# 브랜치 전체
+> /code-qa --branch
+```
+
+### 8.3 실행 흐름
+
+```
+/code-qa 실행
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase -1: @env-setup 호출                                  │
+│  ├─ Shell 확인                                              │
+│  ├─ 환경 확인/선택                                          │
+│  └─ 더블 체크                                               │
+└─────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 0-5: QA 파이프라인                                    │
+│  ├─ Git Input → Pre-Check → Review → Fix                   │
+│  └─ Quality → Build → Test                                  │
+└─────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 6-8: Commit & Push                                    │
+│  ├─ Commit/Amend                                            │
+│  ├─ Summary Report                                          │
+│  └─ Push & PR (사용자 확인)                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.4 Command 전체 코드
+
+`.opencode/command/code-qa.md`:
+
+```markdown
+---
+description: "Code QA 워크플로우 v4 (Environment + Git 통합)"
+model: opencode/gpt-oss-120b
+---
+
+# Code QA Workflow v4
+
+$ARGUMENTS
+
+## Phase -1: Environment Setup
+
+**먼저 @env-setup을 호출하여 실행 환경을 확인합니다.**
+
+@env-setup에게 다음을 요청:
+1. Shell 확인 (zsh/bash/sh)
+2. 현재 활성화된 환경 확인
+3. 환경이 없으면 사용자에게 선택 요청
+4. Python, CUDA, PyTorch 버전 더블 체크
+
+## Phase 0-5: QA 파이프라인
+
+순차적으로 호출:
+1. @pre-checker - 자동 수정
+2. @code-reviewer - 심층 분석
+3. @code-fixer - 이슈 수정
+4. @quality-checker - 품질 검사
+5. @build-tester - 빌드 테스트
+6. @function-tester - 기능 테스트
+
+## Phase 6-8: Commit & Push
+
+1. @git-committer - 커밋/amend
+2. @summary-reporter - 결과 리포트
+3. @git-pusher - Push & PR (사용자 확인 필수)
+```
+
+### 8.5 Phase별 Agent 호출
+
+| Phase | Agent | 역할 |
+|-------|-------|------|
+| -1 | `@env-setup` | 환경 설정 |
+| 0 | `@git-input` | Git diff 추출 |
+| 1 | `@pre-checker` | 자동 수정 |
+| 2 | `@code-reviewer` | 심층 분석 |
+| 3 | `@code-fixer` | 이슈 수정 |
+| 4 | `@quality-checker` | 품질 검사 |
+| 5 | `@build-tester` | 빌드 테스트 |
+| 6 | `@function-tester` | 기능 테스트 |
+| 7 | `@git-committer` | 커밋 |
+| 8 | `@summary-reporter` | 결과 리포트 |
+| 9 | `@git-pusher` | Push & PR |
 
 ---
 
