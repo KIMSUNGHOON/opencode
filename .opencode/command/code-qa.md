@@ -24,7 +24,8 @@ QUALITY_THRESHOLD = 70
 - `--range <a>..<b>`: 특정 범위
 
 ### Sandbox 옵션
-- `--sandbox`: Docker 컨테이너에서 Build/Test 실행 (GPU 지원)
+- (기본값): Docker Sandbox에서 Build/Test 실행 (GPU 지원)
+- `--no-sandbox`: 호스트에서 직접 Build/Test 실행
 
 ---
 
@@ -69,15 +70,12 @@ QUALITY_THRESHOLD = 70
 
 ## Phase 5-6: Build & Test
 
-### `--sandbox` 플래그가 없는 경우 (호스트 실행)
+### 기본값 (Docker Sandbox 실행)
 
-5. **@build-tester** - 호스트에서 빌드 테스트
-6. **@function-tester** - 호스트에서 기능 테스트
+Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
 
-### `--sandbox` 플래그가 있는 경우 (Docker 실행)
-
-5. **@build-tester --sandbox** - Docker 컨테이너에서 빌드 테스트
-6. **@function-tester --sandbox** - Docker 컨테이너에서 기능 테스트
+5. **@build-tester** - Docker 컨테이너에서 빌드 테스트
+6. **@function-tester** - Docker 컨테이너에서 기능 테스트
 
 #### Sandbox 실행 방법
 
@@ -100,11 +98,16 @@ docker run --gpus all --rm \
   python -m pytest tests/ -v || npm test
 ```
 
+### `--no-sandbox` 플래그가 있는 경우 (호스트 실행)
+
+5. **@build-tester --no-sandbox** - 호스트에서 빌드 테스트
+6. **@function-tester --no-sandbox** - 호스트에서 기능 테스트
+
 #### Sandbox 설정 (env-config.yaml)
 
 ```yaml
 sandbox:
-  enabled: false                    # --sandbox 플래그로 활성화
+  enabled: true                     # 기본값: Docker Sandbox 사용
   dockerfile: ".opencode/docker/Dockerfile.sandbox"
   image_name: "qa-sandbox"
   gpu: true                         # nvidia-docker 사용
@@ -160,4 +163,5 @@ sandbox:
 2. **Phase 9의 모든 remote 작업은 사용자 확인 필수**
 3. **강제 푸시 시 경고 표시**
 4. **회귀 최대 3회**
-5. **--sandbox 사용 시 Docker와 nvidia-docker 필요**
+5. **Build/Test는 기본적으로 Docker Sandbox에서 실행** (nvidia-docker 필요)
+6. **호스트에서 실행하려면 `--no-sandbox` 플래그 사용**

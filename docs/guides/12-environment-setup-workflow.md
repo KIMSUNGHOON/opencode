@@ -707,11 +707,11 @@ Docker Sandbox는 Build와 Test를 격리된 Docker 컨테이너에서 실행하
 ### 9.2 사용법
 
 ```bash
-# 호스트에서 실행 (기본값)
+# Docker Sandbox에서 실행 (기본값)
 > /code-qa --last
 
-# Docker Sandbox에서 실행
-> /code-qa --last --sandbox
+# 호스트에서 직접 실행
+> /code-qa --last --no-sandbox
 ```
 
 ### 9.3 파일 구조
@@ -773,7 +773,7 @@ requirements:
 
 # Sandbox 설정
 sandbox:
-  enabled: false                    # --sandbox 플래그로 활성화
+  enabled: true                     # 기본값: Docker Sandbox 사용
   dockerfile: ".opencode/docker/Dockerfile.sandbox"
   image_name: "qa-sandbox"
   gpu: true                         # nvidia-docker 사용
