@@ -1,0 +1,85 @@
+# =============================================================================
+# OpenCode QA Sandbox - Python/CUDA 범용 템플릿
+# =============================================================================
+#
+# 사용법:
+#   docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
+#   docker run --gpus all -v $(pwd):/workspace qa-sandbox <command>
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Base Image: NVIDIA CUDA + Python
+# -----------------------------------------------------------------------------
+ARG CUDA_VERSION=11.8.0
+ARG PYTHON_VERSION=3.11
+
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Python version
+ARG PYTHON_VERSION
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+
+# Workspace
+WORKDIR /workspace
+
+# -----------------------------------------------------------------------------
+# System Dependencies
+# -----------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python${PYTHON_VERSION}-venv \
+    python3-pip \
+    # Build tools
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    # Utilities
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    # Python symlinks
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python \
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
+
+# -----------------------------------------------------------------------------
+# Python Package Manager (pip upgrade)
+# -----------------------------------------------------------------------------
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# -----------------------------------------------------------------------------
+# Project Dependencies (if requirements.txt exists)
+# -----------------------------------------------------------------------------
+# 이 부분은 빌드 시 프로젝트 의존성을 설치합니다.
+# 캐시 레이어를 활용하기 위해 requirements.txt만 먼저 복사합니다.
+
+COPY requirements*.txt ./
+RUN if [ -f requirements.txt ]; then \
+        pip install -r requirements.txt; \
+    fi && \
+    if [ -f requirements-dev.txt ]; then \
+        pip install -r requirements-dev.txt; \
+    fi
+
+# -----------------------------------------------------------------------------
+# Source Code (마지막에 복사 - 캐시 활용)
+# -----------------------------------------------------------------------------
+# 실제 실행 시에는 볼륨 마운트를 사용하므로 이 단계는 선택적입니다.
+# COPY . .
+
+# -----------------------------------------------------------------------------
+# Default Command
+# -----------------------------------------------------------------------------
+CMD ["python", "--version"]

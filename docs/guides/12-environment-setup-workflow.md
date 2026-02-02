@@ -54,6 +54,7 @@ OpenCode TUI에서 build/function test를 수행하기 위해 올바른 실행 �
 6. [다이어그램](#6-다이어그램)
 7. [Agent 정의](#7-agent-정의)
 8. [Command 통합](#8-command-통합)
+9. [Docker Sandbox](#9-docker-sandbox)
 
 ---
 
@@ -687,6 +688,151 @@ $ARGUMENTS
 | 7 | `@git-committer` | 커밋 |
 | 8 | `@summary-reporter` | 결과 리포트 |
 | 9 | `@git-pusher` | Push & PR |
+
+---
+
+## 9. Docker Sandbox
+
+### 9.1 개요
+
+Docker Sandbox는 Build와 Test를 격리된 Docker 컨테이너에서 실행하는 기능입니다.
+
+| 항목 | 호스트 실행 | Sandbox 실행 |
+|------|-------------|--------------|
+| 환경 | 호스트 의존 | 격리된 컨테이너 |
+| 재현성 | 환경마다 다름 | 동일한 결과 |
+| GPU | 직접 사용 | nvidia-docker |
+| 속도 | 빠름 | 첫 빌드 느림 (캐시 후 빠름) |
+
+### 9.2 사용법
+
+```bash
+# 호스트에서 실행 (기본값)
+> /code-qa --last
+
+# Docker Sandbox에서 실행
+> /code-qa --last --sandbox
+```
+
+### 9.3 파일 구조
+
+```
+project-root/
+└── .opencode/
+    ├── docker/
+    │   └── Dockerfile.sandbox    # 범용 Dockerfile
+    └── env-config.yaml           # sandbox 설정 포함
+```
+
+### 9.4 Dockerfile 템플릿
+
+`.opencode/docker/Dockerfile.sandbox`:
+
+```dockerfile
+# Base Image: NVIDIA CUDA + Python
+ARG CUDA_VERSION=11.8.0
+ARG PYTHON_VERSION=3.11
+
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /workspace
+
+# System Dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python3-pip \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python symlinks
+RUN ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python
+
+# Project Dependencies
+COPY requirements*.txt ./
+RUN pip install -r requirements.txt
+
+CMD ["python", "--version"]
+```
+
+### 9.5 env-config.yaml 설정
+
+```yaml
+# 기존 설정
+shell:
+  type: "zsh"
+environment:
+  name: "ml-dev"
+  type: "conda"
+requirements:
+  python: ">=3.10"
+  cuda: ">=11.8"
+  torch: ">=2.0"
+
+# Sandbox 설정
+sandbox:
+  enabled: false                    # --sandbox 플래그로 활성화
+  dockerfile: ".opencode/docker/Dockerfile.sandbox"
+  image_name: "qa-sandbox"
+  gpu: true                         # nvidia-docker 사용
+  build_args:
+    CUDA_VERSION: "11.8.0"
+    PYTHON_VERSION: "3.11"
+```
+
+### 9.6 실행 흐름
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         /code-qa --last --sandbox                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  Phase -1 ~ 4: 호스트에서 실행                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  @env-setup → @git-input → @pre-checker → @code-reviewer               │   │
+│  │  → @code-fixer → @quality-checker                                       │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  Phase 5-6: Docker Sandbox에서 실행                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  1. Docker 이미지 빌드 (캐시 활용)                                       │   │
+│  │     $ docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .│   │
+│  │                                                                          │   │
+│  │  2. Build 테스트 (GPU)                                                   │   │
+│  │     $ docker run --gpus all -v $(pwd):/workspace qa-sandbox \           │   │
+│  │         python -m pytest tests/ --tb=short                               │   │
+│  │                                                                          │   │
+│  │  3. Function 테스트 (GPU)                                                │   │
+│  │     $ docker run --gpus all -v $(pwd):/workspace qa-sandbox \           │   │
+│  │         python -m pytest tests/ -v                                       │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  Phase 7-9: 호스트에서 실행                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  @git-committer → @summary-reporter → @git-pusher                       │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.7 요구사항
+
+| 요구사항 | 설명 |
+|----------|------|
+| Docker | Docker Engine 설치 필요 |
+| nvidia-docker | GPU 사용 시 NVIDIA Container Toolkit 필요 |
+| CUDA Driver | 호스트에 NVIDIA 드라이버 설치 필요 |
+
+### 9.8 장점
+
+- 호스트 환경 오염 없음
+- 재현 가능한 빌드/테스트
+- CI/CD와 동일한 환경
+- 의존성 격리
 
 ---
 

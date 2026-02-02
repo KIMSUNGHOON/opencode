@@ -1,5 +1,5 @@
 ---
-description: "Code QA 워크플로우 v4 (Environment + Git 통합)"
+description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
 model: opencode/gpt-oss-120b
 ---
 
@@ -16,11 +16,15 @@ QUALITY_THRESHOLD = 70
 
 ## 입력 옵션
 
+### Git 옵션
 - (기본값): `--working` (git diff)
 - `--staged`: staged 변경만
 - `--last`: 마지막 커밋
 - `--branch`: 브랜치 전체
 - `--range <a>..<b>`: 특정 범위
+
+### Sandbox 옵션
+- `--sandbox`: Docker 컨테이너에서 Build/Test 실행 (GPU 지원)
 
 ---
 
@@ -47,18 +51,71 @@ QUALITY_THRESHOLD = 70
 
 ---
 
-## Phase 1-5: QA 파이프라인
+## Phase 1-3: 코드 분석 및 수정
 
-순차적으로 호출:
+순차적으로 호출 (호스트에서 실행):
 
 1. **@pre-checker** - 자동 수정 (lint --fix, format)
 2. **@code-reviewer** - 심층 코드 분석
 3. **@code-fixer** - 발견된 이슈 수정
-4. **@quality-checker** - 품질 점수 검사 (≥70% 필요)
-5. **@build-tester** - 빌드 테스트
-6. **@function-tester** - 기능 테스트
 
-### 회귀 조건
+---
+
+## Phase 4: Quality Check
+
+**@quality-checker** - 품질 점수 검사 (≥70% 필요)
+
+---
+
+## Phase 5-6: Build & Test
+
+### `--sandbox` 플래그가 없는 경우 (호스트 실행)
+
+5. **@build-tester** - 호스트에서 빌드 테스트
+6. **@function-tester** - 호스트에서 기능 테스트
+
+### `--sandbox` 플래그가 있는 경우 (Docker 실행)
+
+5. **@build-tester --sandbox** - Docker 컨테이너에서 빌드 테스트
+6. **@function-tester --sandbox** - Docker 컨테이너에서 기능 테스트
+
+#### Sandbox 실행 방법
+
+```bash
+# Docker 이미지 빌드 (첫 실행 시 또는 캐시 무효화 시)
+docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
+
+# 빌드 테스트 (GPU 사용)
+docker run --gpus all --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  python -m pytest tests/ --tb=short || npm run build
+
+# 기능 테스트 (GPU 사용)
+docker run --gpus all --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  python -m pytest tests/ -v || npm test
+```
+
+#### Sandbox 설정 (env-config.yaml)
+
+```yaml
+sandbox:
+  enabled: false                    # --sandbox 플래그로 활성화
+  dockerfile: ".opencode/docker/Dockerfile.sandbox"
+  image_name: "qa-sandbox"
+  gpu: true                         # nvidia-docker 사용
+  build_args:
+    CUDA_VERSION: "11.8.0"
+    PYTHON_VERSION: "3.11"
+```
+
+---
+
+## 회귀 조건
 
 - Quality Check < 70% → @code-fixer로 회귀 (최대 3회)
 - Build 실패 → @code-fixer로 회귀
@@ -66,7 +123,7 @@ QUALITY_THRESHOLD = 70
 
 ---
 
-## Phase 6: Commit
+## Phase 7: Commit
 
 @git-committer를 호출하여:
 1. 수정 여부 확인 (`git status --porcelain`)
@@ -76,7 +133,7 @@ QUALITY_THRESHOLD = 70
 
 ---
 
-## Phase 7: Summary Report
+## Phase 8: Summary Report
 
 @summary-reporter를 호출하여:
 1. 전체 QA 결과 수집
@@ -85,7 +142,7 @@ QUALITY_THRESHOLD = 70
 
 ---
 
-## Phase 8: Push & PR
+## Phase 9: Push & PR
 
 @git-pusher를 호출하여:
 1. **사용자에게 Push 여부 확인** (필수)
@@ -100,6 +157,7 @@ QUALITY_THRESHOLD = 70
 ## 중요 규칙
 
 1. **Phase -1은 항상 먼저 실행** - 환경 설정 없이 QA 진행 금지
-2. **Phase 8의 모든 remote 작업은 사용자 확인 필수**
+2. **Phase 9의 모든 remote 작업은 사용자 확인 필수**
 3. **강제 푸시 시 경고 표시**
 4. **회귀 최대 3회**
+5. **--sandbox 사용 시 Docker와 nvidia-docker 필요**
