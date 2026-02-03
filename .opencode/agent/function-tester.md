@@ -113,36 +113,39 @@ Docker Sandbox 또는 호스트 환경에서 테스트를 실행합니다.
 
 ### STEP 1: 테스트 탐지 및 사용자 확인 (필수)
 
+**⚠️ 중요: 모든 언어 테스트를 한 번에 탐색하고, 사용자에게 한 번만 확인받습니다.**
+
+언어별로 따로 물어보지 말고, 아래 명령을 **한 번에 실행**하여 모든 테스트를 탐지하세요:
+
 ```bash
-# Python 테스트
-ls tests/ test_*.py *_test.py pytest.ini pyproject.toml 2>/dev/null
+# 모든 테스트 파일 한 번에 탐지 (단일 명령)
+echo "=== 테스트 탐지 시작 ===" && \
+ls -la tests/ test/ __tests__/ spec/ src/test/ Tests/ 2>/dev/null; \
+find . -maxdepth 3 -type f \( \
+  -name "test_*.py" -o -name "*_test.py" -o \
+  -name "*.test.js" -o -name "*.test.ts" -o -name "*.spec.js" -o -name "*.spec.ts" -o \
+  -name "*_test.cpp" -o -name "test_*.cpp" -o -name "*_test.c" -o \
+  -name "*Test.java" -o -name "*Tests.java" -o \
+  -name "*_test.go" -o \
+  -name "*_test.rs" -o \
+  -name "*_spec.rb" -o -name "*_test.rb" -o \
+  -name "*Test.php" -o \
+  -name "*Tests.swift" \
+\) 2>/dev/null | head -50; \
+echo "=== 설정 파일 확인 ===" && \
+ls pytest.ini pyproject.toml jest.config.* CMakeLists.txt pom.xml build.gradle \
+   Cargo.toml phpunit.xml Package.swift Gemfile go.mod 2>/dev/null
+```
 
-# JavaScript/TypeScript 테스트
-ls __tests__/ *.test.js *.test.ts *.spec.js *.spec.ts jest.config.* 2>/dev/null
+**또는 Glob 도구 사용 (권장):**
 
-# C/C++ 테스트 (Google Test, CTest)
-ls tests/ test/ *_test.cpp test_*.cpp CMakeLists.txt 2>/dev/null
-
-# Java 테스트 (JUnit)
-ls src/test/ *Test.java *Tests.java pom.xml build.gradle 2>/dev/null
-
-# Go 테스트
-ls *_test.go 2>/dev/null
-
-# Rust 테스트
-ls tests/ src/**/test*.rs Cargo.toml 2>/dev/null
-
-# Ruby 테스트 (RSpec)
-ls spec/ test/ *_spec.rb *_test.rb 2>/dev/null
-
-# PHP 테스트 (PHPUnit)
-ls tests/ phpunit.xml *Test.php 2>/dev/null
-
-# Swift 테스트
-ls Tests/ *Tests.swift Package.swift 2>/dev/null
+```
+Glob 패턴: **/test*.*  또는  **/*test*.*  또는  **/*_test.*
 ```
 
 **⚠️ 테스트 탐지 결과를 보여주고 반드시 사용자 확인을 받으세요:**
+
+**⚠️ 중요: 언어별로 여러 번 물어보지 말고, 모든 언어 테스트를 한 번에 보여주고 한 번만 확인받으세요!**
 
 **테스트 파일이 발견된 경우:**
 ```
@@ -150,21 +153,34 @@ ls Tests/ *Tests.swift Package.swift 2>/dev/null
 🧪 테스트 탐지 결과 (사용자 확인 필수)
 ═══════════════════════════════════════════════════════════════
 
-발견된 테스트:
-┌──────────────┬─────────────────────────────────────────────┐
-│ 프레임워크   │ {pytest/jest/go test/cargo test/...}        │
-│ 테스트 경로  │ {tests/, __tests__/, ...}                   │
-│ 테스트 파일  │ {파일 개수}개                               │
-│ 설정 파일    │ {pytest.ini, jest.config.js, ...}           │
-└──────────────┴─────────────────────────────────────────────┘
+발견된 테스트 (언어별 요약):
+┌──────────────────┬──────────────┬─────────────────────────────┐
+│ 언어             │ 프레임워크   │ 테스트 파일                 │
+├──────────────────┼──────────────┼─────────────────────────────┤
+│ Python           │ pytest       │ tests/test_*.py (5개)       │
+│ JavaScript       │ jest         │ __tests__/*.test.js (3개)   │
+│ Go               │ go test      │ *_test.go (2개)             │
+│ ...              │ ...          │ ...                         │
+└──────────────────┴──────────────┴─────────────────────────────┘
 
-발견된 테스트 파일 목록:
-- {test_file_1}
-- {test_file_2}
-- ...
+총 발견된 테스트: {전체 파일 개수}개
 
-➡️ 테스트를 실행하려면 "실행" 또는 "y"를 입력해주세요:
-➡️ 테스트를 스킵하려면 "스킵" 또는 "n"을 입력해주세요:
+📁 테스트 파일 목록:
+┌─────────────────────────────────────────────────────────────┐
+│ [Python]     tests/test_processor.py                        │
+│ [Python]     tests/test_utils.py                            │
+│ [JavaScript] __tests__/api.test.js                          │
+│ [Go]         pkg/handler_test.go                            │
+│ ...                                                         │
+└─────────────────────────────────────────────────────────────┘
+
+🔧 감지된 설정 파일:
+- pytest.ini, jest.config.js, go.mod
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+➡️ 모든 테스트를 실행하려면 "실행" 또는 "y"를 입력해주세요.
+➡️ 특정 언어만 실행하려면 언어를 입력해주세요. (예: python, javascript)
+➡️ 테스트를 스킵하려면 "스킵" 또는 "n"을 입력해주세요.
 ═══════════════════════════════════════════════════════════════
 ```
 

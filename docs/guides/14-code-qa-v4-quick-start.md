@@ -24,9 +24,11 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 ### 1.2 주요 특징
 
 - **단일 모델 전략**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling)
-- **사용자 확인 단계**: env-setup, build-tester, function-tester에서 필수 확인
-- **Docker Sandbox**: 격리된 Build/Test 환경
+- **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
+- **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
 - **회귀 루프**: 품질 기준 미달 시 자동 재시도 (최대 3회)
+- **GitLab-CE 지원**: GitHub 및 GitLab 모두 지원 (gh/glab CLI)
+- **인증 오류 처리**: SSH/HTTPS/GPG/CLI 인증 문제 감지 및 안내
 
 ### 1.3 모델 스펙
 
@@ -322,20 +324,30 @@ opencode
 
 ### 6.4 사용자 확인 단계
 
-다음 3개의 Agent에서 사용자 입력을 요구합니다:
+다음 Agent들에서 사용자 입력을 요구합니다:
 
 | Agent | 필요한 입력 | 설명 |
 |-------|------------|------|
 | **env-setup** | Shell 선택 (1-3), 환경 타입 선택 (1-4) | 어떤 Shell과 가상환경을 사용할지 선택 |
+| **git-input** | "초기화/git init", 파일 경로, 또는 "종료/exit" | Git 저장소가 아닌 경우 처리 방법 선택 |
 | **build-tester** | "확인/y" 또는 "재설정/n" | 환경 설정이 올바른지 확인 후 빌드 진행 |
-| **function-tester** | "실행/y" 또는 "스킵/n" | 테스트 존재 여부 확인 후 실행 여부 결정 |
+| **function-tester** | "실행/y", 특정 언어, 또는 "스킵/n" | 모든 언어 테스트 한 번에 표시 후 실행 여부 결정 |
+| **git-committer** | "확인/y", 새 메시지, 또는 "취소/n" | 커밋 정보 확인 후 커밋 실행 여부 결정 |
+| **git-pusher** | "확인/y", "재시도", 또는 "스킵/n" | Push 여부 및 인증 오류 처리 |
 
 ### 6.5 워크플로우 진행 과정
 
 ```
 Phase -1: Environment Setup (사용자 입력 필수)
+    │
     ↓
-Phase 0: Git Input
+Phase 0: Git Input ────────────────┐
+    │                               │ (Git 저장소 아님)
+    │                               ↓
+    │                          사용자 선택
+    │                          - 초기화 → 계속
+    │                          - 파일 지정 → 계속
+    │                          - 종료 → 워크플로우 종료
     ↓
 Phase 1: Pre-Check (Lint/Format)
     ↓
@@ -352,17 +364,26 @@ Phase 5: Build Test (사용자 확인)   │
     ↓ (성공)                         │
     │                                │
 Phase 6: Function Test (사용자 확인)│
+    │    └─ 모든 언어 한 번에 표시   │
+    │    └─ 한 번만 확인 요청        │
     │                                │
     └──→ 실패 시 ───────────────────┘
                         ↓
                    Code Fixer로 회귀
                    (최대 3회)
     ↓
-Phase 7: Git Commit
+Phase 7: Git Commit (사용자 확인 필수)
+    │    └─ 커밋 정보 미리보기
+    │    └─ 메시지 수정 가능
     ↓
 Phase 8: Summary Report
     ↓
-Phase 9: Push & PR (사용자 확인)
+Phase 9: Push & PR/MR (사용자 확인)
+    │    └─ GitHub: gh pr create
+    │    └─ GitLab: glab mr create
+    │    └─ 인증 오류 시: 해결 안내
+    ↓
+워크플로우 완료
 ```
 
 ---
@@ -467,13 +488,73 @@ ls .opencode/agent/
 
 ### 8.5 WAITING_INPUT 상태에서 멈춤
 
-env-setup, build-tester, function-tester에서 사용자 입력을 기다리는 상태입니다.
+env-setup, git-input, build-tester, function-tester, git-committer에서 사용자 입력을 기다리는 상태입니다.
 
 **해결**: 요청된 입력을 제공하세요:
 - Shell 선택: `1`, `2`, 또는 `3`
 - 환경 타입: `1`, `2`, `3`, 또는 `4`
 - 확인: `y` 또는 `확인`
 - 스킵: `n` 또는 `스킵`
+- Git 초기화: `git init` 또는 `초기화`
+- 커밋 메시지 수정: 새 메시지 직접 입력
+
+### 8.6 Git 저장소가 아닌 경우 (NO_GIT_REPO)
+
+```
+GIT_INPUT_RESULT: NO_GIT_REPO
+```
+
+**해결**:
+- Git 저장소로 초기화: `git init` 또는 `초기화` 입력
+- 특정 파일만 QA: 파일 경로 입력 (예: `src/main.py`)
+- QA 종료: `종료` 또는 `exit` 입력
+
+### 8.7 인증 오류 (AUTH_ERROR)
+
+```
+PUSH_RESULT: AUTH_ERROR
+AUTH_TYPE: SSH
+```
+
+**해결**: 인증 유형에 따라 다음 명령 실행
+
+| 오류 유형 | 해결 명령 |
+|----------|----------|
+| SSH 키 없음 | `ssh-keygen -t ed25519` |
+| SSH agent 비활성 | `eval "$(ssh-agent -s)"` |
+| SSH 키 미등록 | `ssh-add ~/.ssh/id_ed25519` |
+| GitHub CLI 미인증 | `gh auth login` |
+| GitLab CLI 미인증 | `glab auth login` |
+| GPG 서명 실패 | `gpg --list-secret-keys` |
+
+### 8.8 GitLab-CE Push/MR 실패
+
+```
+Error: glab not found
+```
+
+**해결**:
+```bash
+# GitLab CLI 설치
+# macOS
+brew install glab
+
+# Linux (snap)
+sudo snap install glab
+
+# 또는 pip
+pip install python-gitlab
+
+# 인증
+glab auth login
+```
+
+**GitLab-CE (self-hosted) 설정:**
+```bash
+# GitLab instance 설정
+glab config set host your-gitlab.example.com
+glab auth login --hostname your-gitlab.example.com
+```
 
 ---
 

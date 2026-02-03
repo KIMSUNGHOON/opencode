@@ -118,13 +118,16 @@ test_confirmed = false        # function-tester 테스트 확인 여부
 
 ## 사용자 입력이 필요한 Agent들
 
-다음 3개의 Agent는 반드시 사용자 입력을 받아야 진행됩니다:
+다음 Agent들은 반드시 사용자 입력을 받아야 진행됩니다:
 
 | Agent | 필요한 입력 | 대기 상태 |
 |-------|------------|----------|
 | env-setup | Shell 선택 (1-3), 환경 타입 선택 (1-4) | `WAITING_INPUT` |
+| git-input | Git 저장소 없을 때: 초기화/파일 지정/종료 | `NO_GIT_REPO` |
 | build-tester | 환경 확인 ("확인/y" 또는 "재설정/n") | `WAITING_INPUT` |
 | function-tester | 테스트 실행 여부 ("실행/y" 또는 "스킵/n") | `WAITING_INPUT` |
+| git-committer | 커밋 확인 ("확인/y" 또는 "취소/n") | `WAITING_INPUT` |
+| git-pusher | Push 확인, 인증 오류 시 재시도/스킵 | `AUTH_ERROR` |
 
 **WAITING_INPUT 상태 처리:**
 1. Agent가 `WAITING_INPUT`을 반환하면, 사용자 응답을 기다립니다
@@ -161,6 +164,21 @@ Task 도구 호출:
 - subagent_type: "git-input"
 - prompt: "사용자의 입력 옵션을 파싱하고 변경 파일 목록을 추출하세요"
 - description: "Git 입력 파싱"
+
+**⚠️ Git 저장소 없음 처리:**
+```
+IF Task 결과에 "GIT_INPUT_RESULT: NO_GIT_REPO" 포함:
+    → 사용자 응답을 기다립니다
+    → 사용자가 "git init" 또는 "초기화" 입력 시: git-input 다시 호출
+    → 사용자가 파일 경로 입력 시: 해당 파일을 changed_files로 사용
+    → 사용자가 "종료" 또는 "exit" 입력 시: 워크플로우 종료
+
+IF Task 결과에 "GIT_INPUT_RESULT: ABORTED" 포함:
+    → 워크플로우 종료
+
+IF Task 결과에 "GIT_INPUT_RESULT: SUCCESS" 포함:
+    → STEP 3으로 진행
+```
 
 **결과 저장:** Task 결과에서 파일 목록을 추출하여 `changed_files`에 저장
 
@@ -266,11 +284,26 @@ IF Task 결과에 "TEST_RESULT: SKIPPED" 또는 "TEST_RESULT: NO_TESTS" 포함:
 → 성공/스킵: STEP 9로
 → 실패: STEP 5로 회귀 (최대 3회)
 
-### STEP 9: Git Commit
+### STEP 9: Git Commit (사용자 확인 필수)
 Task 도구 호출:
 - subagent_type: "git-committer"
-- prompt: "변경 사항을 커밋하세요"
+- prompt: "변경 사항을 커밋하세요. 먼저 커밋 정보(파일 목록, 커밋 메시지)를 보여주고 사용자의 확인을 받은 후에만 커밋을 실행하세요."
 - description: "Git 커밋"
+
+**⚠️ 사용자 입력 대기 처리:**
+```
+IF Task 결과에 "COMMIT_RESULT: WAITING_INPUT" 포함:
+    → 사용자가 커밋 정보를 확인할 때까지 기다립니다
+    → 사용자가 "확인/y"를 입력하면 커밋 진행
+    → 사용자가 새 메시지를 입력하면 해당 메시지로 커밋
+    → 사용자가 "취소/n"을 입력하면 커밋 스킵
+
+IF Task 결과에 "COMMIT_RESULT: SUCCESS" 포함:
+    → STEP 10으로 진행
+
+IF Task 결과에 "COMMIT_RESULT: SKIPPED" 또는 "COMMIT_RESULT: NO_CHANGES" 포함:
+    → STEP 10으로 진행 (커밋 스킵)
+```
 
 → 완료 시 STEP 10으로
 
@@ -304,11 +337,33 @@ Task 도구 호출:
 
 → 완료 시 STEP 11로
 
-### STEP 11: Push & PR
+### STEP 11: Push & PR/MR
 Task 도구 호출:
 - subagent_type: "git-pusher"
-- prompt: "사용자에게 Push 여부를 확인하고, PR 생성 여부도 확인하세요"
-- description: "Push 및 PR"
+- prompt: "원격 저장소 플랫폼(GitHub/GitLab)을 감지하고, 사용자에게 Push 여부를 확인하세요. Push 후 PR(GitHub) 또는 MR(GitLab) 생성 여부도 확인하세요."
+- description: "Push 및 PR/MR"
+
+**⚠️ 인증 오류 처리:**
+```
+IF Task 결과에 "PUSH_RESULT: AUTH_ERROR" 포함:
+    → 인증 오류 유형(SSH/HTTPS/GPG/CLI)과 해결 방법을 사용자에게 안내
+    → 사용자가 "재시도"를 입력하면 git-pusher 다시 호출
+    → 사용자가 "스킵"을 입력하면 Push 스킵하고 워크플로우 종료
+
+IF Task 결과에 "PUSH_RESULT: SUCCESS" 포함:
+    → 워크플로우 종료 (성공)
+
+IF Task 결과에 "PUSH_RESULT: SKIPPED" 포함:
+    → 워크플로우 종료 (Push 스킵)
+
+IF Task 결과에 "PUSH_RESULT: FAIL" 포함:
+    → 오류 메시지 출력 후 워크플로우 종료
+```
+
+**플랫폼별 PR/MR 생성:**
+- GitHub: `gh pr create` 사용
+- GitLab/GitLab-CE: `glab mr create` 사용
+- 기타: 수동 생성 안내
 
 → 완료: 워크플로우 종료
 
