@@ -58,7 +58,9 @@ your-project/
 │   │   ├── summary-reporter.md# Phase 8
 │   │   └── git-pusher.md      # Phase 9
 │   ├── command/
-│   │   └── code-qa.md         # 메인 워크플로우
+│   │   └── code-qa.md         # Command 워크플로우
+│   ├── mode/
+│   │   └── code-qa.md         # Mode 워크플로우
 │   └── docker/
 │       └── Dockerfile.sandbox # Sandbox 이미지 (선택)
 └── ...
@@ -295,7 +297,31 @@ permission:
 
 ## 6. 사용 방법
 
-### 6.1 기본 사용
+### 6.1 Mode vs Command
+
+Code QA는 두 가지 방식으로 사용할 수 있습니다:
+
+| 방식 | 위치 | 사용법 | 용도 |
+|------|------|--------|------|
+| **Mode** | `.opencode/mode/code-qa.md` | 모드 선택기에서 "code-qa" 선택 | 지속적인 QA 세션 |
+| **Command** | `.opencode/command/code-qa.md` | `/code-qa [options]` | 일회성 QA 실행 |
+
+#### Mode로 사용하기
+
+opencode의 build, plan 등과 같이 모드 선택기에서 "code-qa"를 선택하면 Code QA 워크플로우 오케스트레이터 모드로 전환됩니다.
+
+```
+# opencode 실행 후 모드 선택기에서:
+> code-qa (Code QA 워크플로우 - 자동화된 코드 품질 검사)
+```
+
+Mode를 선택하면 대화 전체가 Code QA 워크플로우 컨텍스트에서 진행됩니다.
+
+#### Command로 사용하기
+
+특정 옵션과 함께 일회성으로 QA를 실행할 때 사용합니다.
+
+### 6.2 기본 사용
 
 ```bash
 # Working directory 변경 검사 (기본값)
@@ -314,7 +340,7 @@ permission:
 /code-qa --range abc123..def456
 ```
 
-### 6.2 Sandbox 옵션
+### 6.3 Sandbox 옵션
 
 ```bash
 # Docker Sandbox에서 실행 (기본값)
@@ -324,7 +350,7 @@ permission:
 /code-qa --no-sandbox
 ```
 
-### 6.3 조합 사용
+### 6.4 조합 사용
 
 ```bash
 # Staged 변경을 호스트에서 검사
@@ -334,7 +360,7 @@ permission:
 /code-qa --last
 ```
 
-### 6.4 워크플로우 진행 과정
+### 6.5 워크플로우 진행 과정
 
 ```
 Phase -1: Environment Setup
