@@ -173,17 +173,34 @@ Shell에 따른 RC 파일:
 
 ### STEP 2: 가상 환경 타입 선택 (사용자 입력 필수)
 
-**⚠️ 중요: Non-interactive shell에서 conda 초기화 필요**
+**⚠️ 중요: Bash tool은 별도 프로세스로 실행되어 사용자의 zsh 환경을 상속받지 않음**
+
+> 사용자가 zsh에서 opencode를 실행해도, Bash tool은 `/bin/bash`로 새 프로세스를 생성합니다.
+> 따라서 ~/.zshrc의 conda init, 환경 변수 등이 자동으로 로드되지 않습니다.
 
 ```bash
-# Conda 초기화 (non-interactive shell에서 필수)
-# conda가 설치된 경우 conda.sh를 source하여 초기화
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
-    source "/opt/conda/etc/profile.d/conda.sh"
+# Conda 초기화 (Bash tool은 사용자의 zsh 환경을 상속받지 않으므로 필수)
+# 다양한 conda 설치 경로 지원
+CONDA_SH=""
+for path in \
+    "$HOME/anaconda3/etc/profile.d/conda.sh" \
+    "$HOME/miniconda3/etc/profile.d/conda.sh" \
+    "$HOME/.conda/etc/profile.d/conda.sh" \
+    "/opt/conda/etc/profile.d/conda.sh" \
+    "/usr/local/anaconda3/etc/profile.d/conda.sh" \
+    "/usr/local/miniconda3/etc/profile.d/conda.sh"
+do
+    if [ -f "$path" ]; then
+        CONDA_SH="$path"
+        break
+    fi
+done
+
+if [ -n "$CONDA_SH" ]; then
+    source "$CONDA_SH"
+    echo "Conda 초기화됨: $CONDA_SH"
+else
+    echo "Conda를 찾을 수 없습니다"
 fi
 
 # 사용 가능한 환경 관리자 확인
@@ -250,14 +267,10 @@ RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
 
 **conda 선택 시:**
 ```bash
-# Conda 초기화 (non-interactive shell에서 필수)
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
-    source "/opt/conda/etc/profile.d/conda.sh"
-fi
+# Conda 초기화
+for path in "$HOME/anaconda3" "$HOME/miniconda3" "$HOME/.conda" "/opt/conda"; do
+    [ -f "$path/etc/profile.d/conda.sh" ] && source "$path/etc/profile.d/conda.sh" && break
+done
 
 # 환경 목록 조회
 conda env list
@@ -353,14 +366,10 @@ venv 가상 환경 옵션:
 ### STEP 4: 환경 활성화 확인
 
 ```bash
-# Conda 초기화 (non-interactive shell에서 필수)
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
-    source "/opt/conda/etc/profile.d/conda.sh"
-fi
+# Conda 초기화
+for path in "$HOME/anaconda3" "$HOME/miniconda3" "$HOME/.conda" "/opt/conda"; do
+    [ -f "$path/etc/profile.d/conda.sh" ] && source "$path/etc/profile.d/conda.sh" && break
+done
 
 # conda 환경 활성화 확인
 echo "Conda 환경: $CONDA_DEFAULT_ENV"
