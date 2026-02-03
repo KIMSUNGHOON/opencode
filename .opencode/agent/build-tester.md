@@ -10,6 +10,22 @@ tools:
   "Glob": true
 permission:
   bash:
+    # 환경 상태 확인 (STEP 0)
+    "echo *": allow
+    "echo $SHELL": allow
+    "echo $CONDA_DEFAULT_ENV": allow
+    "echo $VIRTUAL_ENV": allow
+    "python --version": allow
+    "python3 --version": allow
+    "node --version": allow
+    "go version": allow
+    "cargo --version": allow
+    "rustc --version": allow
+    "java --version": allow
+    "javac --version": allow
+    "gcc --version": allow
+    "g++ --version": allow
+    "clang --version": allow
     # Docker 명령
     "docker build *": allow
     "docker run *": allow
@@ -101,7 +117,70 @@ Docker Sandbox 또는 호스트 환경에서 빌드를 테스트합니다.
 
 ## 빌드 프로세스
 
-### STEP 1: 환경 확인
+### STEP 0: 환경 상태 검증 (필수)
+
+**빌드 시작 전 반드시 환경 상태를 확인해야 합니다.**
+
+```bash
+# 1. Shell 확인
+echo "Current Shell: $SHELL"
+
+# 2. 가상 환경 활성화 상태 확인
+echo "Conda Env: $CONDA_DEFAULT_ENV"
+echo "Virtual Env: $VIRTUAL_ENV"
+
+# 3. Python 경로 확인 (Python 프로젝트)
+which python python3
+python --version 2>/dev/null || python3 --version
+
+# 4. 언어별 런타임 확인
+which node npm 2>/dev/null && node --version
+which go 2>/dev/null && go version
+which cargo rustc 2>/dev/null && cargo --version
+which java javac 2>/dev/null && java --version
+which gcc g++ clang 2>/dev/null && gcc --version
+```
+
+**환경 검증 체크리스트:**
+```
+═══════════════════════════════════════════════════════════════
+🔍 Pre-Build Environment Check
+═══════════════════════════════════════════════════════════════
+
+✅ Shell: {shell_type} 확인됨
+✅ 가상 환경: {env_type}/{env_name} 활성화됨
+✅ Python: {version} 확인됨
+✅ 필요한 런타임 설치됨
+
+⚠️ 문제 발견 시:
+- 가상 환경 미활성화: "conda activate {env}" 또는 "source venv/bin/activate" 실행 필요
+- 런타임 미설치: 해당 언어 런타임 설치 필요
+
+═══════════════════════════════════════════════════════════════
+```
+
+**환경 검증 실패 시:**
+```
+═══════════════════════════════════════════════════════════════
+❌ Environment Check Failed
+═══════════════════════════════════════════════════════════════
+
+문제:
+- {문제 설명}
+
+해결 방법:
+1. {해결 단계 1}
+2. {해결 단계 2}
+
+환경 설정 후 다시 빌드를 시도해주세요.
+
+ENV_CHECK_RESULT: FAIL
+═══════════════════════════════════════════════════════════════
+```
+
+**환경 검증이 성공해야만 STEP 1로 진행합니다.**
+
+### STEP 1: Docker/호스트 환경 확인
 
 ```bash
 # Sandbox 모드인 경우 Docker 확인
