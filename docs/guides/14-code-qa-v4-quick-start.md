@@ -98,24 +98,72 @@ docker --version
 nvidia-docker --version  # GPU 사용 시
 ```
 
-### 2.3 모델 서버 배포
+### 2.3 모델 서버 배포 (SGLang)
+
+SGLang을 사용하여 모델 서버를 배포합니다.
+
+#### SGLang vs vLLM
+
+| 항목 | SGLang | vLLM |
+|------|--------|------|
+| **처리량** | 16,215 tok/s | 12,553 tok/s (+29%) |
+| **동시 요청** | 안정적 (75-78 tok/s) | 감소 (37→35 tok/s) |
+| **Multi-turn** | RadixAttention (~10% 향상) | 기본 |
+| **Qwen3-Next 최적화** | MambaRadixCache, NEXTN | - |
+
+> **권장: SGLang** - Multi-turn 대화, 긴 컨텍스트, 안정적 성능
+
+#### 설치
 
 ```bash
-# vLLM 최신 버전 설치
-pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+# SGLang 설치
+pip install "sglang[all]>=0.4.6"
 
+# FlashInfer 설치 (성능 향상)
+pip install flashinfer -i https://flashinfer.ai/whl/cu124/torch2.5/
+```
+
+#### 기본 배포
+
+```bash
 # 2x H100 NVL - 256K context
-vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --context-length 262144 \
   --port 8000 \
-  --tensor-parallel-size 2 \
-  --max-model-len 262144 \
-  --gpu-memory-utilization 0.9
+  --host 0.0.0.0
 
 # 1x H100 NVL - 128K context (최소 구성)
-vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --context-length 131072 \
   --port 8000 \
-  --max-model-len 131072 \
-  --gpu-memory-utilization 0.9
+  --host 0.0.0.0
+```
+
+#### 고성능 배포 (Speculative Decoding)
+
+단일 사용자 추론 시 ~30% 성능 향상:
+
+```bash
+# NEXTN Speculative Decoding (2x H100 NVL)
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --context-length 262144 \
+  --speculative-algo NEXTN \
+  --speculative-num-steps 3 \
+  --speculative-eagle-topk 1 \
+  --speculative-num-draft-tokens 4 \
+  --port 8000 \
+  --host 0.0.0.0
+```
+
+#### 서버 상태 확인
+
+```bash
+curl http://localhost:8000/v1/models
 ```
 
 ---
@@ -421,15 +469,18 @@ Error: Failed to connect to model server
 
 **해결:**
 ```bash
-# vLLM 서버 상태 확인
+# SGLang 서버 상태 확인
 curl http://localhost:8000/v1/models
 
+# 서버 health check
+curl http://localhost:8000/health
+
 # 서버 로그 확인
-tail -f /var/log/vllm.log
+# (SGLang은 stdout으로 로그 출력)
 ```
 - 글로벌 설정의 `api` URL 확인
 - 방화벽 설정 확인
-- vLLM 서버 재시작
+- SGLang 서버 재시작
 
 ### 7.2 OOM (Out of Memory) 오류
 
@@ -440,9 +491,18 @@ Error: CUDA out of memory
 **해결:**
 ```bash
 # Context 길이 줄이기
-vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
-  --max-model-len 131072 \  # 256K → 128K
-  --gpu-memory-utilization 0.85  # 0.9 → 0.85
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --context-length 131072 \  # 256K → 128K
+  --port 8000
+
+# 또는 chunked prefill 사용
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --chunked-prefill-size 4096 \
+  --port 8000
 ```
 
 ### 7.3 Docker Sandbox 실패

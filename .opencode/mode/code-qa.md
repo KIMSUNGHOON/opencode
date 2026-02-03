@@ -300,15 +300,25 @@ TASK_RETRY_DELAY = 2000  # 재시도 간격 (ms)
 - Context 128K 제한
 ```
 
-### 배포 명령어
+### 배포 명령어 (SGLang)
 
 ```bash
 # 2x H100 NVL - 256K context
-vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --context-length 262144 \
   --port 8000 \
-  --tensor-parallel-size 2 \
-  --max-model-len 262144 \
-  --gpu-memory-utilization 0.9
+  --host 0.0.0.0
+
+# 고성능 배포 (NEXTN Speculative Decoding, ~30% 향상)
+python3 -m sglang.launch_server \
+  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --tp 2 \
+  --context-length 262144 \
+  --speculative-algo NEXTN \
+  --speculative-num-steps 3 \
+  --port 8000
 ```
 
 ---
