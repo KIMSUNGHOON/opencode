@@ -1,23 +1,20 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // "plugin": ["opencode-openai-codex-auth"],
-  // "enterprise": {
-  //   "url": "https://enterprise.dev.opencode.ai",
-  // },
-  "instructions": ["STYLE_GUIDE.md"],
   "provider": {
-    "opencode": {
-      "options": {},
+    "gpt-oss": {
+      "options": {
+        "timeout": 600000,
+        "baseURL": "{env:GPT_OSS_BASE_URL}"
+      }
     },
+    "qwen": {
+      "options": {
+        "timeout": 300000,
+        "baseURL": "{env:QWEN_BASE_URL}"
+      }
+    }
   },
-  "mcp": {
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-    },
-  },
-  "tools": {
-    "github-triage": false,
-    "github-pr-search": false,
-  },
+  "experimental": {
+    "chatMaxRetries": 5
+  }
 }

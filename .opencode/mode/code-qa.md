@@ -230,4 +230,76 @@ Task 도구 호출:
 ```
 MAX_RETRY = 3
 QUALITY_THRESHOLD = 70
+TASK_RETRY = 3           # Task 호출 재시도 횟수
+TASK_RETRY_DELAY = 2000  # 재시도 간격 (ms)
+FALLBACK_MODEL = "qwen/qwen3-coder-30b"
+```
+
+---
+
+## 에러 핸들링 및 Fallback
+
+### Task 호출 실패 시 처리
+
+Task 호출이 실패하거나 응답이 없는 경우:
+
+```
+task_retry_count = 0
+max_task_retry = 3
+
+WHILE task_retry_count < max_task_retry:
+    Task 호출 시도
+
+    IF 성공:
+        BREAK
+    ELSE IF "pending" OR "timeout" OR 응답 없음:
+        task_retry_count += 1
+        WAIT 2초
+        CONTINUE
+
+IF task_retry_count >= max_task_retry:
+    # Fallback: Qwen 모델로 재시도
+    Task 호출 (model: "qwen/qwen3-coder-30b")
+```
+
+### Fallback 전략
+
+1. **1차 시도**: GPT-OSS-120B로 Task 호출
+2. **재시도**: 실패 시 3회까지 재시도 (2초 간격)
+3. **Fallback**: 3회 실패 시 Qwen3-Coder-30B로 전환
+
+### Task 호출 시 model 파라미터 사용
+
+Fallback 시 model 파라미터를 명시적으로 전달:
+
+```json
+{
+  "name": "task",
+  "arguments": {
+    "subagent_type": "code-reviewer",
+    "prompt": "코드를 분석하세요...",
+    "description": "코드 리뷰",
+    "model": "qwen/qwen3-coder-30b"
+  }
+}
+```
+
+### 에러 유형별 처리
+
+| 에러 유형 | 처리 방법 |
+|----------|----------|
+| pending/timeout | 재시도 (최대 3회) |
+| 응답 끊김 | 재시도 (최대 3회) |
+| 모델 과부하 | Fallback 모델로 전환 |
+| 네트워크 에러 | 재시도 후 Fallback |
+
+### 실패 로그 출력
+
+Task 실패 시 다음 형식으로 로그 출력:
+
+```
+⚠️ Task 실패: {agent_name}
+- 시도: {retry_count}/3
+- 에러: {error_message}
+- 다음 동작: {retry/fallback/abort}
 ```
