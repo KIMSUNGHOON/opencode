@@ -138,6 +138,31 @@ ENV_SETUP_RESULT: WAITING_INPUT
 WAITING_FOR: SHELL_SELECTION
 ```
 
+**⚠️ 잘못된 입력 또는 Shell을 찾을 수 없는 경우 재시도:**
+```
+═══════════════════════════════════════════════════════════════
+❌ 잘못된 입력입니다
+═══════════════════════════════════════════════════════════════
+
+입력: "{user_input}"
+문제: {1-3 이외의 숫자 / 선택한 Shell이 설치되지 않음}
+
+다시 선택해주세요:
+1. zsh  (macOS 기본, Oh My Zsh 지원)
+2. bash (Linux 기본, 광범위한 호환성)
+3. sh   (POSIX 표준, 최소 기능)
+
+➡️ 숫자를 입력해주세요 [1-3]:
+═══════════════════════════════════════════════════════════════
+```
+
+**재시도 상태:**
+```
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: SHELL_SELECTION_RETRY
+RETRY_REASON: {INVALID_INPUT/SHELL_NOT_FOUND}
+```
+
 Shell에 따른 RC 파일:
 - `zsh` → `~/.zshrc`
 - `bash` → `~/.bashrc`
@@ -174,6 +199,35 @@ ENV_SETUP_RESULT: WAITING_INPUT
 WAITING_FOR: ENV_TYPE_SELECTION
 ```
 
+**⚠️ 잘못된 입력 또는 환경 관리자를 찾을 수 없는 경우 재시도:**
+```
+═══════════════════════════════════════════════════════════════
+❌ 잘못된 입력입니다
+═══════════════════════════════════════════════════════════════
+
+입력: "{user_input}"
+문제: {1-4 이외의 숫자 / 선택한 환경 관리자가 미설치}
+
+예: conda를 선택했지만 conda가 설치되지 않은 경우:
+"conda가 설치되어 있지 않습니다. 다른 옵션을 선택해주세요."
+
+다시 선택해주세요:
+1. conda - {설치됨/미설치}
+2. uv    - {설치됨/미설치}
+3. venv  - Python 내장
+4. 없음  - 시스템 Python 사용
+
+➡️ 숫자를 입력해주세요 [1-4]:
+═══════════════════════════════════════════════════════════════
+```
+
+**재시도 상태:**
+```
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: ENV_TYPE_SELECTION_RETRY
+RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
+```
+
 ### STEP 3: 환경 목록 조회 및 선택 (사용자 입력 필수)
 
 **conda 선택 시:**
@@ -201,6 +255,33 @@ conda env list
 ```
 ENV_SETUP_RESULT: WAITING_INPUT
 WAITING_FOR: ENV_NAME_SELECTION
+```
+
+**⚠️ 잘못된 입력 또는 환경을 찾을 수 없는 경우 재시도:**
+```
+═══════════════════════════════════════════════════════════════
+❌ 환경을 찾을 수 없습니다
+═══════════════════════════════════════════════════════════════
+
+입력: "{user_input}"
+문제: {목록에 없는 번호 / 해당 환경이 존재하지 않음}
+
+사용 가능한 conda 환경:
+1. base (기본)
+2. ml-dev
+3. project-env
+...
+
+➡️ 목록에 있는 번호를 입력해주세요:
+   또는 "새로 생성"을 입력하면 새 환경 이름을 물어봅니다.
+═══════════════════════════════════════════════════════════════
+```
+
+**재시도 상태:**
+```
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: ENV_NAME_SELECTION_RETRY
+RETRY_REASON: {INVALID_INPUT/ENV_NOT_FOUND}
 ```
 
 **uv 선택 시:**
@@ -389,6 +470,35 @@ WAITING_FOR: {SHELL_SELECTION/ENV_TYPE_SELECTION/ENV_NAME_SELECTION}
 ═══════════════════════════════════════════════════════════════
 ```
 
+## 입력 검증 및 재시도 로직
+
+**모든 사용자 입력에 대해 다음을 검증하세요:**
+
+1. **숫자 범위 검증**
+   - Shell 선택: 1-3 범위 확인
+   - 환경 타입: 1-4 범위 확인
+   - 환경 목록: 실제 목록 범위 확인
+
+2. **존재 여부 검증**
+   - 선택한 Shell이 실제로 설치되어 있는지 (`which {shell}`)
+   - 선택한 환경 관리자가 설치되어 있는지 (`which conda/uv`)
+   - 선택한 환경이 존재하는지 (`conda env list` 결과 확인)
+
+3. **재시도 프로세스**
+   ```
+   사용자 입력 받음
+       ↓
+   입력 검증 (숫자 범위 + 존재 여부)
+       ↓
+   [실패] → 에러 메시지 출력 → 재입력 요청 (WAITING_INPUT + _RETRY)
+       ↓
+   [성공] → 다음 STEP으로 진행
+   ```
+
+4. **최대 재시도 횟수**: 3회
+   - 3회 실패 시 `ENV_SETUP_RESULT: FAIL` 반환
+   - 사용자에게 수동 환경 설정 안내
+
 ## 주의사항
 
 1. **사용자 확인 필수:**
@@ -400,10 +510,10 @@ WAITING_FOR: {SHELL_SELECTION/ENV_TYPE_SELECTION/ENV_NAME_SELECTION}
    - 패키지 설치/삭제 불가
 
 3. **실패 처리:**
-   - 환경을 찾을 수 없으면 사용자에게 안내
+   - 환경을 찾을 수 없으면 사용자에게 안내 후 **재입력 요청**
    - 더블 체크 실패 시 경고와 함께 진행 여부 확인
 
-4. **필수 토큰 출력**: `ENV_SETUP_RESULT: SUCCESS/FAIL` 형식 반드시 포함
+4. **필수 토큰 출력**: `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` 형식 반드시 포함
 
 ## Config 파일 위치
 
