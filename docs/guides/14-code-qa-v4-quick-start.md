@@ -206,63 +206,80 @@ curl http://localhost:8000/v1/models
   "agents": {
     "env-setup": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.3,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "git-input": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.1,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "pre-checker": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.2,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "code-reviewer": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.7,
+      "temperature": 0.6,
       "top_p": 0.95,
-      "top_k": 40,
-      "min_p": 0.05
+      "top_k": 20,
+      "min_p": 0
     },
     "code-fixer": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.3,
-      "top_p": 0.9,
-      "top_k": 20
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "quality-checker": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.2,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "build-tester": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.1,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "function-tester": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.1,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "git-committer": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.3,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     },
     "summary-reporter": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
       "temperature": 0.6,
       "top_p": 0.95,
-      "top_k": 40,
-      "min_p": 0.05
+      "top_k": 20,
+      "min_p": 0
     },
     "git-pusher": {
       "model": "qwen/qwen3-next-80b-a3b-thinking",
-      "temperature": 0.1,
-      "top_p": 0.9
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     }
   }
 }
@@ -283,32 +300,27 @@ curl http://localhost:8000/v1/models
 
 ### 3.3 Agent별 샘플링 파라미터
 
-각 Agent의 역할에 맞게 샘플링 파라미터를 조정합니다:
+[공식 문서](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Thinking-FP8)에서 권장하는 기본값을 모든 Agent에 적용합니다:
 
-| Agent | Temperature | Top-P | Top-K | Min-P | 설명 |
-|-------|-------------|-------|-------|-------|------|
-| **code-reviewer** | 0.7 | 0.95 | 40 | 0.05 | 창의적 분석, 다양한 이슈 탐지 |
-| **summary-reporter** | 0.6 | 0.95 | 40 | 0.05 | 종합적 리포트 생성 |
-| **code-fixer** | 0.3 | 0.9 | 20 | - | 정확한 코드 수정 |
-| **git-committer** | 0.3 | 0.9 | - | - | 일관된 커밋 메시지 |
-| **env-setup** | 0.3 | 0.9 | - | - | 안정적 환경 감지 |
-| **pre-checker** | 0.2 | 0.9 | - | - | 정확한 Lint 수정 |
-| **quality-checker** | 0.2 | 0.9 | - | - | 일관된 점수 계산 |
-| **git-input** | 0.1 | 0.9 | - | - | 정확한 파일 파싱 |
-| **build-tester** | 0.1 | 0.9 | - | - | 정확한 빌드 명령 |
-| **function-tester** | 0.1 | 0.9 | - | - | 정확한 테스트 실행 |
-| **git-pusher** | 0.1 | 0.9 | - | - | 안전한 Push 처리 |
+| 파라미터 | 권장값 | 설명 |
+|----------|--------|------|
+| `temperature` | **0.6** | 창의성과 일관성의 균형 |
+| `top_p` | **0.95** | 누적 확률 기반 토큰 필터링 |
+| `top_k` | **20** | 상위 20개 토큰만 고려 |
+| `min_p` | **0** | 최소 확률 임계값 비활성화 |
 
-#### 샘플링 파라미터 설명
+#### 모든 Agent 동일 설정
 
-| 파라미터 | 범위 | 설명 |
-|----------|------|------|
-| `temperature` | 0.0-2.0 | 높을수록 창의적, 낮을수록 결정적 |
-| `top_p` | 0.0-1.0 | 누적 확률 기반 토큰 필터링 |
-| `top_k` | 1-100 | 상위 K개 토큰만 고려 |
-| `min_p` | 0.0-1.0 | 최소 확률 임계값 (낮은 확률 토큰 제거) |
+```json
+{
+  "temperature": 0.6,
+  "top_p": 0.95,
+  "top_k": 20,
+  "min_p": 0
+}
+```
 
-> **팁**: Reasoning 작업(code-reviewer, summary-reporter)은 높은 temperature로 다양한 관점 탐색, Tool Calling 작업(build-tester, git-pusher)은 낮은 temperature로 정확성 확보
+> **Note**: Qwen3-Next-Thinking 모델은 공식 권장 파라미터로 최적화되어 있습니다. Agent별로 다른 값을 사용하기보다 공식 권장값을 일관되게 사용하는 것을 권장합니다.
 
 ### 3.4 모델 설정 상세
 
