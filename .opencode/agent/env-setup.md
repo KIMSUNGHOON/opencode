@@ -49,9 +49,12 @@ permission:
     # GPU/CUDA 감지
     "nvidia-smi *": allow
     "nvcc --version": allow
+    # Conda 초기화 (non-interactive shell에서 필수)
+    "source */conda.sh": allow
+    "source */profile.d/conda.sh": allow
     # 환경 활성화 (사용자 확인)
     "conda activate *": ask
-    "source *": ask
+    "source */bin/activate": ask
     # 위험한 명령 차단
     "rm *": deny
     "conda remove *": deny
@@ -170,11 +173,26 @@ Shell에 따른 RC 파일:
 
 ### STEP 2: 가상 환경 타입 선택 (사용자 입력 필수)
 
+**⚠️ 중요: Non-interactive shell에서 conda 초기화 필요**
+
 ```bash
+# Conda 초기화 (non-interactive shell에서 필수)
+# conda가 설치된 경우 conda.sh를 source하여 초기화
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
+    source "/opt/conda/etc/profile.d/conda.sh"
+fi
+
 # 사용 가능한 환경 관리자 확인
 which conda uv python3 2>/dev/null
 conda --version 2>/dev/null
 uv --version 2>/dev/null
+
+# 현재 활성화된 conda 환경 확인
+echo "현재 conda 환경: $CONDA_DEFAULT_ENV"
 ```
 
 **⚠️ 반드시 아래 형식으로 사용자에게 물어보고, 응답을 받을 때까지 대기하세요:**
@@ -232,6 +250,16 @@ RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
 
 **conda 선택 시:**
 ```bash
+# Conda 초기화 (non-interactive shell에서 필수)
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
+    source "/opt/conda/etc/profile.d/conda.sh"
+fi
+
+# 환경 목록 조회
 conda env list
 ```
 
@@ -325,11 +353,20 @@ venv 가상 환경 옵션:
 ### STEP 4: 환경 활성화 확인
 
 ```bash
+# Conda 초기화 (non-interactive shell에서 필수)
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
+    source "/opt/conda/etc/profile.d/conda.sh"
+fi
+
 # conda 환경 활성화 확인
-echo $CONDA_DEFAULT_ENV
+echo "Conda 환경: $CONDA_DEFAULT_ENV"
 
 # venv 환경 활성화 확인
-echo $VIRTUAL_ENV
+echo "Virtual Env: $VIRTUAL_ENV"
 
 # Python 경로 확인
 which python python3
