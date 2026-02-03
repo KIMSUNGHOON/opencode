@@ -35,17 +35,7 @@ prompt: |
   **Task는 bash 명령이 아닙니다!**
   Task는 당신이 사용할 수 있는 도구(tool/function)입니다.
 
-  Agent를 호출하려면 Task 도구를 function call로 호출하세요:
-  ```json
-  {
-    "name": "task",
-    "arguments": {
-      "subagent_type": "env-setup",
-      "prompt": "환경을 확인하세요",
-      "description": "환경 설정 확인"
-    }
-  }
-  ```
+  Agent를 호출하려면 Task 도구를 function call로 호출하세요.
 
   **필수 파라미터만 사용하세요:**
   - subagent_type: agent 이름 (필수)
@@ -85,9 +75,29 @@ retry_count = 0
 quality_score = 0
 changed_files = []      # git-input에서 받은 파일 목록
 review_issues = []      # code-reviewer에서 발견한 이슈
+
+# 사용자 입력 관련 상태
+env_setup_confirmed = false   # env-setup 완료 여부
+build_env_confirmed = false   # build-tester 환경 확인 여부
+test_confirmed = false        # function-tester 테스트 확인 여부
 ```
 
 **중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
+
+## 사용자 입력이 필요한 Agent들
+
+다음 3개의 Agent는 반드시 사용자 입력을 받아야 진행됩니다:
+
+| Agent | 필요한 입력 | 대기 상태 |
+|-------|------------|----------|
+| env-setup | Shell 선택 (1-3), 환경 타입 선택 (1-4) | `WAITING_INPUT` |
+| build-tester | 환경 확인 ("확인/y" 또는 "재설정/n") | `WAITING_INPUT` |
+| function-tester | 테스트 실행 여부 ("실행/y" 또는 "스킵/n") | `WAITING_INPUT` |
+
+**WAITING_INPUT 상태 처리:**
+1. Agent가 `WAITING_INPUT`을 반환하면, 사용자 응답을 기다립니다
+2. 사용자 응답을 받으면, 해당 Agent를 다시 호출하여 계속 진행합니다
+3. 사용자 입력 없이 자동 진행하지 마세요
 
 ---
 
@@ -96,13 +106,23 @@ review_issues = []      # code-reviewer에서 발견한 이슈
 각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
 **Task가 완료되면 결과를 확인하고 즉시 다음 STEP으로 진행하세요.**
 
-### STEP 1: Environment Setup
+### STEP 1: Environment Setup (사용자 입력 필수)
 Task 도구 호출:
 - subagent_type: "env-setup"
-- prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요"
+- prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요. 반드시 사용자에게 Shell 타입(zsh/bash/sh)과 가상 환경 타입(conda/uv/venv)을 선택받으세요."
 - description: "환경 설정 확인"
 
-→ 완료 시 STEP 2로
+**⚠️ 사용자 입력 대기 처리:**
+```
+IF Task 결과에 "ENV_SETUP_RESULT: WAITING_INPUT" 포함:
+    → 사용자 응답을 기다립니다 (STEP 1 반복)
+    → 사용자가 입력하면 env-setup을 다시 호출합니다
+
+IF Task 결과에 "ENV_SETUP_RESULT: SUCCESS" 포함:
+    → STEP 2로 진행
+```
+
+→ 사용자 입력 완료 후 STEP 2로
 
 ### STEP 2: Git Input
 Task 도구 호출:
@@ -164,22 +184,54 @@ ELSE IF 점수 < 70 OR "STATUS: FAIL" 포함:
 
 **점수를 찾지 못한 경우:** quality-checker를 다시 호출하세요.
 
-### STEP 7: Build Test
+### STEP 7: Build Test (사용자 확인 필수)
 Task 도구 호출:
 - subagent_type: "build-tester"
-- prompt: "빌드 테스트를 실행하세요 (--no-sandbox 없으면 Docker 사용)"
+- prompt: "빌드 테스트를 실행하세요. 먼저 현재 환경 상태(Shell, 가상환경, 런타임)를 보여주고 사용자의 확인을 받은 후에만 빌드를 진행하세요."
 - description: "빌드 테스트"
+
+**⚠️ 사용자 입력 대기 처리:**
+```
+IF Task 결과에 "BUILD_RESULT: WAITING_INPUT" 포함:
+    → 사용자가 환경을 확인할 때까지 기다립니다
+    → 사용자가 "확인/y"를 입력하면 빌드 진행
+    → 사용자가 "재설정/n"을 입력하면 STEP 1 (env-setup)로 회귀
+
+IF Task 결과에 "BUILD_RESULT: SUCCESS" 포함:
+    → STEP 8로 진행
+
+IF Task 결과에 "BUILD_RESULT: FAIL" 포함:
+    → STEP 5로 회귀 (최대 3회)
+```
 
 → 성공: STEP 8로
 → 실패: STEP 5로 회귀 (최대 3회)
+→ 재설정: STEP 1로 회귀
 
-### STEP 8: Function Test
+### STEP 8: Function Test (사용자 확인 필수)
 Task 도구 호출:
 - subagent_type: "function-tester"
-- prompt: "기능 테스트를 실행하세요 (--no-sandbox 없으면 Docker 사용)"
+- prompt: "기능 테스트를 실행하세요. 먼저 테스트 파일을 탐지한 결과를 보여주고, 사용자에게 테스트 실행 여부를 확인받은 후에만 진행하세요."
 - description: "기능 테스트"
 
-→ 성공: STEP 9로
+**⚠️ 사용자 입력 대기 처리:**
+```
+IF Task 결과에 "TEST_RESULT: WAITING_INPUT" 포함:
+    → 사용자가 테스트 실행 여부를 선택할 때까지 기다립니다
+    → 사용자가 "실행/y"를 입력하면 테스트 진행
+    → 사용자가 "스킵/n"을 입력하면 테스트 스킵
+
+IF Task 결과에 "TEST_RESULT: SUCCESS" 포함:
+    → STEP 9로 진행
+
+IF Task 결과에 "TEST_RESULT: FAIL" 포함:
+    → STEP 5로 회귀 (최대 3회)
+
+IF Task 결과에 "TEST_RESULT: SKIPPED" 또는 "TEST_RESULT: NO_TESTS" 포함:
+    → STEP 9로 진행 (테스트 스킵)
+```
+
+→ 성공/스킵: STEP 9로
 → 실패: STEP 5로 회귀 (최대 3회)
 
 ### STEP 9: Git Commit
