@@ -19,8 +19,8 @@
 ARG CUDA_VERSION=13.0.0
 ARG PYTHON_VERSION=3.12
 
-# Ubuntu 24.04 for Python 3.12 support
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn-runtime-ubuntu24.04
+# Ubuntu 22.04 with CUDA 13.0.0
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn9-runtime-ubuntu22.04
 
 # -----------------------------------------------------------------------------
 # Environment Variables
@@ -47,14 +47,18 @@ COPY .opencode/docker/certs/*.crt /usr/local/share/ca-certificates/ 2>/dev/null 
 COPY .opencode/docker/certs/*.pem /usr/local/share/ca-certificates/ 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
-# System Dependencies
+# System Dependencies + Python 3.12 (deadsnakes PPA)
 # -----------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Python
+    software-properties-common \
+    gnupg \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    # Python 3.12 from deadsnakes
     python${PYTHON_VERSION} \
     python${PYTHON_VERSION}-dev \
     python${PYTHON_VERSION}-venv \
-    python3-pip \
+    python${PYTHON_VERSION}-distutils \
     # Build tools
     build-essential \
     cmake \
@@ -70,10 +74,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python \
     && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
 
+# Install pip for Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYTHON_VERSION}
+
 # -----------------------------------------------------------------------------
-# Python Package Manager (pip upgrade)
+# Python Package Manager (upgrade)
 # -----------------------------------------------------------------------------
-RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install --upgrade setuptools wheel
 
 # -----------------------------------------------------------------------------
 # Project Dependencies (if requirements.txt exists)
