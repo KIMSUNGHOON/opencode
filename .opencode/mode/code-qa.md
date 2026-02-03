@@ -1,6 +1,6 @@
 ---
 description: "Code QA 워크플로우 - 자동화된 코드 품질 검사"
-model: qwen/qwen3-coder-30b
+model: gpt-oss/gpt-oss-120b
 mode: all
 color: "#E74C3C"
 ---
@@ -291,8 +291,17 @@ MAX_RETRY = 3
 QUALITY_THRESHOLD = 70
 TASK_RETRY = 3           # Task 호출 재시도 횟수
 TASK_RETRY_DELAY = 2000  # 재시도 간격 (ms)
-FALLBACK_MODEL = "qwen/qwen3-coder-30b"
+FALLBACK_MODEL = "qwen/qwen3-coder-30b"  # Sub-Agent 전용
 ```
+
+### 모델 역할 구분
+
+| 역할 | 모델 | 이유 |
+|------|------|------|
+| **오케스트레이터** | gpt-oss/gpt-oss-120b | Reasoning 필요 (조건 분기, 회귀 판단) |
+| **Sub-Agent** | qwen/qwen3-coder-30b | Tool Calling 특화 (Instructor 모델) |
+
+> **주의**: Qwen3-Coder-30B는 reasoning 모델이 아닌 instructor 모델입니다. 따라서 오케스트레이터로 사용하면 안 됩니다.
 
 ---
 

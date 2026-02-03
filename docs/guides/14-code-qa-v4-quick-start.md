@@ -27,10 +27,12 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 ### 모델 배분
 
-| 모델 | 용도 | Agent |
+| 모델 | 용도 | 역할 |
 |------|------|-------|
-| **GPT-OSS-120B** | Chain-of-Thought 추론 | code-reviewer, summary-reporter |
-| **Qwen3-Coder-30B** | Tool Calling, SWE-Bench | 나머지 9개 Agent |
+| **GPT-OSS-120B** | Chain-of-Thought 추론 (Reasoning) | **오케스트레이터**, code-reviewer, summary-reporter |
+| **Qwen3-Coder-30B** | Tool Calling, SWE-Bench (Instructor) | 나머지 9개 Sub-Agent |
+
+> **중요**: Qwen3-Coder-30B는 reasoning 모델이 아닌 instructor 모델이므로, 워크플로우 조율이 필요한 오케스트레이터 역할에는 적합하지 않습니다. 오케스트레이터는 반드시 reasoning 능력이 있는 GPT-OSS-120B를 사용해야 합니다.
 
 ---
 
@@ -250,13 +252,28 @@ Agent 파일들은 `.opencode/agent/` 디렉토리에 위치합니다.
 | `summary-reporter.md` | 8 | **GPT-OSS-120B** | 결과 종합 리포트 |
 | `git-pusher.md` | 9 | Qwen3-Coder | Push 및 PR |
 
-### 5.2 Agent 파일 구조
+### 5.2 Mode 파일 (오케스트레이터)
+
+오케스트레이터는 `.opencode/mode/code-qa.md`에 정의됩니다.
+
+```markdown
+---
+description: "Code QA 워크플로우 - 자동화된 코드 품질 검사"
+model: gpt-oss/gpt-oss-120b   # 오케스트레이터는 reasoning 모델 필수!
+mode: all
+color: "#E74C3C"
+---
+```
+
+> **중요**: 오케스트레이터는 워크플로우 전체를 조율하고 조건부 분기, 회귀 판단 등 복잡한 의사결정을 수행합니다. 따라서 **reasoning 능력이 있는 모델(GPT-OSS-120B)**을 사용해야 합니다. Qwen3-Coder-30B는 instructor 모델로 Tool Calling에는 뛰어나지만 reasoning이 부족하여 오케스트레이터 역할에 적합하지 않습니다.
+
+### 5.4 Sub-Agent 파일 구조
 
 ```markdown
 ---
 description: Agent 설명
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-coder-30b   # Sub-Agent는 instructor 모델 사용
 color: "#3498DB"
 tools:
   "*": false
@@ -278,7 +295,7 @@ permission:
 
 > **Note**: Agent 파일의 `model` 필드는 글로벌 설정의 `agents` 섹션으로 오버라이드됩니다.
 
-### 5.3 Permission 규칙
+### 5.5 Permission 규칙
 
 ```yaml
 permission:
