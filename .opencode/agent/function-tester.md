@@ -14,16 +14,50 @@ permission:
     # Docker 명령
     "docker run *": allow
     "docker ps *": allow
-    # 테스트 명령 (호스트)
+    # Python 테스트
     "python -m pytest *": allow
     "pytest *": allow
+    "python -m unittest *": allow
+    "nose2 *": allow
+    # JavaScript/TypeScript 테스트
     "npm test *": allow
     "npm run test *": allow
-    "cargo test *": allow
+    "npx jest *": allow
+    "npx mocha *": allow
+    "yarn test *": allow
+    "pnpm test *": allow
+    # C/C++ 테스트
+    "ctest *": allow
+    "make test *": allow
+    "./test *": allow
+    # Java 테스트
+    "mvn test *": allow
+    "./gradlew test *": allow
+    "gradle test *": allow
+    # Go 테스트
     "go test *": allow
+    # Rust 테스트
+    "cargo test *": allow
+    # Ruby 테스트
+    "rspec *": allow
+    "rake test *": allow
+    "bundle exec rspec *": allow
+    # PHP 테스트
+    "phpunit *": allow
+    "./vendor/bin/phpunit *": allow
+    # Swift 테스트
+    "swift test *": allow
+    "xcodebuild test *": allow
+    # Kotlin 테스트
+    "./gradlew test *": allow
     # 커버리지
     "coverage *": allow
     "nyc *": allow
+    "gcov *": allow
+    "lcov *": allow
+    # 탐색 명령
+    "ls *": allow
+    "which *": allow
     # Git 상태
     "git status *": allow
     # 위험한 명령 차단
@@ -54,10 +88,31 @@ Docker Sandbox 또는 호스트 환경에서 테스트를 실행합니다.
 
 ```bash
 # Python 테스트
-ls tests/ test_*.py *_test.py pytest.ini pyproject.toml
+ls tests/ test_*.py *_test.py pytest.ini pyproject.toml 2>/dev/null
 
 # JavaScript/TypeScript 테스트
-ls __tests__/ *.test.js *.test.ts *.spec.js *.spec.ts jest.config.*
+ls __tests__/ *.test.js *.test.ts *.spec.js *.spec.ts jest.config.* 2>/dev/null
+
+# C/C++ 테스트 (Google Test, CTest)
+ls tests/ test/ *_test.cpp test_*.cpp CMakeLists.txt 2>/dev/null
+
+# Java 테스트 (JUnit)
+ls src/test/ *Test.java *Tests.java pom.xml build.gradle 2>/dev/null
+
+# Go 테스트
+ls *_test.go 2>/dev/null
+
+# Rust 테스트
+ls tests/ src/**/test*.rs Cargo.toml 2>/dev/null
+
+# Ruby 테스트 (RSpec)
+ls spec/ test/ *_spec.rb *_test.rb 2>/dev/null
+
+# PHP 테스트 (PHPUnit)
+ls tests/ phpunit.xml *Test.php 2>/dev/null
+
+# Swift 테스트
+ls Tests/ *Tests.swift Package.swift 2>/dev/null
 ```
 
 ### STEP 2: 테스트 실행
@@ -86,6 +141,33 @@ python -m pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
 
 # JavaScript/TypeScript
 npm test -- --coverage
+
+# C/C++ (CMake + CTest)
+cd build && ctest --output-on-failure
+
+# C/C++ (Make)
+make test
+
+# Java (Maven)
+mvn test
+
+# Java (Gradle)
+./gradlew test
+
+# Go
+go test -v -cover ./...
+
+# Rust
+cargo test --verbose
+
+# Ruby (RSpec)
+bundle exec rspec --format documentation
+
+# PHP (PHPUnit)
+./vendor/bin/phpunit --coverage-text
+
+# Swift
+swift test --verbose
 ```
 
 ### STEP 3: 결과 분석

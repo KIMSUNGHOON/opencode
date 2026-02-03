@@ -15,13 +15,53 @@ permission:
     "docker run *": allow
     "docker images *": allow
     "docker ps *": allow
-    # 빌드 명령 (호스트)
+    # Python 빌드
     "python -m build *": allow
     "pip install * -e .": allow
+    "pip install *": allow
+    "poetry build *": allow
+    "poetry install *": allow
+    # Node.js 빌드
     "npm run build *": allow
     "npm install *": allow
-    "cargo build *": allow
+    "yarn build *": allow
+    "yarn install *": allow
+    "pnpm build *": allow
+    "pnpm install *": allow
+    # C/C++ 빌드
+    "cmake *": allow
+    "make *": allow
+    "ninja *": allow
+    "gcc *": allow
+    "g++ *": allow
+    "clang *": allow
+    "clang++ *": allow
+    # Java 빌드
+    "mvn *": allow
+    "gradle *": allow
+    "./gradlew *": allow
+    "javac *": allow
+    # Go 빌드
     "go build *": allow
+    "go mod *": allow
+    # Rust 빌드
+    "cargo build *": allow
+    "cargo check *": allow
+    # Ruby 빌드
+    "bundle install *": allow
+    "gem build *": allow
+    "rake *": allow
+    # PHP 빌드
+    "composer install *": allow
+    "composer build *": allow
+    # Swift 빌드
+    "swift build *": allow
+    "xcodebuild *": allow
+    # Kotlin 빌드
+    "kotlinc *": allow
+    # 탐색 명령
+    "ls *": allow
+    "which *": allow
     # Git 상태
     "git status *": allow
     # 위험한 명령 차단
@@ -95,6 +135,48 @@ docker run --rm \
   -w /workspace \
   qa-sandbox \
   npm install && npm run build
+
+# C/C++ 프로젝트 (CMake)
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  mkdir -p build && cd build && cmake .. && make
+
+# C/C++ 프로젝트 (Makefile)
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  make
+
+# Java 프로젝트 (Maven)
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  mvn compile
+
+# Java 프로젝트 (Gradle)
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  ./gradlew build
+
+# Go 프로젝트
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  go build ./...
+
+# Rust 프로젝트
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  qa-sandbox \
+  cargo build
 ```
 
 #### 호스트 모드 (--no-sandbox)
@@ -106,6 +188,36 @@ python -m build
 # Node.js 프로젝트
 npm install
 npm run build
+
+# C/C++ 프로젝트 (CMake)
+mkdir -p build && cd build && cmake .. && make
+
+# C/C++ 프로젝트 (Makefile)
+make
+
+# Java 프로젝트 (Maven)
+mvn compile
+
+# Java 프로젝트 (Gradle)
+./gradlew build
+
+# Go 프로젝트
+go build ./...
+
+# Rust 프로젝트
+cargo build
+
+# Ruby 프로젝트
+bundle install
+
+# PHP 프로젝트
+composer install
+
+# Swift 프로젝트
+swift build
+
+# Kotlin 프로젝트
+kotlinc src/*.kt -include-runtime -d app.jar
 ```
 
 ### STEP 4: 빌드 검증
@@ -116,6 +228,27 @@ ls dist/*.whl dist/*.tar.gz
 
 # Node.js - 빌드 출력 확인
 ls dist/ build/
+
+# C/C++ - 실행 파일/라이브러리 확인
+ls build/*.a build/*.so build/*.out *.exe 2>/dev/null
+ls *.o *.a *.so 2>/dev/null
+
+# Java - JAR/WAR 확인
+ls target/*.jar target/*.war 2>/dev/null
+ls build/libs/*.jar 2>/dev/null
+
+# Go - 바이너리 확인
+ls *.exe 2>/dev/null
+file $(go list -f '{{.Target}}' ./...) 2>/dev/null
+
+# Rust - 바이너리 확인
+ls target/debug/* target/release/* 2>/dev/null
+
+# Ruby - gem 확인
+ls *.gem 2>/dev/null
+
+# Swift - 빌드 확인
+ls .build/debug/* .build/release/* 2>/dev/null
 ```
 
 ### STEP 5: 결과 리포트

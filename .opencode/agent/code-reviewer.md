@@ -35,13 +35,23 @@ Chain-of-Thought 추론을 사용하여 코드를 분석하고 이슈를 발견�
 - 하드코딩된 비밀키
 - 안전하지 않은 역직렬화
 - 경로 순회 취약점
+- 버퍼 오버플로우 (C/C++)
+- Use-after-free (C/C++)
+- Integer overflow (C/C++/Java)
+- Command injection
+- CSRF 취약점
 
 ### 2. 버그 (Bugs)
-- Null/None 참조
+- Null/None/nil 참조
 - 인덱스 범위 초과
 - 타입 불일치
 - 무한 루프 가능성
-- 리소스 누수
+- 리소스 누수 (파일, 소켓, 메모리)
+- 데드락 가능성 (멀티스레드)
+- 레이스 컨디션 (Go, Rust, C++)
+- 메모리 누수 (C/C++, 수동 메모리 관리)
+- 초기화되지 않은 변수 (C/C++)
+- 더블 프리 (C/C++)
 
 ### 3. 성능 (Performance)
 - N+1 쿼리 문제
@@ -49,6 +59,10 @@ Chain-of-Thought 추론을 사용하여 코드를 분석하고 이슈를 발견�
 - 메모리 누수 가능성
 - 비효율적 알고리즘
 - 캐싱 누락
+- 불필요한 복사 (C++, Rust)
+- 비효율적인 메모리 할당
+- 불필요한 동기화 (멀티스레드)
+- 스택 오버플로우 위험 (재귀)
 
 ### 4. 유지보수성 (Maintainability)
 - 중복 코드
@@ -56,12 +70,78 @@ Chain-of-Thought 추론을 사용하여 코드를 분석하고 이슈를 발견�
 - 매직 넘버
 - 부적절한 네이밍
 - 누락된 에러 처리
+- 과도한 중첩
+- 긴 함수/메서드
+- 높은 순환 복잡도
 
 ### 5. 베스트 프랙티스 (Best Practices)
-- 타입 힌트 누락
+- 타입 힌트 누락 (Python, TypeScript)
 - 문서화 부족
 - 테스트 커버리지
 - 코드 스타일 일관성
+- RAII 패턴 미사용 (C++)
+- 스마트 포인터 미사용 (C++)
+- unsafe 블록 남용 (Rust)
+- goroutine 누수 (Go)
+- 에러 무시 (Go)
+
+## 언어별 분석 포인트
+
+### Python
+- `except:` 대신 구체적 예외
+- f-string 사용
+- `with` 문 사용 (context manager)
+- 불필요한 `global` 사용
+- mutable default argument
+
+### JavaScript/TypeScript
+- `var` 대신 `const`/`let`
+- `===` 대신 `==` 사용
+- Promise 에러 처리
+- async/await 패턴
+- TypeScript any 남용
+
+### C/C++
+- 포인터 null 체크
+- 메모리 할당/해제 매칭
+- RAII 패턴
+- const 정확성
+- 스마트 포인터 사용
+- 버퍼 크기 검증
+- 정수 오버플로우 검사
+
+### Java
+- 리소스 자동 해제 (try-with-resources)
+- NullPointerException 방지
+- equals/hashCode 일관성
+- Serializable 구현
+- 동기화 문제
+
+### Go
+- 에러 반환값 검사
+- defer 사용
+- goroutine 누수
+- 채널 닫기
+- context 사용
+
+### Rust
+- unwrap() 남용
+- unsafe 블록 최소화
+- 라이프타임 명시
+- 에러 처리 (Result)
+- Clone 남용
+
+### Ruby
+- 예외 처리
+- 블록 사용
+- 메서드 가시성
+- freeze 사용
+
+### PHP
+- SQL Prepared Statement
+- XSS 이스케이프
+- 타입 힌트 사용
+- 예외 처리
 
 ## 분석 프로세스
 

@@ -11,18 +11,55 @@ tools:
   "Grep": true
 permission:
   bash:
-    # Lint 검사 (수정 없이)
+    # Python Lint/Type 검사
     "ruff check *": allow
     "eslint *": allow
     "mypy *": allow
     "pylint *": allow
+    "flake8 *": allow
+    # TypeScript/JavaScript
     "tsc --noEmit *": allow
+    "npx tsc *": allow
+    "npx eslint *": allow
+    # C/C++ 정적 분석
+    "cppcheck *": allow
+    "clang-tidy *": allow
+    "scan-build *": allow
+    # Java 정적 분석
+    "checkstyle *": allow
+    "pmd *": allow
+    "spotbugs *": allow
+    "mvn checkstyle:check *": allow
+    "gradle checkstyle *": allow
+    # Go 정적 분석
+    "go vet *": allow
+    "staticcheck *": allow
+    "golint *": allow
+    "golangci-lint *": allow
+    # Rust 정적 분석
+    "cargo clippy *": allow
+    "cargo check *": allow
+    # Ruby 정적 분석
+    "rubocop *": allow
+    "reek *": allow
+    # PHP 정적 분석
+    "phpcs *": allow
+    "phpstan *": allow
+    "psalm *": allow
+    # Swift 정적 분석
+    "swiftlint *": allow
+    # Kotlin 정적 분석
+    "ktlint *": allow
+    "detekt *": allow
     # 복잡도 검사
     "radon cc *": allow
     "radon mi *": allow
     # Git 상태
     "git status *": allow
     "git diff *": allow
+    # 탐색 명령
+    "which *": allow
+    "ls *": allow
     # 위험한 명령 차단
     "rm *": deny
     "git push *": deny
@@ -52,6 +89,24 @@ ls pyproject.toml setup.py requirements.txt 2>/dev/null
 
 # Node.js 프로젝트 확인
 ls package.json 2>/dev/null
+
+# C/C++ 프로젝트 확인
+ls CMakeLists.txt Makefile *.c *.cpp *.h *.hpp 2>/dev/null
+
+# Java 프로젝트 확인
+ls pom.xml build.gradle *.java 2>/dev/null
+
+# Go 프로젝트 확인
+ls go.mod go.sum 2>/dev/null
+
+# Rust 프로젝트 확인
+ls Cargo.toml 2>/dev/null
+
+# Ruby 프로젝트 확인
+ls Gemfile *.rb 2>/dev/null
+
+# PHP 프로젝트 확인
+ls composer.json *.php 2>/dev/null
 ```
 
 ### STEP 2: Lint 검사 실행
@@ -59,11 +114,60 @@ ls package.json 2>/dev/null
 **Python 프로젝트:**
 ```bash
 ruff check . --output-format=text 2>&1 || echo "ruff not found or failed"
+pylint --output-format=text . 2>&1 || echo "pylint not found"
+flake8 . 2>&1 || echo "flake8 not found"
 ```
 
-**Node.js 프로젝트:**
+**Node.js/TypeScript 프로젝트:**
 ```bash
 npx eslint . --format=stylish 2>&1 || echo "eslint not found or failed"
+```
+
+**C/C++ 프로젝트:**
+```bash
+cppcheck --enable=all --error-exitcode=1 . 2>&1 || echo "cppcheck not found"
+clang-tidy *.cpp *.c 2>&1 || echo "clang-tidy not found"
+```
+
+**Java 프로젝트:**
+```bash
+checkstyle -c /google_checks.xml src/ 2>&1 || echo "checkstyle not found"
+pmd check -d src -R rulesets/java/quickstart.xml 2>&1 || echo "pmd not found"
+```
+
+**Go 프로젝트:**
+```bash
+go vet ./... 2>&1 || echo "go vet failed"
+staticcheck ./... 2>&1 || echo "staticcheck not found"
+golangci-lint run 2>&1 || echo "golangci-lint not found"
+```
+
+**Rust 프로젝트:**
+```bash
+cargo clippy -- -W clippy::all 2>&1 || echo "clippy not found"
+cargo check 2>&1 || echo "cargo check failed"
+```
+
+**Ruby 프로젝트:**
+```bash
+rubocop --format simple 2>&1 || echo "rubocop not found"
+```
+
+**PHP 프로젝트:**
+```bash
+phpcs --standard=PSR12 . 2>&1 || echo "phpcs not found"
+phpstan analyse src 2>&1 || echo "phpstan not found"
+```
+
+**Swift 프로젝트:**
+```bash
+swiftlint lint 2>&1 || echo "swiftlint not found"
+```
+
+**Kotlin 프로젝트:**
+```bash
+ktlint 2>&1 || echo "ktlint not found"
+detekt 2>&1 || echo "detekt not found"
 ```
 
 ### STEP 3: 타입 검사 실행
@@ -78,11 +182,39 @@ mypy . --ignore-missing-imports 2>&1 || echo "mypy not found or failed"
 npx tsc --noEmit 2>&1 || echo "tsc not found or failed"
 ```
 
-### STEP 4: 복잡도 검사 (Python만)
+**Rust (이미 타입 체크 포함):**
+```bash
+cargo check 2>&1 || echo "cargo check failed"
+```
 
+**Go (이미 타입 체크 포함):**
+```bash
+go build ./... 2>&1 || echo "go build failed"
+```
+
+### STEP 4: 복잡도 검사
+
+**Python:**
 ```bash
 radon cc . -a 2>&1 || echo "radon not found"
 radon mi . 2>&1 || echo "radon mi not found"
+```
+
+**JavaScript/TypeScript:**
+```bash
+npx complexity-report . 2>&1 || echo "complexity-report not found"
+```
+
+**Java:**
+```bash
+# PMD에서 복잡도 검사 포함
+pmd check -d src -R rulesets/java/design.xml 2>&1 || echo "pmd design rules not found"
+```
+
+**C/C++:**
+```bash
+# cppcheck에서 복잡도 경고 포함
+cppcheck --enable=style . 2>&1 || echo "cppcheck style check failed"
 ```
 
 ### STEP 5: 점수 계산

@@ -11,16 +11,44 @@ tools:
   "Grep": true
 permission:
   bash:
-    # Linter 자동 수정
+    # Python Linter/Formatter
     "ruff check * --fix": allow
     "ruff format *": allow
-    "eslint * --fix": allow
-    "prettier * --write": allow
     "black *": allow
     "isort *": allow
-    # 읽기 명령
+    # JavaScript/TypeScript
+    "eslint * --fix": allow
+    "prettier * --write": allow
+    "npx eslint * --fix": allow
+    "npx prettier * --write": allow
+    # C/C++
+    "clang-format *": allow
+    "clang-tidy * --fix *": allow
+    "find * clang-format *": allow
+    # Java
+    "google-java-format *": allow
+    "find * google-java-format *": allow
+    # Go
+    "gofmt *": allow
+    "goimports *": allow
+    # Rust
+    "rustfmt *": allow
+    "cargo fmt *": allow
+    # Ruby
+    "rubocop *": allow
+    # PHP
+    "php-cs-fixer *": allow
+    "phpcbf *": allow
+    # Swift
+    "swiftformat *": allow
+    "swiftlint * --fix": allow
+    # Kotlin
+    "ktlint *": allow
+    # 읽기/탐색 명령
     "git status *": allow
     "git diff *": allow
+    "which *": allow
+    "ls *": allow
     # 위험한 명령 차단
     "rm *": deny
     "git push *": deny
@@ -55,6 +83,36 @@ Lint와 Format 도구를 사용하여 코드를 자동으로 정리합니다.
 - `eslint --fix` - Lint 자동 수정
 - `prettier --write` - 코드 포맷팅
 
+### C/C++
+- `clang-format -i` - 코드 포맷팅
+- `clang-tidy --fix` - 정적 분석 및 자동 수정
+
+### Java
+- `google-java-format -i` - 코드 포맷팅
+- `checkstyle` - 스타일 검사 (자동 수정 없음)
+
+### Go
+- `gofmt -w` - 코드 포맷팅
+- `goimports -w` - import 정렬 및 포맷팅
+
+### Rust
+- `rustfmt` - 코드 포맷팅
+- `cargo fmt` - Cargo 통합 포맷팅
+
+### Ruby
+- `rubocop -a` - Lint 자동 수정
+
+### PHP
+- `php-cs-fixer fix` - 코드 스타일 수정
+- `phpcbf` - PHP CodeSniffer 자동 수정
+
+### Swift
+- `swiftformat` - 코드 포맷팅
+- `swiftlint --fix` - Lint 자동 수정
+
+### Kotlin
+- `ktlint -F` - 코드 포맷팅 및 수정
+
 ## 실행 단계
 
 ### STEP 1: 프로젝트 타입 감지
@@ -65,6 +123,24 @@ ls pyproject.toml setup.py requirements.txt 2>/dev/null
 
 # Node.js 프로젝트 확인
 ls package.json 2>/dev/null
+
+# C/C++ 프로젝트 확인
+ls CMakeLists.txt Makefile *.c *.cpp *.h *.hpp 2>/dev/null
+
+# Java 프로젝트 확인
+ls pom.xml build.gradle *.java 2>/dev/null
+
+# Go 프로젝트 확인
+ls go.mod go.sum *.go 2>/dev/null
+
+# Rust 프로젝트 확인
+ls Cargo.toml *.rs 2>/dev/null
+
+# Ruby 프로젝트 확인
+ls Gemfile *.rb 2>/dev/null
+
+# PHP 프로젝트 확인
+ls composer.json *.php 2>/dev/null
 ```
 
 ### STEP 2: 사용 가능한 도구 확인
@@ -75,6 +151,30 @@ which ruff black isort
 
 # JavaScript/TypeScript
 which eslint prettier npx
+
+# C/C++
+which clang-format clang-tidy
+
+# Java
+which google-java-format checkstyle
+
+# Go
+which gofmt goimports
+
+# Rust
+which rustfmt cargo
+
+# Ruby
+which rubocop
+
+# PHP
+which php-cs-fixer phpcbf
+
+# Swift
+which swiftformat swiftlint
+
+# Kotlin
+which ktlint
 ```
 
 ### STEP 3: 자동 수정 실행
@@ -95,6 +195,67 @@ isort .
 # ESLint + Prettier
 npx eslint . --fix
 npx prettier . --write
+```
+
+#### C/C++ 프로젝트
+```bash
+# clang-format (모든 소스 파일)
+find . -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | xargs clang-format -i
+
+# clang-tidy 자동 수정 (CMake 프로젝트)
+clang-tidy --fix *.cpp -- -std=c++17
+```
+
+#### Java 프로젝트
+```bash
+# Google Java Format
+find . -name "*.java" | xargs google-java-format -i
+```
+
+#### Go 프로젝트
+```bash
+# gofmt + goimports
+gofmt -w .
+goimports -w .
+```
+
+#### Rust 프로젝트
+```bash
+# cargo fmt (권장)
+cargo fmt
+
+# 또는 rustfmt 직접 실행
+rustfmt --edition 2021 src/**/*.rs
+```
+
+#### Ruby 프로젝트
+```bash
+# RuboCop 자동 수정
+rubocop -a
+```
+
+#### PHP 프로젝트
+```bash
+# PHP-CS-Fixer
+php-cs-fixer fix .
+
+# 또는 PHPCBF
+phpcbf .
+```
+
+#### Swift 프로젝트
+```bash
+# SwiftFormat
+swiftformat .
+
+# SwiftLint 자동 수정
+swiftlint --fix
+```
+
+#### Kotlin 프로젝트
+```bash
+# ktlint
+ktlint -F
 ```
 
 ### STEP 4: 변경 사항 확인

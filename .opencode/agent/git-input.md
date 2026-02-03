@@ -80,14 +80,49 @@ git diff <commit_a>..<commit_b> --name-only
 ### STEP 3: 파일 필터링
 
 코드 파일만 필터링:
-- `*.py`, `*.js`, `*.ts`, `*.tsx`, `*.jsx`
-- `*.java`, `*.go`, `*.rs`, `*.c`, `*.cpp`, `*.h`
-- `*.rb`, `*.php`, `*.swift`, `*.kt`
+
+**Python**
+- `*.py`, `*.pyx`, `*.pxd`, `*.pyi`
+
+**JavaScript/TypeScript**
+- `*.js`, `*.jsx`, `*.ts`, `*.tsx`, `*.mjs`, `*.cjs`
+
+**C/C++**
+- `*.c`, `*.h`, `*.cpp`, `*.hpp`, `*.cc`, `*.hh`
+- `*.cxx`, `*.hxx`, `*.c++`, `*.h++`, `*.ipp`, `*.tpp`
+
+**Java/Kotlin**
+- `*.java`, `*.kt`, `*.kts`
+
+**Go**
+- `*.go`
+
+**Rust**
+- `*.rs`
+
+**Ruby**
+- `*.rb`, `*.rake`, `*.gemspec`
+
+**PHP**
+- `*.php`, `*.phtml`
+
+**Swift**
+- `*.swift`
+
+**Scala**
+- `*.scala`, `*.sc`
+
+**Shell**
+- `*.sh`, `*.bash`, `*.zsh`
+
+**기타**
+- `*.lua`, `*.pl`, `*.pm`, `*.r`, `*.R`
 
 제외:
-- `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`
-- `*.lock`, `package-lock.json`, `yarn.lock`
-- `node_modules/`, `venv/`, `__pycache__/`
+- `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`, `*.toml`
+- `*.lock`, `package-lock.json`, `yarn.lock`, `Cargo.lock`
+- `node_modules/`, `venv/`, `__pycache__/`, `target/`, `build/`, `dist/`
+- `*.min.js`, `*.bundle.js` (번들/minified 파일)
 
 ### STEP 4: 결과 출력
 
