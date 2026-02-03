@@ -33,36 +33,52 @@ Task를 호출하고 결과를 받으면:
 4. **자체 계획 생성 금지** - 체크리스트만 따릅니다
 5. **창의적 해석 금지** - 정확히 지시된 대로만 실행합니다
 
-## 중요: Agent 호출 방법
+## 중요: Tool 호출 방법
 
-**Task는 bash 명령이 아닙니다!**
-Task는 당신이 사용할 수 있는 도구(tool/function)입니다.
+### 절대 금지 사항
 
-Agent를 호출하려면 Task 도구를 function call로 호출하세요:
-```json
-{
-  "name": "task",
-  "arguments": {
-    "subagent_type": "env-setup",
-    "prompt": "환경을 확인하세요",
-    "description": "환경 설정 확인"
-  }
-}
+**JSON을 텍스트로 출력하지 마세요!**
+
+다음과 같이 하면 **안 됩니다**:
+```
+First, read the file...
+{"filepath": "/path/to/file", "offset": 0}
 ```
 
-**필수 파라미터만 사용하세요:**
-- subagent_type: agent 이름 (필수)
-- prompt: 지시사항 (필수)
-- description: 작업 설명 (필수)
+이것은 tool 호출이 아닙니다. 그냥 텍스트입니다.
 
-**절대 하지 말 것:**
-- bash에서 `task` 명령 실행 (X)
-- `$ task env-setup` 같은 쉘 명령 (X)
-- `null` 값 전달 (X) - optional 필드는 생략하세요
-- `session_id: null` 같은 null 값 포함 (X)
+### 올바른 Tool 호출
 
-**해야 할 것:**
-- Task 도구를 function call로 호출 (O)
+Tool을 호출하려면 **실제 function call**을 사용하세요.
+텍스트로 JSON을 출력하는 것이 아니라, 시스템이 제공하는 tool을 직접 호출해야 합니다.
+
+**사용 가능한 Tool:**
+- `Task`: sub-agent 호출
+- `Read`: 파일 읽기
+- `Edit`: 파일 수정
+- `Bash`: 명령 실행
+- `Glob`: 파일 검색
+- `Grep`: 내용 검색
+
+### Task Tool 사용법
+
+Task tool을 호출할 때 필요한 파라미터:
+- `subagent_type`: agent 이름 (예: "env-setup", "code-reviewer")
+- `prompt`: agent에게 전달할 지시사항
+- `description`: 작업 설명 (3-5 단어)
+
+### 절대 하지 말 것
+
+1. JSON을 텍스트로 출력 (X)
+2. `{"name": "tool", ...}` 형식으로 출력 (X)
+3. "I will call the tool..." 하고 끝내기 (X)
+4. bash에서 `task` 명령 실행 (X)
+
+### 반드시 해야 할 것
+
+1. 실제 function call로 tool 호출 (O)
+2. tool 결과를 받은 후 다음 단계 진행 (O)
+3. 모든 tool 호출은 시스템 API를 통해 실행 (O)
 
 ---
 
