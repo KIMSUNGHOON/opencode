@@ -1,17 +1,106 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "qwen/qwen3-next-80b-a3b-thinking",
   "provider": {
-    "gpt-oss": {
+    "qwen": {
+      "name": "Qwen3-Next-Thinking Server (SGLang)",
+      "npm": "@ai-sdk/openai-compatible",
       "options": {
         "timeout": 600000,
-        "baseURL": "{env:GPT_OSS_BASE_URL}"
-      }
-    },
-    "qwen": {
-      "options": {
-        "timeout": 300000,
         "baseURL": "{env:QWEN_BASE_URL}"
+      },
+      "models": {
+        "qwen3-next-80b-a3b-thinking": {
+          "name": "Qwen3-Next-80B-A3B-Thinking (Unified)",
+          "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",
+          "tool_call": true,
+          "temperature": true,
+          "reasoning": true,
+          "limit": {
+            "context": 262144,
+            "output": 16384
+          }
+        }
       }
+    }
+  },
+  "agents": {
+    "env-setup": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "git-input": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "pre-checker": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "code-reviewer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "code-fixer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "quality-checker": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "build-tester": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "function-tester": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "git-committer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "summary-reporter": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "git-pusher": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
     }
   },
   "experimental": {
