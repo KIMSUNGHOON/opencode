@@ -144,10 +144,26 @@ Task 도구 호출:
 
 → 완료 시 STEP 4로
 
-### STEP 4: Code Review
+### STEP 4: Code Review (GPT-OSS - Tool 없음)
+
+**중요: code-reviewer는 GPT-OSS 모델을 사용하며 Tool이 없습니다.**
+
+**사전 작업 (오케스트레이터가 수행):**
+1. `changed_files`의 각 파일을 Read tool로 읽습니다
+2. 읽은 내용을 prompt에 포함하여 전달합니다
+
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
+- prompt: |
+    다음 파일들의 코드를 분석하고 이슈를 찾으세요.
+
+    === {파일1 경로} ===
+    {파일1 내용}
+
+    === {파일2 경로} ===
+    {파일2 내용}
+
+    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
 - description: "코드 리뷰"
 
 **결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
@@ -212,10 +228,37 @@ Task 도구 호출:
 
 → 완료 시 STEP 10으로
 
-### STEP 10: Summary Report
+### STEP 10: Summary Report (GPT-OSS - Tool 없음)
+
+**중요: summary-reporter는 GPT-OSS 모델을 사용하며 Tool이 없습니다.**
+
+**사전 작업:** 지금까지 수집한 모든 결과를 prompt에 포함합니다.
+
 Task 도구 호출:
 - subagent_type: "summary-reporter"
-- prompt: "전체 QA 결과를 요약하세요"
+- prompt: |
+    다음 QA 결과를 분석하고 종합 리포트를 생성하세요.
+
+    === 환경 정보 ===
+    {env_setup_result}
+
+    === 변경 파일 ({changed_files 개수}개) ===
+    {changed_files 목록}
+
+    === 코드 리뷰 결과 ===
+    {review_issues}
+
+    === 품질 점수 ===
+    {quality_score}/100
+
+    === 빌드 결과 ===
+    {build_result}
+
+    === 테스트 결과 ===
+    {test_result}
+
+    === 커밋 정보 ===
+    {commit_info}
 - description: "결과 리포트"
 
 → 완료 시 STEP 11로
