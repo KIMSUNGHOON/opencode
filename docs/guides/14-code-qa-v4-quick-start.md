@@ -306,23 +306,118 @@ opencode
 > code-qa (Code QA 워크플로우)
 ```
 
-### 6.3 Command로 사용하기
+### 6.3 전체 워크플로우 (/code-qa)
 
 ```bash
-# Working directory 변경 검사 (기본값)
-/code-qa
+# ═══════════════════════════════════════════════════════════════
+# /code-qa - 전체 Code QA 워크플로우 (11단계)
+# ═══════════════════════════════════════════════════════════════
 
-# Staged 변경만 검사
-/code-qa --staged
+# ── Git 모드 (기본값) ──────────────────────────────────────────
+/code-qa                        # Working directory 변경 검사
+/code-qa --staged               # Staged 변경만 검사
+/code-qa --last                 # 마지막 커밋 검사
+/code-qa --branch               # 브랜치 전체 검사 (main 대비)
+/code-qa --range a1b2c3..d4e5f6 # 특정 커밋 범위 검사
 
-# 마지막 커밋 검사
-/code-qa --last
+# ── 파일 직접 지정 모드 (Non-Git) ──────────────────────────────
+/code-qa --files src/main.py              # 단일 파일
+/code-qa --files src/*.py                 # 와일드카드
+/code-qa --files src/,lib/                # 여러 디렉토리
+/code-qa --files "src/**/*.py"            # 재귀 패턴
 
-# 호스트에서 직접 실행 (Docker Sandbox 비활성화)
-/code-qa --no-sandbox
+# ── 실행 환경 옵션 ─────────────────────────────────────────────
+/code-qa --no-sandbox           # Docker 없이 호스트에서 직접 실행
+
+# ── 조합 예시 ──────────────────────────────────────────────────
+/code-qa --staged --no-sandbox            # Staged + 호스트
+/code-qa --files src/ --no-sandbox        # 파일 지정 + 호스트
+/code-qa --last --no-sandbox              # 마지막 커밋 + 호스트
 ```
 
-### 6.4 사용자 확인 단계
+**Git 모드 vs 파일 모드:**
+
+| 모드 | 입력 소스 | Git 단계 | 사용 시나리오 |
+|------|----------|----------|--------------|
+| **Git 모드** | git diff | 포함 | Git 저장소 프로젝트 |
+| **파일 모드** | --files | 제외 | Non-Git 프로젝트, 특정 파일만 검사 |
+
+### 6.4 독립 실행 커맨드
+
+각 sub-agent를 독립적으로 실행할 수 있습니다:
+
+```bash
+# ═══════════════════════════════════════════════════════════════
+# 독립 실행 커맨드 - Sub-Agent 개별 사용
+# ═══════════════════════════════════════════════════════════════
+
+# ── /env - 환경 설정 ───────────────────────────────────────────
+/env                            # 대화형 환경 설정
+/env --shell zsh --env conda    # Shell/환경 미리 지정
+/env --info                     # 현재 환경 정보만 확인
+/env --reset                    # 환경 설정 초기화
+
+# ── /lint - Lint/Format 자동 수정 ──────────────────────────────
+/lint                           # 현재 디렉토리 전체
+/lint src/main.py               # 특정 파일
+/lint src/                      # 특정 디렉토리
+/lint src/*.py                  # 와일드카드
+/lint --check                   # 수정 없이 검사만
+/lint --no-sandbox              # 호스트에서 실행
+
+# ── /review - 코드 리뷰 ────────────────────────────────────────
+/review                         # Working directory 변경 리뷰
+/review --staged                # Staged 변경만 리뷰
+/review --last                  # 마지막 커밋 리뷰
+/review src/main.py             # 특정 파일 리뷰
+/review --security              # 보안 이슈만 집중
+/review --verbose               # 상세 분석
+
+# ── /fix - 코드 이슈 수정 ──────────────────────────────────────
+/fix "src/main.py:45 - SQL injection"  # 특정 이슈 수정
+/fix src/main.py                # 파일의 모든 이슈 수정
+/fix --from-review              # /review 결과 기반 수정
+/fix --type security src/       # 특정 타입만 수정
+/fix --dry-run                  # 미리보기만
+
+# ── /quality - 품질 검사 ───────────────────────────────────────
+/quality                        # 현재 디렉토리 검사
+/quality src/                   # 특정 디렉토리 검사
+/quality --threshold 80         # 통과 기준 변경
+/quality --verbose              # 상세 결과
+/quality --json                 # JSON 출력
+/quality --no-sandbox           # 호스트에서 실행
+
+# ── /build - 빌드 테스트 ───────────────────────────────────────
+/build                          # Docker Sandbox에서 빌드
+/build --no-sandbox             # 호스트에서 빌드
+/build --skip-confirm           # 환경 확인 건너뛰기
+/build --cmd "pip install -e ." # 커스텀 빌드 명령
+/build --verbose                # 상세 로그
+
+# ── /test - 기능 테스트 ────────────────────────────────────────
+/test                           # 모든 테스트 탐지/실행
+/test tests/test_main.py        # 특정 테스트 파일
+/test tests/::test_function     # 특정 테스트 함수
+/test --lang python             # 특정 언어만
+/test --coverage                # 커버리지 포함
+/test --no-sandbox              # 호스트에서 실행
+/test --fail-fast               # 첫 실패시 중단
+```
+
+**독립 커맨드 사용 시나리오:**
+
+| 커맨드 | 사용 시나리오 |
+|--------|--------------|
+| `/lint` | 빠른 포맷팅/린트 수정 |
+| `/review` | 코드 리뷰만 필요할 때 |
+| `/fix` | 특정 이슈만 수정 |
+| `/quality` | 품질 점수 확인만 |
+| `/build` | 빌드 테스트만 |
+| `/test` | 테스트만 실행 |
+| `/env` | 환경 설정만 |
+
+### 6.5 사용자 확인 단계
 
 다음 Agent들에서 사용자 입력을 요구합니다:
 
@@ -330,13 +425,32 @@ opencode
 |-------|------------|------|
 | **env-setup** | Shell 선택 (1-3), 환경 타입 선택 (1-4) | 어떤 Shell과 가상환경을 사용할지 선택 |
 | **git-input** | "초기화/git init", 파일 경로, 또는 "종료/exit" | Git 저장소가 아닌 경우 처리 방법 선택 |
+| **file-input** | (자동) | --files 옵션 사용 시 파일 탐색 |
 | **build-tester** | "확인/y" 또는 "재설정/n" | 환경 설정이 올바른지 확인 후 빌드 진행 |
 | **function-tester** | "실행/y", 특정 언어, 또는 "스킵/n" | 모든 언어 테스트 한 번에 표시 후 실행 여부 결정 |
-| **git-committer** | "확인/y", 새 메시지, 또는 "취소/n" | 커밋 정보 확인 후 커밋 실행 여부 결정 |
-| **git-pusher** | "확인/y", "재시도", 또는 "스킵/n" | Push 여부 및 인증 오류 처리 |
+| **git-committer** | "확인/y", 새 메시지, 또는 "취소/n" | 커밋 정보 확인 후 커밋 실행 여부 결정 (Git 모드만) |
+| **git-pusher** | "확인/y", "재시도", 또는 "스킵/n" | Push 여부 및 인증 오류 처리 (Git 모드만) |
 
-### 6.5 워크플로우 진행 과정
+**Git 모드 vs 파일 모드에서 실행되는 Agent:**
 
+| Agent | Git 모드 | 파일 모드 (--files) |
+|-------|---------|-------------------|
+| env-setup | ✅ | ✅ |
+| git-input | ✅ | ❌ |
+| file-input | ❌ | ✅ |
+| pre-checker | ✅ | ✅ |
+| code-reviewer | ✅ | ✅ |
+| code-fixer | ✅ | ✅ |
+| quality-checker | ✅ | ✅ |
+| build-tester | ✅ | ✅ |
+| function-tester | ✅ | ✅ |
+| git-committer | ✅ | ❌ |
+| summary-reporter | ✅ | ✅ |
+| git-pusher | ✅ | ❌ |
+
+### 6.6 워크플로우 진행 과정
+
+**Git 모드 워크플로우 (기본):**
 ```
 Phase -1: Environment Setup (사용자 입력 필수)
     │
@@ -346,7 +460,7 @@ Phase 0: Git Input ────────────────┐
     │                               ↓
     │                          사용자 선택
     │                          - 초기화 → 계속
-    │                          - 파일 지정 → 계속
+    │                          - 파일 지정 → 파일 모드로 전환
     │                          - 종료 → 워크플로우 종료
     ↓
 Phase 1: Pre-Check (Lint/Format)
@@ -386,6 +500,38 @@ Phase 9: Push & PR/MR (사용자 확인)
 워크플로우 완료
 ```
 
+**파일 모드 워크플로우 (--files 옵션):**
+```
+Phase -1: Environment Setup (사용자 입력 필수)
+    ↓
+Phase 0: File Input (--files 경로 파싱)
+    ↓
+Phase 1: Pre-Check (Lint/Format)
+    ↓
+Phase 2: Code Review
+    ↓
+Phase 3: Code Fix
+    ↓
+Phase 4: Quality Check ──────────────┐
+    │                                │
+    ↓ (>=70점)                       │ (<70점)
+    │                                │
+Phase 5: Build Test (사용자 확인)   │
+    │                                │
+    ↓ (성공)                         │
+    │                                │
+Phase 6: Function Test (사용자 확인)│
+    │                                │
+    └──→ 실패 시 ───────────────────┘
+                        ↓
+                   Code Fixer로 회귀
+                   (최대 3회)
+    ↓
+Phase 8: Summary Report  ← Git 단계 건너뜀
+    ↓
+워크플로우 완료 (Commit/Push 없음)
+```
+
 ---
 
 ## 7. 제거
@@ -393,9 +539,13 @@ Phase 9: Push & PR/MR (사용자 확인)
 ### 7.1 글로벌 설정 제거
 
 ```bash
-# 글로벌 Code QA 설정 제거
-rm -rf ~/.config/opencode/.opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
-rm -rf ~/.config/opencode/.opencode/command/code-qa.md
+# 글로벌 Code QA Agent 제거 (12개)
+rm -rf ~/.config/opencode/.opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,file-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
+
+# 글로벌 Code QA Command 제거 (8개)
+rm -rf ~/.config/opencode/.opencode/command/{code-qa,env,lint,review,fix,quality,build,test}.md
+
+# 글로벌 Code QA Mode 제거
 rm -rf ~/.config/opencode/.opencode/mode/code-qa.md
 
 # 글로벌 설정 파일에서 Code QA agent 설정 제거 (수동)
@@ -413,10 +563,16 @@ rm -rf ~/.config/opencode/
 ### 7.3 프로젝트별 설정 제거
 
 ```bash
-# 프로젝트의 Code QA 관련 파일 제거
-rm -rf .opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
-rm -rf .opencode/command/code-qa.md
+# 프로젝트의 Code QA Agent 제거 (있는 경우)
+rm -rf .opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,file-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
+
+# 프로젝트의 Code QA Command 제거 (있는 경우)
+rm -rf .opencode/command/{code-qa,env,lint,review,fix,quality,build,test}.md
+
+# 프로젝트의 Code QA Mode 제거 (있는 경우)
 rm -rf .opencode/mode/code-qa.md
+
+# 기타 설정 파일 제거
 rm -rf .opencode/env-config.yaml
 rm -rf .opencode/docker/
 ```
@@ -566,22 +722,30 @@ glab auth login --hostname your-gitlab.example.com
 ~/.config/opencode/
 ├── opencode.json                           ✅ Provider, Agent 설정
 └── .opencode/
-    ├── agent/
-    │   ├── env-setup.md                    ✅
-    │   ├── git-input.md                    ✅
-    │   ├── pre-checker.md                  ✅
-    │   ├── code-reviewer.md                ✅
-    │   ├── code-fixer.md                   ✅
-    │   ├── quality-checker.md              ✅
-    │   ├── build-tester.md                 ✅
-    │   ├── function-tester.md              ✅
-    │   ├── git-committer.md                ✅
-    │   ├── summary-reporter.md             ✅
-    │   └── git-pusher.md                   ✅
-    ├── command/
-    │   └── code-qa.md                      ✅
+    ├── agent/                              (12개 Agent)
+    │   ├── env-setup.md                    ✅ 환경 설정
+    │   ├── git-input.md                    ✅ Git 입력 파서
+    │   ├── file-input.md                   ✅ 파일 입력 파서 (Non-Git)
+    │   ├── pre-checker.md                  ✅ Lint/Format
+    │   ├── code-reviewer.md                ✅ 코드 리뷰
+    │   ├── code-fixer.md                   ✅ 코드 수정
+    │   ├── quality-checker.md              ✅ 품질 검사
+    │   ├── build-tester.md                 ✅ 빌드 테스트
+    │   ├── function-tester.md              ✅ 기능 테스트
+    │   ├── git-committer.md                ✅ Git 커밋
+    │   ├── summary-reporter.md             ✅ 결과 리포트
+    │   └── git-pusher.md                   ✅ Push/PR
+    ├── command/                            (8개 Command)
+    │   ├── code-qa.md                      ✅ 전체 워크플로우
+    │   ├── env.md                          ✅ /env - 환경 설정
+    │   ├── lint.md                         ✅ /lint - Lint/Format
+    │   ├── review.md                       ✅ /review - 코드 리뷰
+    │   ├── fix.md                          ✅ /fix - 코드 수정
+    │   ├── quality.md                      ✅ /quality - 품질 검사
+    │   ├── build.md                        ✅ /build - 빌드 테스트
+    │   └── test.md                         ✅ /test - 기능 테스트
     └── mode/
-        └── code-qa.md                      ✅
+        └── code-qa.md                      ✅ QA 오케스트레이터
 ```
 
 ### 환경 변수 (필수)
@@ -589,6 +753,20 @@ glab auth login --hostname your-gitlab.example.com
 ```bash
 QWEN_BASE_URL="http://localhost:30000/v1"   ✅
 ```
+
+### 커맨드 요약
+
+| 커맨드 | 용도 | Git 필요 |
+|--------|------|---------|
+| `/code-qa` | 전체 워크플로우 | 선택 |
+| `/code-qa --files <경로>` | 전체 워크플로우 (Non-Git) | ❌ |
+| `/env` | 환경 설정만 | ❌ |
+| `/lint` | Lint/Format만 | ❌ |
+| `/review` | 코드 리뷰만 | 선택 |
+| `/fix` | 코드 수정만 | ❌ |
+| `/quality` | 품질 검사만 | ❌ |
+| `/build` | 빌드 테스트만 | ❌ |
+| `/test` | 기능 테스트만 | ❌ |
 
 ---
 

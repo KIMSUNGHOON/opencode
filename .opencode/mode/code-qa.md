@@ -86,16 +86,31 @@ Task tool을 호출할 때 필요한 파라미터:
 
 사용자가 입력한 옵션을 확인하세요:
 
-### Git 옵션
+### 입력 모드 (상호 배타적)
+
+**Git 모드 (기본값):**
 - (기본값): --working (git diff)
 - --staged: staged 변경만
 - --last: 마지막 커밋
 - --branch: 브랜치 전체
 - --range <a>..<b>: 특정 범위
 
+**파일 직접 지정 모드 (Non-Git):**
+- --files <경로>: 파일/디렉토리 직접 지정 (Git 불필요)
+  - 예: `--files src/main.py`
+  - 예: `--files src/*.py`
+  - 예: `--files src/,lib/,tests/`
+  - 예: `--files "src/**/*.py"`
+
+**중요:** `--files` 옵션 사용 시 Git 관련 단계(git-input, git-committer, git-pusher)를 건너뜁니다.
+
 ### Sandbox 옵션
 - (기본값): Docker Sandbox 사용
 - --no-sandbox: 호스트에서 직접 실행
+
+### 워크플로우 모드
+- (기본값): 전체 워크플로우 (11단계)
+- --no-git: Git 단계 제외 (env-setup → pre-check → review → fix → quality → build → test → summary)
 
 ---
 
@@ -105,8 +120,11 @@ Task tool을 호출할 때 필요한 파라미터:
 ```
 retry_count = 0
 quality_score = 0
-changed_files = []      # git-input에서 받은 파일 목록
+changed_files = []      # git-input 또는 file-input에서 받은 파일 목록
 review_issues = []      # code-reviewer에서 발견한 이슈
+
+# 입력 모드 (--files 옵션 여부에 따라 결정)
+use_git_mode = true     # --files 없으면 true, 있으면 false
 
 # 사용자 입력 관련 상태
 env_setup_confirmed = false   # env-setup 완료 여부
@@ -115,6 +133,14 @@ test_confirmed = false        # function-tester 테스트 확인 여부
 ```
 
 **중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
+
+**입력 모드 판단:**
+```
+IF $ARGUMENTS에 "--files" 포함:
+    use_git_mode = false
+ELSE:
+    use_git_mode = true
+```
 
 ## 사용자 입력이 필요한 Agent들
 
@@ -159,7 +185,11 @@ IF Task 결과에 "ENV_SETUP_RESULT: SUCCESS" 포함:
 
 → 사용자 입력 완료 후 STEP 2로
 
-### STEP 2: Git Input
+### STEP 2: File Input (Git 또는 Direct)
+
+**입력 모드에 따라 다른 Agent 호출:**
+
+#### 옵션 A: Git 모드 (use_git_mode == true)
 Task 도구 호출:
 - subagent_type: "git-input"
 - prompt: "사용자의 입력 옵션을 파싱하고 변경 파일 목록을 추출하세요"
@@ -170,7 +200,7 @@ Task 도구 호출:
 IF Task 결과에 "GIT_INPUT_RESULT: NO_GIT_REPO" 포함:
     → 사용자 응답을 기다립니다
     → 사용자가 "git init" 또는 "초기화" 입력 시: git-input 다시 호출
-    → 사용자가 파일 경로 입력 시: 해당 파일을 changed_files로 사용
+    → 사용자가 파일 경로 입력 시: use_git_mode = false로 변경, file-input 호출
     → 사용자가 "종료" 또는 "exit" 입력 시: 워크플로우 종료
 
 IF Task 결과에 "GIT_INPUT_RESULT: ABORTED" 포함:
@@ -178,6 +208,20 @@ IF Task 결과에 "GIT_INPUT_RESULT: ABORTED" 포함:
 
 IF Task 결과에 "GIT_INPUT_RESULT: SUCCESS" 포함:
     → STEP 3으로 진행
+```
+
+#### 옵션 B: 파일 직접 지정 모드 (use_git_mode == false, --files 옵션)
+Task 도구 호출:
+- subagent_type: "file-input"
+- prompt: "다음 경로에서 코드 파일을 찾으세요: {--files 값}"
+- description: "파일 입력 파싱"
+
+```
+IF Task 결과에 "FILE_INPUT_RESULT: SUCCESS" 포함:
+    → STEP 3으로 진행
+
+IF Task 결과에 "FILE_INPUT_RESULT: NO_FILES" 또는 "FILE_INPUT_RESULT: INVALID_PATH" 포함:
+    → 오류 메시지 출력 후 워크플로우 종료
 ```
 
 **결과 저장:** Task 결과에서 파일 목록을 추출하여 `changed_files`에 저장
@@ -284,7 +328,16 @@ IF Task 결과에 "TEST_RESULT: SKIPPED" 또는 "TEST_RESULT: NO_TESTS" 포함:
 → 성공/스킵: STEP 9로
 → 실패: STEP 5로 회귀 (최대 3회)
 
-### STEP 9: Git Commit (사용자 확인 필수)
+### STEP 9: Git Commit (사용자 확인 필수) - Git 모드 전용
+
+**⚠️ Non-Git 모드 (--files 사용 시):**
+```
+IF use_git_mode == false:
+    → STEP 9 건너뛰기
+    → STEP 10 (Summary Report)으로 바로 진행
+```
+
+**Git 모드:**
 Task 도구 호출:
 - subagent_type: "git-committer"
 - prompt: "변경 사항을 커밋하세요. 먼저 커밋 정보(파일 목록, 커밋 메시지)를 보여주고 사용자의 확인을 받은 후에만 커밋을 실행하세요."
@@ -337,7 +390,16 @@ Task 도구 호출:
 
 → 완료 시 STEP 11로
 
-### STEP 11: Push & PR/MR
+### STEP 11: Push & PR/MR - Git 모드 전용
+
+**⚠️ Non-Git 모드 (--files 사용 시):**
+```
+IF use_git_mode == false:
+    → STEP 11 건너뛰기
+    → 워크플로우 종료 (Summary Report로 완료)
+```
+
+**Git 모드:**
 Task 도구 호출:
 - subagent_type: "git-pusher"
 - prompt: "원격 저장소 플랫폼(GitHub/GitLab)을 감지하고, 사용자에게 Push 여부를 확인하세요. Push 후 PR(GitHub) 또는 MR(GitLab) 생성 여부도 확인하세요."
