@@ -112,11 +112,13 @@ Task 도구 호출:
 ### STEP 6: Quality Check
 Task 도구 호출:
 - subagent_type: "quality-checker"
-- prompt: "품질 점수를 계산하세요"
+- prompt: "ruff, mypy, radon 등 정적 분석 도구를 직접 실행하고, 결과를 바탕으로 품질 점수를 계산하세요. 반드시 QUALITY_SCORE: XX/100 형식으로 점수를 출력하세요."
 - description: "품질 검사"
 
-→ 점수 >= 70: STEP 7로
-→ 점수 < 70: STEP 5로 회귀 (최대 3회)
+**점수 파싱**: 결과에서 `QUALITY_SCORE: XX/100` 패턴을 찾아 점수 확인
+
+→ STATUS: PASS (점수 >= 70): STEP 7로
+→ STATUS: FAIL (점수 < 70): STEP 5로 회귀 (최대 3회)
 
 ### STEP 7: Build Test
 Task 도구 호출:
