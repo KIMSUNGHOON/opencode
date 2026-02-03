@@ -6,15 +6,21 @@
 #   docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
 #   docker run --gpus all -v $(pwd):/workspace qa-sandbox <command>
 #
+# CA 인증서 설정:
+#   빌드 전에 호스트의 CA 인증서를 .opencode/docker/certs/ 에 복사하세요:
+#   cp /usr/local/share/ca-certificates/*.crt .opencode/docker/certs/
+#   cp /usr/local/share/ca-certificates/*.pem .opencode/docker/certs/
+#
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Base Image: NVIDIA CUDA + Python
 # -----------------------------------------------------------------------------
-ARG CUDA_VERSION=11.8.0
-ARG PYTHON_VERSION=3.11
+ARG CUDA_VERSION=13.0.0
+ARG PYTHON_VERSION=3.12
 
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+# Ubuntu 24.04 for Python 3.12 support
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn-runtime-ubuntu24.04
 
 # -----------------------------------------------------------------------------
 # Environment Variables
@@ -31,6 +37,14 @@ ENV PYTHON_VERSION=${PYTHON_VERSION}
 
 # Workspace
 WORKDIR /workspace
+
+# -----------------------------------------------------------------------------
+# CA Certificates (호스트에서 복사)
+# -----------------------------------------------------------------------------
+# 호스트의 CA 인증서를 Docker 내부로 복사
+# 빌드 전에 .opencode/docker/certs/ 디렉토리에 인증서를 복사해두세요
+COPY .opencode/docker/certs/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true
+COPY .opencode/docker/certs/*.pem /usr/local/share/ca-certificates/ 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
 # System Dependencies
@@ -50,6 +64,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Utilities
     ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
+    # Update CA certificates
+    && update-ca-certificates \
     # Python symlinks
     && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python \
     && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
