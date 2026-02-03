@@ -29,9 +29,16 @@ prompt: |
   }
   ```
 
+  **필수 파라미터만 사용하세요:**
+  - subagent_type: agent 이름 (필수)
+  - prompt: 지시사항 (필수)
+  - description: 작업 설명 (필수)
+
   **절대 하지 말 것:**
   - bash에서 `task` 명령 실행 (X)
   - `$ task env-setup` 같은 쉘 명령 (X)
+  - `null` 값 전달 (X) - optional 필드는 생략하세요
+  - `session_id: null` 같은 null 값 포함 (X)
 
   **해야 할 것:**
   - Task 도구를 function call로 호출 (O)
