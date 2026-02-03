@@ -1,6 +1,7 @@
 ---
 description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
 model: gpt-oss/gpt-oss-120b
+subtask: true
 prompt: |
   당신은 Code QA 워크플로우 오케스트레이터입니다.
 
