@@ -22,17 +22,33 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 - **Environment Setup**: 자동 환경 감지 및 설정
 - **Docker Sandbox**: 격리된 Build/Test 환경
-- **두 가지 모델 전략**: GPT-OSS-120B (추론) + Qwen3-Coder-30B (에이전틱)
+- **단일 모델 전략**: Qwen3-Next-80B-A3B-Thinking (Reasoning + Tool Calling)
 - **회귀 루프**: 품질 기준 미달 시 자동 재시도
+- **256K Context Window**: 긴 코드 파일 처리 가능
 
-### 모델 배분
+### 단일 모델 전략
 
 | 모델 | 용도 | 역할 |
 |------|------|-------|
-| **GPT-OSS-120B** | Chain-of-Thought 추론 (Reasoning) | **오케스트레이터**, code-reviewer, summary-reporter |
-| **Qwen3-Coder-30B** | Tool Calling, SWE-Bench (Instructor) | 나머지 9개 Sub-Agent |
+| **Qwen3-Next-80B-A3B-Thinking** | Reasoning + Tool Calling | 오케스트레이터 + 모든 Sub-Agent |
 
-> **중요**: Qwen3-Coder-30B는 reasoning 모델이 아닌 instructor 모델이므로, 워크플로우 조율이 필요한 오케스트레이터 역할에는 적합하지 않습니다. 오케스트레이터는 반드시 reasoning 능력이 있는 GPT-OSS-120B를 사용해야 합니다.
+> **왜 단일 모델인가?**
+> - **256K Context Window**: 긴 코드 파일도 한 번에 처리 가능
+> - **Thinking + Tool Calling**: 추론과 도구 호출 모두 단일 모델로 지원
+> - **단순한 인프라**: 하나의 모델 서버만 운영
+> - **일관된 성능**: 모델 전환 없이 낮은 지연시간
+
+### 하드웨어 요구사항
+
+```
+권장: 2x H100 NVL 96GB (Tensor Parallel)
+- 모델 가중치 (FP8): ~76GB
+- KV Cache (256K): ~50GB
+- 여유: ~66GB
+
+최소: 1x H100 NVL 96GB
+- Context 128K 제한
+```
 
 ---
 
@@ -42,7 +58,7 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 ```
 ~/.config/opencode/
-└── opencode.json              # 글로벌 설정 (Provider, Model, Agent 포함)
+└── opencode.json              # 글로벌 설정 (Provider, Model 포함)
 
 your-project/
 ├── .opencode/
@@ -82,80 +98,62 @@ docker --version
 nvidia-docker --version  # GPU 사용 시
 ```
 
+### 2.3 모델 서버 배포
+
+```bash
+# vLLM 최신 버전 설치
+pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+
+# 2x H100 NVL - 256K context
+vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --port 8000 \
+  --tensor-parallel-size 2 \
+  --max-model-len 262144 \
+  --gpu-memory-utilization 0.9
+
+# 1x H100 NVL - 128K context (최소 구성)
+vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --port 8000 \
+  --max-model-len 131072 \
+  --gpu-memory-utilization 0.9
+```
+
 ---
 
 ## 3. 글로벌 설정
 
 글로벌 설정 파일을 `~/.config/opencode/opencode.json`에 생성합니다.
-Provider, Model, Agent 설정을 모두 포함합니다.
 
 ### 3.1 글로벌 설정 파일 (복사해서 사용)
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "gpt-oss/gpt-oss-120b",
-  "small_model": "qwen/qwen3-coder-30b",
+  "model": "qwen/qwen3-next-80b-a3b-thinking",
   "provider": {
-    "gpt-oss": {
-      "name": "GPT-OSS-120B Server",
+    "qwen": {
+      "name": "Qwen3-Next-Thinking Server",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8000/v1",
       "options": {
         "apiKey": "dummy",
         "baseURL": "http://localhost:8000/v1",
-        "timeout": 300000
+        "timeout": 600000
       },
       "models": {
-        "gpt-oss-120b": {
-          "name": "GPT-OSS-120B (Reasoning)",
-          "id": "gpt-oss-120b",
+        "qwen3-next-80b-a3b-thinking": {
+          "name": "Qwen3-Next-80B-A3B-Thinking (Unified)",
+          "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": true,
           "limit": {
-            "context": 131072,
-            "output": 8192
-          }
-        }
-      }
-    },
-    "qwen": {
-      "name": "Qwen3-Coder-30B Server",
-      "npm": "@ai-sdk/openai-compatible",
-      "api": "http://localhost:8001/v1",
-      "options": {
-        "apiKey": "dummy",
-        "baseURL": "http://localhost:8001/v1",
-        "timeout": 300000
-      },
-      "models": {
-        "qwen3-coder-30b": {
-          "name": "Qwen3-Coder-30B (Agentic)",
-          "id": "qwen3-coder-30b",
-          "tool_call": true,
-          "temperature": true,
-          "reasoning": false,
-          "limit": {
             "context": 262144,
-            "output": 8192
+            "output": 16384
           }
         }
       }
     }
-  },
-  "agents": {
-    "env-setup": { "model": "qwen/qwen3-coder-30b" },
-    "git-input": { "model": "qwen/qwen3-coder-30b" },
-    "pre-checker": { "model": "qwen/qwen3-coder-30b" },
-    "code-reviewer": { "model": "gpt-oss/gpt-oss-120b" },
-    "code-fixer": { "model": "qwen/qwen3-coder-30b" },
-    "quality-checker": { "model": "qwen/qwen3-coder-30b" },
-    "build-tester": { "model": "qwen/qwen3-coder-30b" },
-    "function-tester": { "model": "qwen/qwen3-coder-30b" },
-    "git-committer": { "model": "qwen/qwen3-coder-30b" },
-    "summary-reporter": { "model": "gpt-oss/gpt-oss-120b" },
-    "git-pusher": { "model": "qwen/qwen3-coder-30b" }
   }
 }
 ```
@@ -164,37 +162,36 @@ Provider, Model, Agent 설정을 모두 포함합니다.
 
 | 항목 | 설명 |
 |------|------|
-| `model` | 기본 모델 (메인 워크플로우용) |
-| `small_model` | 보조 모델 (빠른 작업용) |
-| `provider.{name}.api` | LLM 서버 API 엔드포인트 |
-| `provider.{name}.options` | API 연결 옵션 |
-| `provider.{name}.models` | 사용 가능한 모델 목록 |
-| `agents.{name}.model` | Agent별 모델 오버라이드 |
+| `model` | 기본 모델 (오케스트레이터 + Sub-Agent) |
+| `provider.qwen.api` | vLLM 서버 API 엔드포인트 |
+| `provider.qwen.options.timeout` | 요청 타임아웃 (ms) - 긴 추론 고려 |
+| `limit.context` | 컨텍스트 윈도우 (256K) |
+| `limit.output` | 최대 출력 토큰 (16K) |
 
-### 3.3 Provider 설정
-
-두 모델이 별도 포트로 서빙되므로 Provider를 분리합니다:
-
-| Provider | 모델 | 포트 | 용도 |
-|----------|------|------|------|
-| `gpt-oss` | GPT-OSS-120B | 8000 | CoT 추론 (code-reviewer, summary-reporter) |
-| `qwen` | Qwen3-Coder-30B | 8001 | Agentic/Tool Calling (나머지 9개) |
-
-### 3.4 모델 설정 상세
+### 3.3 모델 설정 상세
 
 ```json
-"gpt-oss-120b": {
-  "name": "GPT-OSS-120B (Reasoning)",  // 표시 이름
-  "id": "gpt-oss-120b",                 // SGLang 서버의 모델 ID
-  "tool_call": true,                    // Tool/Function Calling 지원
-  "temperature": true,                  // Temperature 조절 지원
-  "reasoning": true,                    // Chain-of-Thought 지원
+"qwen3-next-80b-a3b-thinking": {
+  "name": "Qwen3-Next-80B-A3B-Thinking (Unified)",
+  "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",  // vLLM 서버의 모델 ID
+  "tool_call": true,         // Tool/Function Calling 지원
+  "temperature": true,       // Temperature 조절 지원
+  "reasoning": true,         // Thinking mode 지원
   "limit": {
-    "context": 131072,                  // 컨텍스트 윈도우 (128K)
-    "output": 8192                      // 최대 출력 토큰
+    "context": 262144,       // 256K 컨텍스트
+    "output": 16384          // 16K 출력
   }
 }
 ```
+
+### 3.4 단일 모델의 장점
+
+| 기존 (Dual Model) | 현재 (Single Model) |
+|-------------------|---------------------|
+| GPT-OSS-120B (128K, 불안정) + Qwen3-Coder-30B | Qwen3-Next-80B-A3B-Thinking |
+| 두 개의 모델 서버 운영 | 하나의 모델 서버 |
+| 모델 간 전환 지연 | 전환 없음 |
+| 16K 실질 context 제한 | 256K context |
 
 ---
 
@@ -238,19 +235,21 @@ Agent 파일들은 `.opencode/agent/` 디렉토리에 위치합니다.
 
 ### 5.1 Agent 파일 목록
 
-| 파일 | Phase | 모델 | 역할 |
-|------|-------|------|------|
-| `env-setup.md` | -1 | Qwen3-Coder | 환경 감지 및 설정 |
-| `git-input.md` | 0 | Qwen3-Coder | Git 변경 파일 추출 |
-| `pre-checker.md` | 1 | Qwen3-Coder | Lint/Format 자동 수정 |
-| `code-reviewer.md` | 2 | **GPT-OSS-120B** | 코드 심층 분석 |
-| `code-fixer.md` | 3 | Qwen3-Coder | 이슈 수정 |
-| `quality-checker.md` | 4 | Qwen3-Coder | 품질 점수 검사 |
-| `build-tester.md` | 5 | Qwen3-Coder | 빌드 테스트 |
-| `function-tester.md` | 6 | Qwen3-Coder | 기능 테스트 |
-| `git-committer.md` | 7 | Qwen3-Coder | Git 커밋 |
-| `summary-reporter.md` | 8 | **GPT-OSS-120B** | 결과 종합 리포트 |
-| `git-pusher.md` | 9 | Qwen3-Coder | Push 및 PR |
+모든 Agent가 동일한 모델(Qwen3-Next-80B-A3B-Thinking)을 사용합니다.
+
+| 파일 | Phase | 역할 |
+|------|-------|------|
+| `env-setup.md` | -1 | 환경 감지 및 설정 |
+| `git-input.md` | 0 | Git 변경 파일 추출 |
+| `pre-checker.md` | 1 | Lint/Format 자동 수정 |
+| `code-reviewer.md` | 2 | 코드 심층 분석 (Thinking mode) |
+| `code-fixer.md` | 3 | 이슈 수정 |
+| `quality-checker.md` | 4 | 품질 점수 검사 |
+| `build-tester.md` | 5 | 빌드 테스트 |
+| `function-tester.md` | 6 | 기능 테스트 |
+| `git-committer.md` | 7 | Git 커밋 |
+| `summary-reporter.md` | 8 | 결과 종합 리포트 (Thinking mode) |
+| `git-pusher.md` | 9 | Push 및 PR |
 
 ### 5.2 Mode 파일 (오케스트레이터)
 
@@ -259,21 +258,21 @@ Agent 파일들은 `.opencode/agent/` 디렉토리에 위치합니다.
 ```markdown
 ---
 description: "Code QA 워크플로우 - 자동화된 코드 품질 검사"
-model: gpt-oss/gpt-oss-120b   # 오케스트레이터는 reasoning 모델 필수!
+model: qwen/qwen3-next-80b-a3b-thinking
 mode: all
 color: "#E74C3C"
 ---
 ```
 
-> **중요**: 오케스트레이터는 워크플로우 전체를 조율하고 조건부 분기, 회귀 판단 등 복잡한 의사결정을 수행합니다. 따라서 **reasoning 능력이 있는 모델(GPT-OSS-120B)**을 사용해야 합니다. Qwen3-Coder-30B는 instructor 모델로 Tool Calling에는 뛰어나지만 reasoning이 부족하여 오케스트레이터 역할에 적합하지 않습니다.
+> **단일 모델의 이점**: Qwen3-Next-Thinking은 Thinking mode로 복잡한 추론을, Tool Calling으로 도구 실행을 모두 수행합니다. 별도의 모델 전환 없이 오케스트레이터와 Sub-Agent 역할을 모두 담당합니다.
 
-### 5.4 Sub-Agent 파일 구조
+### 5.3 Sub-Agent 파일 구조
 
 ```markdown
 ---
 description: Agent 설명
 mode: subagent
-model: qwen/qwen3-coder-30b   # Sub-Agent는 instructor 모델 사용
+model: qwen/qwen3-next-80b-a3b-thinking  # 동일 모델 사용
 color: "#3498DB"
 tools:
   "*": false
@@ -293,9 +292,7 @@ permission:
 역할 및 실행 단계 설명...
 ```
 
-> **Note**: Agent 파일의 `model` 필드는 글로벌 설정의 `agents` 섹션으로 오버라이드됩니다.
-
-### 5.5 Permission 규칙
+### 5.4 Permission 규칙
 
 ```yaml
 permission:
@@ -386,7 +383,7 @@ Phase 0: Git Input
     ↓
 Phase 1: Pre-Check (Lint/Format)
     ↓
-Phase 2: Code Review
+Phase 2: Code Review (Thinking mode)
     ↓
 Phase 3: Code Fix
     ↓
@@ -407,7 +404,7 @@ Phase 6: Function Test  │
     ↓
 Phase 7: Git Commit
     ↓
-Phase 8: Summary Report
+Phase 8: Summary Report (Thinking mode)
     ↓
 Phase 9: Push & PR (사용자 확인)
 ```
@@ -424,16 +421,31 @@ Error: Failed to connect to model server
 
 **해결:**
 ```bash
-# GPT-OSS-120B 서버 확인
+# vLLM 서버 상태 확인
 curl http://localhost:8000/v1/models
 
-# Qwen3-Coder-30B 서버 확인
-curl http://localhost:8001/v1/models
+# 서버 로그 확인
+tail -f /var/log/vllm.log
 ```
-- 글로벌 설정의 `api` URL 확인 (8000, 8001 포트)
+- 글로벌 설정의 `api` URL 확인
 - 방화벽 설정 확인
+- vLLM 서버 재시작
 
-### 7.2 Docker Sandbox 실패
+### 7.2 OOM (Out of Memory) 오류
+
+```
+Error: CUDA out of memory
+```
+
+**해결:**
+```bash
+# Context 길이 줄이기
+vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --max-model-len 131072 \  # 256K → 128K
+  --gpu-memory-utilization 0.85  # 0.9 → 0.85
+```
+
+### 7.3 Docker Sandbox 실패
 
 ```
 Error: Docker image not found
@@ -448,7 +460,7 @@ ls .opencode/docker/Dockerfile.sandbox
 docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
 ```
 
-### 7.3 환경 감지 실패
+### 7.4 환경 감지 실패
 
 ```
 Warning: No conda environment detected
@@ -458,7 +470,7 @@ Warning: No conda environment detected
 1. conda 환경 활성화: `conda activate my-env`
 2. `.opencode/env-config.yaml`에 환경 설정 추가
 
-### 7.4 Permission 오류
+### 7.5 Permission 오류
 
 ```
 Error: Command denied by permission rules
@@ -468,7 +480,7 @@ Error: Command denied by permission rules
 1. Agent 파일의 `permission.bash` 규칙 확인
 2. 필요한 명령 패턴 추가
 
-### 7.5 품질 점수 미달
+### 7.6 품질 점수 미달
 
 ```
 Quality Score: 45/100 (FAIL)
@@ -481,6 +493,17 @@ Retrying... (attempt 2/3)
 - 수동 검토 필요
 - 남은 이슈 확인
 - 필요 시 수동 수정
+
+### 7.7 긴 응답 시간
+
+```
+Warning: Response taking longer than expected
+```
+
+**해결:**
+- Thinking mode는 복잡한 추론에 시간이 걸림
+- `timeout` 설정 확인 (기본 600000ms = 10분)
+- 정상적인 동작임
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 description: 코드 이슈 수정 전문가 (SWE-Bench SOTA)
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#27AE60"
 tools:
   "*": false

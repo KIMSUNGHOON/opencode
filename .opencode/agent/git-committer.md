@@ -1,7 +1,7 @@
 ---
 description: Git 커밋 전문가
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#E67E22"
 tools:
   "*": false

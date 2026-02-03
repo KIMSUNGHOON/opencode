@@ -1,6 +1,6 @@
 ---
 description: "Code QA 워크플로우 - 자동화된 코드 품질 검사"
-model: gpt-oss/gpt-oss-120b
+model: qwen/qwen3-next-80b-a3b-thinking
 mode: all
 color: "#E74C3C"
 ---
@@ -144,26 +144,10 @@ Task 도구 호출:
 
 → 완료 시 STEP 4로
 
-### STEP 4: Code Review (GPT-OSS - Tool 없음)
-
-**중요: code-reviewer는 GPT-OSS 모델을 사용하며 Tool이 없습니다.**
-
-**사전 작업 (오케스트레이터가 수행):**
-1. `changed_files`의 각 파일을 Read tool로 읽습니다
-2. 읽은 내용을 prompt에 포함하여 전달합니다
-
+### STEP 4: Code Review
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: |
-    다음 파일들의 코드를 분석하고 이슈를 찾으세요.
-
-    === {파일1 경로} ===
-    {파일1 내용}
-
-    === {파일2 경로} ===
-    {파일2 내용}
-
-    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
+- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
 - description: "코드 리뷰"
 
 **결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
@@ -228,12 +212,7 @@ Task 도구 호출:
 
 → 완료 시 STEP 10으로
 
-### STEP 10: Summary Report (GPT-OSS - Tool 없음)
-
-**중요: summary-reporter는 GPT-OSS 모델을 사용하며 Tool이 없습니다.**
-
-**사전 작업:** 지금까지 수집한 모든 결과를 prompt에 포함합니다.
-
+### STEP 10: Summary Report
 Task 도구 호출:
 - subagent_type: "summary-reporter"
 - prompt: |
@@ -291,21 +270,50 @@ MAX_RETRY = 3
 QUALITY_THRESHOLD = 70
 TASK_RETRY = 3           # Task 호출 재시도 횟수
 TASK_RETRY_DELAY = 2000  # 재시도 간격 (ms)
-FALLBACK_MODEL = "qwen/qwen3-coder-30b"  # Sub-Agent 전용
 ```
 
-### 모델 역할 구분
+### 단일 모델 전략
 
-| 역할 | 모델 | 이유 |
+이 워크플로우는 **Qwen3-Next-80B-A3B-Thinking** 단일 모델로 모든 역할을 수행합니다.
+
+| 역할 | 모델 | 모드 |
 |------|------|------|
-| **오케스트레이터** | gpt-oss/gpt-oss-120b | Reasoning 필요 (조건 분기, 회귀 판단) |
-| **Sub-Agent** | qwen/qwen3-coder-30b | Tool Calling 특화 (Instructor 모델) |
+| **오케스트레이터** | qwen3-next-80b-a3b-thinking | Thinking (추론) |
+| **모든 Sub-Agent** | qwen3-next-80b-a3b-thinking | Tool Calling |
 
-> **주의**: Qwen3-Coder-30B는 reasoning 모델이 아닌 instructor 모델입니다. 따라서 오케스트레이터로 사용하면 안 됩니다.
+### 단일 모델의 장점
+
+1. **256K Context Window**: 긴 코드 파일 처리 가능
+2. **Thinking + Tool Calling**: 추론과 도구 호출 모두 지원
+3. **모델 전환 없음**: 일관된 성능, 낮은 지연시간
+4. **단순한 인프라**: 하나의 모델 서버만 필요
+
+### 하드웨어 요구사항
+
+```
+권장: 2x H100 NVL 96GB (Tensor Parallel)
+- 모델 가중치 (FP8): ~76GB
+- KV Cache (256K): ~50GB
+- 여유: ~66GB
+
+최소: 1x H100 NVL 96GB
+- Context 128K 제한
+```
+
+### 배포 명령어
+
+```bash
+# 2x H100 NVL - 256K context
+vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --port 8000 \
+  --tensor-parallel-size 2 \
+  --max-model-len 262144 \
+  --gpu-memory-utilization 0.9
+```
 
 ---
 
-## 에러 핸들링 및 Fallback
+## 에러 핸들링
 
 ### Task 호출 실패 시 처리
 
@@ -326,30 +334,7 @@ WHILE task_retry_count < max_task_retry:
         CONTINUE
 
 IF task_retry_count >= max_task_retry:
-    # Fallback: Qwen 모델로 재시도
-    Task 호출 (model: "qwen/qwen3-coder-30b")
-```
-
-### Fallback 전략
-
-1. **1차 시도**: GPT-OSS-120B로 Task 호출
-2. **재시도**: 실패 시 3회까지 재시도 (2초 간격)
-3. **Fallback**: 3회 실패 시 Qwen3-Coder-30B로 전환
-
-### Task 호출 시 model 파라미터 사용
-
-Fallback 시 model 파라미터를 명시적으로 전달:
-
-```json
-{
-  "name": "task",
-  "arguments": {
-    "subagent_type": "code-reviewer",
-    "prompt": "코드를 분석하세요...",
-    "description": "코드 리뷰",
-    "model": "qwen/qwen3-coder-30b"
-  }
-}
+    → 워크플로우 중단, 사용자에게 알림
 ```
 
 ### 에러 유형별 처리
@@ -358,8 +343,8 @@ Fallback 시 model 파라미터를 명시적으로 전달:
 |----------|----------|
 | pending/timeout | 재시도 (최대 3회) |
 | 응답 끊김 | 재시도 (최대 3회) |
-| 모델 과부하 | Fallback 모델로 전환 |
-| 네트워크 에러 | 재시도 후 Fallback |
+| OOM | Context 길이 줄여서 재시도 |
+| 네트워크 에러 | 재시도 (최대 3회) |
 
 ### 실패 로그 출력
 
@@ -369,5 +354,5 @@ Task 실패 시 다음 형식으로 로그 출력:
 ⚠️ Task 실패: {agent_name}
 - 시도: {retry_count}/3
 - 에러: {error_message}
-- 다음 동작: {retry/fallback/abort}
+- 다음 동작: {retry/abort}
 ```

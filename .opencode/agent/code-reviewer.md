@@ -1,7 +1,7 @@
 ---
 description: 심층 코드 분석 전문가 (Chain-of-Thought)
 mode: subagent
-model: gpt-oss/gpt-oss-120b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#E74C3C"
 tools:
   "*": false

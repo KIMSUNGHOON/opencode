@@ -1,7 +1,7 @@
 ---
 description: Git 변경 사항 입력 파서
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#3498DB"
 tools:
   "*": false

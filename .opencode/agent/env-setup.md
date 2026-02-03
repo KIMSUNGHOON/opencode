@@ -1,7 +1,7 @@
 ---
 description: 개발 환경 감지 및 설정 전문가
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#95A5A6"
 tools:
   "*": false

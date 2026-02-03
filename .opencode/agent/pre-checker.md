@@ -1,7 +1,7 @@
 ---
 description: 코드 자동 정리 (Lint Fix, Format)
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#9B59B6"
 tools:
   "*": false
