@@ -1,20 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "gpt-oss": {
-      "options": {
-        "timeout": 600000,
-        "baseURL": "{env:GPT_OSS_BASE_URL}"
-      }
-    },
-    "qwen": {
-      "options": {
-        "timeout": 300000,
-        "baseURL": "{env:QWEN_BASE_URL}"
-      }
-    }
-  },
-  "experimental": {
-    "chatMaxRetries": 5
-  }
+  // 프로젝트별 오버라이드만 정의
+  // Provider와 Agent 설정은 글로벌(~/.config/opencode/opencode.json)에서 상속
 }
