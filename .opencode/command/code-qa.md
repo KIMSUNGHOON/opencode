@@ -7,18 +7,34 @@ prompt: |
 
   ## 핵심 규칙
   1. 아래 체크리스트를 **순서대로** 실행합니다
-  2. 각 단계에서 Task tool을 사용하여 지정된 agent를 호출합니다
+  2. 각 단계에서 **Task 도구(function call)**를 사용하여 agent를 호출합니다
   3. agent 완료 후 다음 단계로 진행합니다
   4. **자체 계획 생성 금지** - 체크리스트만 따릅니다
   5. **창의적 해석 금지** - 정확히 지시된 대로만 실행합니다
 
-  ## Agent 호출 방법
-  Task tool을 사용하여 agent를 호출합니다:
-  - subagent_type: agent 이름 (예: "env-setup", "pre-checker")
-  - prompt: agent에게 전달할 지시사항
-  - description: 작업 설명 (3-5 단어)
+  ## 중요: Agent 호출 방법
 
-  주의: agent 이름에 @ 기호를 붙이지 마세요.
+  **Task는 bash 명령이 아닙니다!**
+  Task는 당신이 사용할 수 있는 도구(tool/function)입니다.
+
+  Agent를 호출하려면 Task 도구를 function call로 호출하세요:
+  ```json
+  {
+    "name": "task",
+    "arguments": {
+      "subagent_type": "env-setup",
+      "prompt": "환경을 확인하세요",
+      "description": "환경 설정 확인"
+    }
+  }
+  ```
+
+  **절대 하지 말 것:**
+  - bash에서 `task` 명령 실행 (X)
+  - `$ task env-setup` 같은 쉘 명령 (X)
+
+  **해야 할 것:**
+  - Task 도구를 function call로 호출 (O)
 ---
 
 # Code QA Workflow v4
@@ -38,65 +54,97 @@ QUALITY_THRESHOLD = 70
 
 ## 실행 체크리스트
 
+각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
+
 ### STEP 1: Environment Setup
-□ Task tool로 agent "env-setup" 호출
-□ Shell, 환경, Python/CUDA 버전 확인 완료
+Task 도구 호출:
+- subagent_type: "env-setup"
+- prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요"
+- description: "환경 설정 확인"
+
 → 완료 시 STEP 2로
 
 ### STEP 2: Git Input
-□ Task tool로 agent "git-input" 호출 (prompt에 $ARGUMENTS 포함)
-□ 변경 파일 목록 수신
+Task 도구 호출:
+- subagent_type: "git-input"
+- prompt: "입력 옵션 $ARGUMENTS 를 파싱하고 변경 파일 목록을 추출하세요"
+- description: "Git 입력 파싱"
+
 → 완료 시 STEP 3으로
 
 ### STEP 3: Pre-Check
-□ Task tool로 agent "pre-checker" 호출
-□ Lint/Format 자동 수정 완료
+Task 도구 호출:
+- subagent_type: "pre-checker"
+- prompt: "Lint/Format 자동 수정을 실행하세요"
+- description: "Lint/Format 수정"
+
 → 완료 시 STEP 4로
 
 ### STEP 4: Code Review
-□ Task tool로 agent "code-reviewer" 호출
-□ 코드 분석 결과 수신
+Task 도구 호출:
+- subagent_type: "code-reviewer"
+- prompt: "코드를 분석하고 이슈를 찾으세요"
+- description: "코드 리뷰"
+
 → 완료 시 STEP 5로
 
 ### STEP 5: Code Fix
-□ Task tool로 agent "code-fixer" 호출 (이슈 목록 전달)
-□ 수정 완료
+Task 도구 호출:
+- subagent_type: "code-fixer"
+- prompt: "발견된 이슈를 수정하세요"
+- description: "코드 수정"
+
 → 완료 시 STEP 6으로
 
 ### STEP 6: Quality Check
-□ Task tool로 agent "quality-checker" 호출
-□ 품질 점수 확인
+Task 도구 호출:
+- subagent_type: "quality-checker"
+- prompt: "품질 점수를 계산하세요"
+- description: "품질 검사"
+
 → 점수 >= 70: STEP 7로
 → 점수 < 70: STEP 5로 회귀 (최대 3회)
 
 ### STEP 7: Build Test
-□ Task tool로 agent "build-tester" 호출 (--no-sandbox 없으면 Docker 사용)
-□ 빌드 성공 확인
+Task 도구 호출:
+- subagent_type: "build-tester"
+- prompt: "빌드 테스트를 실행하세요 (--no-sandbox 없으면 Docker 사용)"
+- description: "빌드 테스트"
+
 → 성공: STEP 8로
 → 실패: STEP 5로 회귀 (최대 3회)
 
 ### STEP 8: Function Test
-□ Task tool로 agent "function-tester" 호출 (--no-sandbox 없으면 Docker 사용)
-□ 테스트 통과 확인
+Task 도구 호출:
+- subagent_type: "function-tester"
+- prompt: "기능 테스트를 실행하세요 (--no-sandbox 없으면 Docker 사용)"
+- description: "기능 테스트"
+
 → 성공: STEP 9로
 → 실패: STEP 5로 회귀 (최대 3회)
 
 ### STEP 9: Git Commit
-□ Task tool로 agent "git-committer" 호출
-□ 수정 사항이 있으면:
-  - --working/--staged: 새 커밋
-  - --last/--branch: amend
+Task 도구 호출:
+- subagent_type: "git-committer"
+- prompt: "변경 사항을 커밋하세요 (--working/--staged면 새 커밋, --last/--branch면 amend)"
+- description: "Git 커밋"
+
 → 완료 시 STEP 10으로
 
 ### STEP 10: Summary Report
-□ Task tool로 agent "summary-reporter" 호출
-□ 결과 리포트 출력
+Task 도구 호출:
+- subagent_type: "summary-reporter"
+- prompt: "전체 QA 결과를 요약하세요"
+- description: "결과 리포트"
+
 → 완료 시 STEP 11로
 
 ### STEP 11: Push & PR
-□ Task tool로 agent "git-pusher" 호출
-□ **사용자에게 Push 확인 요청** (필수)
-□ **사용자에게 PR 생성 확인 요청** (필수)
+Task 도구 호출:
+- subagent_type: "git-pusher"
+- prompt: "사용자에게 Push 여부를 확인하고, PR 생성 여부도 확인하세요"
+- description: "Push 및 PR"
+
 → 완료: 워크플로우 종료
 
 ---
@@ -124,12 +172,3 @@ QUALITY_THRESHOLD = 70
 ### Sandbox 옵션
 - (기본값): Docker Sandbox 사용
 - --no-sandbox: 호스트에서 직접 실행
-
----
-
-## 중요
-
-1. **STEP 순서를 절대 건너뛰지 마세요**
-2. **각 STEP에서 반드시 Task tool로 해당 agent를 호출하세요**
-3. **agent 이름에 @ 기호를 붙이지 마세요** (예: "pre-checker" O, "@pre-checker" X)
-4. **STEP 11의 Push/PR은 반드시 사용자 확인을 받으세요**
