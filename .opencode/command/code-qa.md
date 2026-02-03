@@ -65,7 +65,11 @@ QUALITY_THRESHOLD = 70
 ```
 retry_count = 0
 quality_score = 0
+changed_files = []      # git-input에서 받은 파일 목록
+review_issues = []      # code-reviewer에서 발견한 이슈
 ```
+
+**중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
 
 ---
 
@@ -88,12 +92,14 @@ Task 도구 호출:
 - prompt: "입력 옵션 $ARGUMENTS 를 파싱하고 변경 파일 목록을 추출하세요"
 - description: "Git 입력 파싱"
 
+**결과 저장:** Task 결과에서 파일 목록을 추출하여 `changed_files`에 저장
+
 → 완료 시 STEP 3으로
 
 ### STEP 3: Pre-Check
 Task 도구 호출:
 - subagent_type: "pre-checker"
-- prompt: "Lint/Format 자동 수정을 실행하세요"
+- prompt: "다음 파일들에 대해 Lint/Format 자동 수정을 실행하세요: {changed_files}"
 - description: "Lint/Format 수정"
 
 → 완료 시 STEP 4로
@@ -101,15 +107,17 @@ Task 도구 호출:
 ### STEP 4: Code Review
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: "코드를 분석하고 이슈를 찾으세요"
+- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
 - description: "코드 리뷰"
+
+**결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
 
 → 완료 시 STEP 5로
 
 ### STEP 5: Code Fix
 Task 도구 호출:
 - subagent_type: "code-fixer"
-- prompt: "발견된 이슈를 수정하세요"
+- prompt: "다음 이슈들을 수정하세요: {review_issues}. 대상 파일: {changed_files}"
 - description: "코드 수정"
 
 → 완료 시 STEP 6으로
