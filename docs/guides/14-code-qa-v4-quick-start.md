@@ -211,10 +211,12 @@ curl http://localhost:8000/v1/models
 | 항목 | 설명 |
 |------|------|
 | `model` | 기본 모델 (오케스트레이터 + Sub-Agent) |
-| `provider.qwen.api` | vLLM 서버 API 엔드포인트 |
+| `provider.qwen.api` | SGLang 서버 API 엔드포인트 |
 | `provider.qwen.options.timeout` | 요청 타임아웃 (ms) - 긴 추론 고려 |
 | `limit.context` | 컨텍스트 윈도우 (256K) |
 | `limit.output` | 최대 출력 토큰 (16K) |
+
+> **Note**: SGLang은 OpenAI compatible API (`/v1/*`)를 제공하므로 `@ai-sdk/openai-compatible` 패키지를 그대로 사용합니다. vLLM에서 SGLang으로 전환해도 설정 변경이 필요 없습니다.
 
 ### 3.3 모델 설정 상세
 
