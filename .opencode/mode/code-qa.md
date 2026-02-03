@@ -1,6 +1,7 @@
 ---
 description: "Code QA 워크플로우 - 자동화된 코드 품질 검사"
 model: gpt-oss/gpt-oss-120b
+mode: all
 color: "#E74C3C"
 ---
 
