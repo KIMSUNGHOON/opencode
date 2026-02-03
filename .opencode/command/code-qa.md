@@ -59,9 +59,20 @@ QUALITY_THRESHOLD = 70
 
 ---
 
+## 상태 변수 초기화
+
+워크플로우 시작 시 다음 변수를 초기화하세요:
+```
+retry_count = 0
+quality_score = 0
+```
+
+---
+
 ## 실행 체크리스트
 
 각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
+**Task가 완료되면 결과를 확인하고 즉시 다음 STEP으로 진행하세요.**
 
 ### STEP 1: Environment Setup
 Task 도구 호출:
@@ -109,10 +120,23 @@ Task 도구 호출:
 - prompt: "ruff, mypy, radon 등 정적 분석 도구를 직접 실행하고, 결과를 바탕으로 품질 점수를 계산하세요. 반드시 QUALITY_SCORE: XX/100 형식으로 점수를 출력하세요."
 - description: "품질 검사"
 
-**점수 파싱**: 결과에서 `QUALITY_SCORE: XX/100` 패턴을 찾아 점수 확인
+**Task 완료 후 필수 동작:**
+1. Task 결과에서 `QUALITY_SCORE: XX/100` 를 찾습니다
+2. 점수를 숫자로 추출합니다 (예: "QUALITY_SCORE: 85/100" → 85)
+3. 아래 조건에 따라 **즉시 다음 Task를 호출**합니다:
 
-→ STATUS: PASS (점수 >= 70): STEP 7로
-→ STATUS: FAIL (점수 < 70): STEP 5로 회귀 (최대 3회)
+```
+IF 점수 >= 70 OR "STATUS: PASS" 포함:
+    → STEP 7 (build-tester) 호출
+ELSE IF 점수 < 70 OR "STATUS: FAIL" 포함:
+    IF retry_count < 3:
+        retry_count += 1
+        → STEP 5 (code-fixer) 호출하여 회귀
+    ELSE:
+        → 워크플로우 중단, "최대 재시도 횟수 초과" 메시지 출력
+```
+
+**점수를 찾지 못한 경우:** quality-checker를 다시 호출하세요.
 
 ### STEP 7: Build Test
 Task 도구 호출:
