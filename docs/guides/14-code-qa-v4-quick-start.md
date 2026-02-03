@@ -202,6 +202,68 @@ curl http://localhost:8000/v1/models
         }
       }
     }
+  },
+  "agents": {
+    "env-setup": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.3,
+      "top_p": 0.9
+    },
+    "git-input": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.1,
+      "top_p": 0.9
+    },
+    "pre-checker": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.2,
+      "top_p": 0.9
+    },
+    "code-reviewer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "top_k": 40,
+      "min_p": 0.05
+    },
+    "code-fixer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.3,
+      "top_p": 0.9,
+      "top_k": 20
+    },
+    "quality-checker": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.2,
+      "top_p": 0.9
+    },
+    "build-tester": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.1,
+      "top_p": 0.9
+    },
+    "function-tester": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.1,
+      "top_p": 0.9
+    },
+    "git-committer": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.3,
+      "top_p": 0.9
+    },
+    "summary-reporter": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 40,
+      "min_p": 0.05
+    },
+    "git-pusher": {
+      "model": "qwen/qwen3-next-80b-a3b-thinking",
+      "temperature": 0.1,
+      "top_p": 0.9
+    }
   }
 }
 ```
@@ -215,15 +277,45 @@ curl http://localhost:8000/v1/models
 | `provider.qwen.options.timeout` | 요청 타임아웃 (ms) - 긴 추론 고려 |
 | `limit.context` | 컨텍스트 윈도우 (256K) |
 | `limit.output` | 최대 출력 토큰 (16K) |
+| `agents.{name}` | Agent별 모델 및 샘플링 파라미터 오버라이드 |
 
 > **Note**: SGLang은 OpenAI compatible API (`/v1/*`)를 제공하므로 `@ai-sdk/openai-compatible` 패키지를 그대로 사용합니다. vLLM에서 SGLang으로 전환해도 설정 변경이 필요 없습니다.
 
-### 3.3 모델 설정 상세
+### 3.3 Agent별 샘플링 파라미터
+
+각 Agent의 역할에 맞게 샘플링 파라미터를 조정합니다:
+
+| Agent | Temperature | Top-P | Top-K | Min-P | 설명 |
+|-------|-------------|-------|-------|-------|------|
+| **code-reviewer** | 0.7 | 0.95 | 40 | 0.05 | 창의적 분석, 다양한 이슈 탐지 |
+| **summary-reporter** | 0.6 | 0.95 | 40 | 0.05 | 종합적 리포트 생성 |
+| **code-fixer** | 0.3 | 0.9 | 20 | - | 정확한 코드 수정 |
+| **git-committer** | 0.3 | 0.9 | - | - | 일관된 커밋 메시지 |
+| **env-setup** | 0.3 | 0.9 | - | - | 안정적 환경 감지 |
+| **pre-checker** | 0.2 | 0.9 | - | - | 정확한 Lint 수정 |
+| **quality-checker** | 0.2 | 0.9 | - | - | 일관된 점수 계산 |
+| **git-input** | 0.1 | 0.9 | - | - | 정확한 파일 파싱 |
+| **build-tester** | 0.1 | 0.9 | - | - | 정확한 빌드 명령 |
+| **function-tester** | 0.1 | 0.9 | - | - | 정확한 테스트 실행 |
+| **git-pusher** | 0.1 | 0.9 | - | - | 안전한 Push 처리 |
+
+#### 샘플링 파라미터 설명
+
+| 파라미터 | 범위 | 설명 |
+|----------|------|------|
+| `temperature` | 0.0-2.0 | 높을수록 창의적, 낮을수록 결정적 |
+| `top_p` | 0.0-1.0 | 누적 확률 기반 토큰 필터링 |
+| `top_k` | 1-100 | 상위 K개 토큰만 고려 |
+| `min_p` | 0.0-1.0 | 최소 확률 임계값 (낮은 확률 토큰 제거) |
+
+> **팁**: Reasoning 작업(code-reviewer, summary-reporter)은 높은 temperature로 다양한 관점 탐색, Tool Calling 작업(build-tester, git-pusher)은 낮은 temperature로 정확성 확보
+
+### 3.4 모델 설정 상세
 
 ```json
 "qwen3-next-80b-a3b-thinking": {
   "name": "Qwen3-Next-80B-A3B-Thinking (Unified)",
-  "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",  // vLLM 서버의 모델 ID
+  "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",  // SGLang 서버의 모델 ID
   "tool_call": true,         // Tool/Function Calling 지원
   "temperature": true,       // Temperature 조절 지원
   "reasoning": true,         // Thinking mode 지원
@@ -234,7 +326,7 @@ curl http://localhost:8000/v1/models
 }
 ```
 
-### 3.4 단일 모델의 장점
+### 3.5 단일 모델의 장점
 
 | 기존 (Dual Model) | 현재 (Single Model) |
 |-------------------|---------------------|
