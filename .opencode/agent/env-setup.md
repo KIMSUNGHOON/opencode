@@ -426,16 +426,30 @@ conda env list
 **⚠️ DO NOT SKIP THIS MENU! DO NOT AUTO-SELECT! SHOW ALL OPTIONS AND WAIT!**
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│    🚫 CRITICAL: USE ACTUAL `conda env list` OUTPUT, NOT EXAMPLES! 🚫    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  The environment names below are PLACEHOLDERS!                           │
+│  You MUST replace them with ACTUAL environments from `conda env list`!  │
+│                                                                          │
+│  DO NOT output "ml-dev", "torch-cuda", "project-env" - these are FAKE!  │
+│  Output the REAL environment names you detected!                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Template (Replace {placeholders} with ACTUAL detected values!):**
+```
 ═══════════════════════════════════════════════════════════════
 📋 Conda Environment Selection Required
 ═══════════════════════════════════════════════════════════════
 
-[Available conda environments]
-1. base (default)
-2. ml-dev
-3. torch-cuda
-4. project-env
-...
+[Available conda environments - FROM ACTUAL `conda env list` OUTPUT]
+1. {ACTUAL_ENV_NAME_1_FROM_CONDA_ENV_LIST}
+2. {ACTUAL_ENV_NAME_2_FROM_CONDA_ENV_LIST}
+3. {ACTUAL_ENV_NAME_3_FROM_CONDA_ENV_LIST}
+... (list ALL environments from `conda env list`)
 
 ⚠️ I cannot choose for you. Please tell me which environment to use.
 
@@ -445,6 +459,25 @@ conda env list
 ENV_SETUP_RESULT: WAITING_INPUT
 WAITING_FOR: ENV_NAME_SELECTION
 ═══════════════════════════════════════════════════════════════
+```
+
+**Example - If `conda env list` shows:**
+```
+# conda environments:
+#
+base                     /home/user/miniconda3
+myproject                /home/user/miniconda3/envs/myproject
+data-analysis            /home/user/miniconda3/envs/data-analysis
+```
+
+**Then output:**
+```
+[Available conda environments]
+1. base
+2. myproject
+3. data-analysis
+
+➡️ Please enter the environment number to use:
 ```
 
 #### 3-3. 🛑 Completely Stop Here (Important!)
@@ -473,9 +506,9 @@ Input: "{user_input}"
 Issue: {Number not in list / Environment does not exist}
 
 Available conda environments:
-1. base (default)
-2. ml-dev
-3. project-env
+(List ACTUAL environments from `conda env list` - NOT fake examples!)
+1. {ACTUAL_ENV_1}
+2. {ACTUAL_ENV_2}
 ...
 
 ➡️ Please enter a number from the list:
