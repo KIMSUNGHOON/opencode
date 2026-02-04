@@ -479,10 +479,60 @@ Task tool call:
 → On completion, go to STEP 4
 
 ### STEP 4: Code Review
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 CRITICAL: Pass ACTUAL file paths from STEP 2 result!                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  You MUST extract file paths from git-input/file-input result and       │
+│  list them EXPLICITLY in the prompt. DO NOT pass "{changed_files}"!     │
+│                                                                          │
+│  WRONG: "Analyze files: {changed_files}"                                │
+│  CORRECT: "Analyze files:\n- /home/user/project/src/main.py\n- ..."     │
+│                                                                          │
+│  The code-reviewer can ONLY read files you explicitly list!             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 Task tool call:
 - subagent_type: "code-reviewer"
-- prompt: "Analyze code and find issues in the following files: {changed_files}. Use Read tool to read each file's content and analyze. Output discovered issues in format: filename, line number, issue description."
+- prompt: |
+    PROJECT_ROOT: {PROJECT_ROOT}
+
+    Analyze code and find issues in the files listed below.
+    Use Read tool to read each file's content and analyze.
+
+    ⚠️ ONLY read files from the "Changed files" list below!
+    DO NOT read any other files! DO NOT invent file paths!
+
+    Changed files:
+    - {ACTUAL_FILE_PATH_1_FROM_GIT_INPUT_RESULT}
+    - {ACTUAL_FILE_PATH_2_FROM_GIT_INPUT_RESULT}
+    - {ACTUAL_FILE_PATH_3_FROM_GIT_INPUT_RESULT}
+    ... (list ALL files from STEP 2 FILE_LIST result)
+
+    Output discovered issues in format: filename, line number, issue description.
 - description: "Code review"
+
+**⚠️ Orchestrator MUST do this before calling code-reviewer:**
+1. Extract `FILE_LIST:` from STEP 2 result
+2. Convert comma-separated list to newline-separated list with full paths
+3. Replace placeholders with ACTUAL file paths in the prompt
+
+**Example - If STEP 2 returned:**
+```
+FILE_LIST: src/main.py, src/utils.py, tests/test_main.py
+```
+
+**Then pass to code-reviewer:**
+```
+Changed files:
+- /home/user/project/src/main.py
+- /home/user/project/src/utils.py
+- /home/user/project/tests/test_main.py
+```
 
 **Agent behavior:** code-reviewer directly reads file content using Read tool and analyzes.
 

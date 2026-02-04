@@ -7,6 +7,7 @@ tools:
   "*": false
   "Bash": true
   "Read": true
+  "Write": true
   "Glob": true
 permission:
   bash:
@@ -17,6 +18,11 @@ permission:
     "git show *": allow
     "git rev-parse *": allow
     "git branch *": allow
+    "git ls-files *": allow
+    # Git init commands (for new repos - requires user confirmation)
+    "git init *": ask
+    "git add *": ask
+    "git commit *": ask
     # Block dangerous commands
     "git push *": deny
     "git reset *": deny
@@ -25,7 +31,10 @@ permission:
     "git rebase *": deny
     "*": deny
   read: allow
-  edit: deny
+  write:
+    # Only allow writing .gitignore
+    ".gitignore": ask
+    "*": deny
   glob: allow
 ---
 
@@ -83,10 +92,10 @@ Cannot use Code QA's Git-based workflow.
 
 Please choose one of the following:
 
-1. Initialize Git repository and proceed
+1. Initialize Git repository (full setup: init → add → commit)
    → Enter "git init" or "initialize"
 
-2. Directly specify files for QA
+2. Directly specify files for QA (skip Git)
    → Enter file paths (e.g., src/main.py, src/utils/*.py)
 
 3. Exit QA
@@ -98,12 +107,157 @@ WAITING_FOR: USER_CHOICE
 ═══════════════════════════════════════════════════════════════
 ```
 
-**If user selects "git init" or "initialize":**
+**If user selects "git init" or "initialize" - COMPLETE FLOW:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚀 Git Repository Initialization - Complete Flow                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  STEP A: git init                                                        │
+│  STEP B: Create .gitignore (if not exists)                              │
+│  STEP C: Show files to be added and get user confirmation               │
+│  STEP D: git add . && git commit -m "Initial commit"                    │
+│                                                                          │
+│  Without STEP D, git diff will show NOTHING (no commits to compare!)    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**STEP A: Initialize repository**
 ```bash
 git init
-git add -A
 ```
-→ Proceed to STEP 1
+
+**STEP B: Check/Create .gitignore**
+```bash
+# Check if .gitignore exists
+if [ ! -f .gitignore ]; then
+    echo "No .gitignore found"
+fi
+
+# List files that would be added (for user review)
+echo "=== Files that will be added ==="
+git status --short
+```
+
+**Show user what will be committed:**
+```
+═══════════════════════════════════════════════════════════════
+📋 Git Repository Initialized
+═══════════════════════════════════════════════════════════════
+
+Git repository has been initialized.
+
+[Files to be added to initial commit]
+{output from git status --short}
+
+⚠️ Review the file list above:
+- Check for sensitive files (.env, credentials, secrets)
+- Check for large files (node_modules, venv, __pycache__)
+
+[Options]
+1. Proceed with initial commit (add all files)
+   → Enter "commit" or "y"
+
+2. Add .gitignore first (recommended if sensitive files exist)
+   → Enter ".gitignore" or "ignore"
+   → I will create a basic .gitignore template
+
+3. Specify files to exclude before commit
+   → Enter file patterns to exclude (e.g., "*.env .env* secrets/")
+
+4. Abort and manually configure Git
+   → Enter "abort" or "n"
+
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: WAITING_INPUT
+WAITING_FOR: INIT_CONFIRMATION
+═══════════════════════════════════════════════════════════════
+```
+
+**If user selects "commit" or "y":**
+```bash
+# Check for common sensitive files before committing
+if [ -f .env ] || [ -f .env.local ] || [ -f credentials.json ]; then
+    echo "WARNING: Sensitive files detected! Consider adding .gitignore first."
+fi
+
+# Add all files and create initial commit
+git add .
+git commit -m "Initial commit"
+
+# Show result
+echo "=== Initial commit created ==="
+git log --oneline -1
+git diff HEAD~1 --name-only 2>/dev/null || git ls-files
+```
+
+**If user selects ".gitignore" or "ignore":**
+```bash
+# Create a basic .gitignore template
+cat > .gitignore << 'EOF'
+# Environment files
+.env
+.env.local
+.env*.local
+*.env
+
+# Credentials and secrets
+credentials.json
+secrets/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.o
+*.so
+*.dylib
+target/
+EOF
+
+echo ".gitignore created"
+git add .gitignore
+```
+→ Then show file list again and ask for commit confirmation
+
+**STEP D: Create initial commit and get changed files**
+
+After initial commit is created:
+```bash
+# Get list of all files in initial commit
+git ls-files
+```
+
+→ Use this list as `changed_files` and proceed to STEP 1
 
 **If user enters file paths:**
 → Use those paths as `changed_files` and proceed to STEP 4
