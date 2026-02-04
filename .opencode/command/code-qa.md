@@ -83,6 +83,10 @@ use_git_mode = true     # --files 없으면 true, 있으면 false
 env_setup_confirmed = false   # env-setup 완료 여부
 build_env_confirmed = false   # build-tester 환경 확인 여부
 test_confirmed = false        # function-tester 테스트 확인 여부
+
+# 워크스페이스 캐시 (NEW)
+workspace_cache = null        # 캐시 데이터 (있으면 사용)
+use_cache = true              # --skip-cache면 false
 ```
 
 **중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
@@ -93,6 +97,11 @@ IF $ARGUMENTS에 "--files" 포함:
     use_git_mode = false
 ELSE:
     use_git_mode = true
+
+IF $ARGUMENTS에 "--skip-cache" 포함:
+    use_cache = false
+ELSE:
+    use_cache = true
 ```
 
 ## 사용자 입력이 필요한 Agent들
@@ -119,6 +128,54 @@ ELSE:
 
 각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
 **Task가 완료되면 결과를 확인하고 즉시 다음 STEP으로 진행하세요.**
+
+### STEP 0: Workspace Cache Check (자동)
+
+**⚠️ 캐시 스킵 조건:**
+```
+IF use_cache == false (--skip-cache 옵션):
+    → 캐시 확인 건너뛰기
+    → workspace_cache = null
+    → STEP 1로 진행
+```
+
+**캐시 확인:**
+Read 도구를 사용하여 `.opencode/workspace-cache/analysis.json` 파일을 읽습니다.
+
+```
+IF 파일이 존재하고 읽기 성공:
+    1. analyzed_at 타임스탬프 확인
+    2. 24시간 이내면 캐시 유효
+
+    IF 캐시 유효:
+        workspace_cache = {읽은 JSON 데이터}
+        → STEP 1로 진행 (캐시 사용)
+    ELSE:
+        → workspace-analyzer 호출하여 재분석
+
+ELSE IF 파일이 없음:
+    → workspace-analyzer 호출하여 분석
+```
+
+**자동 분석 (캐시 없거나 오래됨):**
+Task 도구 호출:
+- subagent_type: "workspace-analyzer"
+- prompt: "현재 워크스페이스를 분석하세요. 프로젝트 타입, 파일 구조, 의존성, 빌드 시스템을 분석하고 CACHE_DATA: 이후에 JSON으로 결과를 출력하세요."
+- description: "워크스페이스 분석"
+
+```
+IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: COMPLETE" 포함:
+    1. CACHE_DATA: 이후의 JSON 추출
+    2. workspace_cache = {추출한 JSON}
+    3. .opencode/workspace-cache/analysis.json에 저장
+    → STEP 1로 진행
+
+IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: FAILED" 포함:
+    → workspace_cache = null (캐시 없이 진행)
+    → STEP 1로 진행 (경고 메시지 출력)
+```
+
+→ 완료 시 STEP 1로
 
 ### STEP 1: Environment Setup (사용자 입력 필수)
 Task 도구 호출:
@@ -192,8 +249,43 @@ Task 도구 호출:
 ### STEP 4: Code Review
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
+- prompt: 아래 형식으로 프롬프트를 구성하세요
 - description: "코드 리뷰"
+
+**프롬프트 구성 (중요!):**
+
+```
+IF workspace_cache != null:
+    프롬프트 =
+    """
+    ## Project Context (from workspace cache)
+    - Project Type: {workspace_cache.project.type}
+    - Languages: {workspace_cache.project.languages}
+    - Frameworks: {workspace_cache.project.frameworks}
+    - Build System: {workspace_cache.build_system.type}
+    - Test Command: {workspace_cache.build_system.test_command}
+
+    ## Changed files to analyze:
+    {changed_files 목록 - 각 파일의 절대 경로}
+
+    위 파일들의 코드를 분석하고 이슈를 찾으세요.
+    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
+    """
+
+ELSE:
+    프롬프트 =
+    """
+    ## Changed files to analyze:
+    {changed_files 목록 - 각 파일의 절대 경로}
+
+    다음 파일들의 코드를 분석하고 이슈를 찾으세요.
+    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
+    """
+```
+
+**⚠️ 중요: code-reviewer는 Read 도구만 사용 가능합니다!**
+- code-reviewer에게 전달하는 파일 목록은 반드시 **절대 경로**여야 합니다
+- code-reviewer는 Glob/Grep을 사용할 수 없으므로 **정확한 파일 경로**를 제공해야 합니다
 
 **결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
 
@@ -393,3 +485,7 @@ IF Task 결과에 "PUSH_RESULT: FAIL" 포함:
 ### Sandbox 옵션
 - (기본값): Docker Sandbox 사용
 - --no-sandbox: 호스트에서 직접 실행
+
+### 캐시 옵션
+- (기본값): 워크스페이스 캐시 사용 (있으면)
+- --skip-cache: 캐시 무시하고 진행 (캐시 확인/분석 단계 건너뜀)

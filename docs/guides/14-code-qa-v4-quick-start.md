@@ -10,6 +10,7 @@
 4. [설정 파일 구조](#4-설정-파일-구조)
 5. [글로벌 설정](#5-글로벌-설정)
 6. [사용 방법](#6-사용-방법)
+   - [6.5 워크스페이스 분석 (/analyze)](#65-워크스페이스-분석-analyze)
 7. [제거](#7-제거)
 8. [문제 해결](#8-문제-해결)
    - [8.9 Agent 대화 멈춤 (Conversational Stoppage)](#89-agent-대화-멈춤-conversational-stoppage)
@@ -423,8 +424,63 @@ opencode
 | `/build` | 빌드 테스트만 |
 | `/test` | 테스트만 실행 |
 | `/env` | 환경 설정만 |
+| `/analyze` | 워크스페이스 분석만 |
 
-### 6.5 사용자 확인 단계
+### 6.5 워크스페이스 분석 (/analyze)
+
+프로젝트 구조, 의존성, 빌드 시스템을 사전에 분석하고 캐시에 저장합니다.
+
+```bash
+# ═══════════════════════════════════════════════════════════════
+# /analyze - 워크스페이스 분석 및 캐시 생성
+# ═══════════════════════════════════════════════════════════════
+
+# 기본 분석 (캐시가 없거나 24시간 경과 시 실행)
+/analyze
+
+# 강제 재분석 (캐시 무시)
+/analyze --force
+```
+
+**분석 항목:**
+
+| 항목 | 설명 |
+|------|------|
+| 프로젝트 타입 | TypeScript, Python, Go, Rust 등 |
+| 파일 구조 | 디렉토리 구조, 파일 목록 |
+| 의존성 | package.json, requirements.txt 등에서 추출 |
+| 빌드 시스템 | npm, cargo, go, make 등 |
+| 환경 정보 | 런타임 버전, Docker 설정 |
+| Git 정보 | remote URL, 현재 브랜치 |
+
+**캐시 파일 위치:**
+```
+.opencode/workspace-cache/
+└── analysis.json       # 메인 분석 결과
+```
+
+**Code-QA와 통합:**
+
+`/analyze`로 생성된 캐시는 `/code-qa`에서 자동으로 사용됩니다:
+
+```bash
+# 방법 1: 사전 분석 후 QA (권장)
+/analyze
+/code-qa
+
+# 방법 2: code-qa가 캐시 없으면 자동 분석
+/code-qa
+
+# 캐시 무시하고 QA 실행
+/code-qa --skip-cache
+```
+
+**캐시 사용 이점:**
+- code-reviewer에게 정확한 프로젝트 컨텍스트 제공
+- 파일 할루시네이션 방지 (존재하지 않는 파일 추측 방지)
+- 반복 실행 시 분석 시간 절약
+
+### 6.6 사용자 확인 단계
 
 다음 Agent들에서 사용자 입력을 요구합니다:
 
@@ -455,7 +511,7 @@ opencode
 | summary-reporter | ✅ | ✅ |
 | git-pusher | ✅ | ❌ |
 
-### 6.6 워크플로우 진행 과정
+### 6.7 워크플로우 진행 과정
 
 **Git 모드 워크플로우 (기본):**
 ```
@@ -820,6 +876,7 @@ permission:
 
 | Agent | Bash | Read | Edit | Write | Glob | Grep | 주요 역할 |
 |-------|:----:|:----:|:----:|:-----:|:----:|:----:|----------|
+| **workspace-analyzer** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 워크스페이스 분석 |
 | env-setup | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 환경 감지 |
 | git-input | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | Git 파싱 |
 | pre-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | Lint/Format |
@@ -849,6 +906,7 @@ permission:
 
 | Agent | 출력 토큰 | 예시 |
 |-------|----------|------|
+| workspace-analyzer | `WORKSPACE_ANALYSIS_RESULT: COMPLETE/FAILED` | `WORKSPACE_ANALYSIS_RESULT: COMPLETE` |
 | env-setup | `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `ENV_SETUP_RESULT: SUCCESS` |
 | git-input | `FILE_LIST: {파일목록}` | `FILE_LIST: src/app.py, src/utils.py` |
 | pre-checker | `PRE_CHECK_RESULT: SUCCESS/PARTIAL` | `PRE_CHECK_RESULT: SUCCESS` |
@@ -896,7 +954,8 @@ commit_result = ""           # 커밋 결과
 ~/.config/opencode/
 ├── opencode.json                           ✅ Provider, Agent 설정
 └── .opencode/
-    ├── agent/                              (12개 Agent)
+    ├── agent/                              (13개 Agent)
+    │   ├── workspace-analyzer.md           ✅ 워크스페이스 분석 (NEW)
     │   ├── env-setup.md                    ✅ 환경 설정
     │   ├── git-input.md                    ✅ Git 입력 파서
     │   ├── file-input.md                   ✅ 파일 입력 파서 (Non-Git)
@@ -909,8 +968,9 @@ commit_result = ""           # 커밋 결과
     │   ├── git-committer.md                ✅ Git 커밋
     │   ├── summary-reporter.md             ✅ 결과 리포트
     │   └── git-pusher.md                   ✅ Push/PR
-    ├── command/                            (8개 Command)
+    ├── command/                            (9개 Command)
     │   ├── code-qa.md                      ✅ 전체 워크플로우
+    │   ├── analyze.md                      ✅ /analyze - 워크스페이스 분석 (NEW)
     │   ├── env.md                          ✅ /env - 환경 설정
     │   ├── lint.md                         ✅ /lint - Lint/Format
     │   ├── review.md                       ✅ /review - 코드 리뷰
@@ -918,8 +978,10 @@ commit_result = ""           # 커밋 결과
     │   ├── quality.md                      ✅ /quality - 품질 검사
     │   ├── build.md                        ✅ /build - 빌드 테스트
     │   └── test.md                         ✅ /test - 기능 테스트
-    └── mode/
-        └── code-qa.md                      ✅ QA 오케스트레이터
+    ├── mode/
+    │   └── code-qa.md                      ✅ QA 오케스트레이터
+    └── workspace-cache/                    (캐시 디렉토리 - 자동 생성)
+        └── analysis.json                   📦 분석 결과 캐시
 ```
 
 ### 환경 변수 (필수)
@@ -934,6 +996,7 @@ QWEN_BASE_URL="http://localhost:30000/v1"   ✅
 |--------|------|---------|
 | `/code-qa` | 전체 워크플로우 | 선택 |
 | `/code-qa --files <경로>` | 전체 워크플로우 (Non-Git) | ❌ |
+| `/analyze` | 워크스페이스 분석 및 캐시 생성 | ❌ |
 | `/env` | 환경 설정만 | ❌ |
 | `/lint` | Lint/Format만 | ❌ |
 | `/review` | 코드 리뷰만 | 선택 |
@@ -949,3 +1012,4 @@ QWEN_BASE_URL="http://localhost:30000/v1"   ✅
 - [05-integrated-configuration.md](./05-integrated-configuration.md) - 전체 설정 통합 가이드
 - [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - 환경 설정 상세
 - [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - 전체 워크플로우 다이어그램
+- [15-workspace-analysis-workflow.md](./15-workspace-analysis-workflow.md) - 워크스페이스 분석 워크플로우 설계
