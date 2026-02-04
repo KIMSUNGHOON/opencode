@@ -276,11 +276,28 @@ Shell RC Files:
 
 **⚠️ Prerequisite: Only execute this step after user has selected Shell in STEP 1.**
 
-#### 2-1. Detect Environment Manager (Bash tool call)
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│         🚀 OPTIMIZED FLOW: DETECT + QUERY ENV LIST IN ONE STEP          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  To avoid unnecessary recursion, run ALL detection in a SINGLE call:    │
+│                                                                          │
+│  1. Detect environment managers (conda, uv, pyenv, etc.)                │
+│  2. If conda is found, ALSO run `conda env list` immediately            │
+│  3. Present environment type menu with full env list info               │
+│                                                                          │
+│  This way, when user selects "1. conda", we already have the env list!  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-**⚠️ Important: Bash tool runs as a separate process and doesn't inherit user's zsh environment**
+#### 2-1. Detect Environment Manager AND Query Environment Lists (Single Bash Call)
+
+**⚠️ Important: Run ALL detection in ONE command to avoid extra round trips!**
 
 ```bash
+# === SINGLE UNIFIED DETECTION COMMAND ===
 # Conda initialization (required as Bash tool doesn't inherit user's zsh environment)
 CONDA_SH=""
 for path in \
@@ -299,53 +316,77 @@ done
 
 if [ -n "$CONDA_SH" ]; then
     source "$CONDA_SH"
-    echo "Conda initialized: $CONDA_SH"
+    echo "=== CONDA DETECTED ==="
+    echo "CONDA_SH_PATH: $CONDA_SH"
+    conda --version 2>/dev/null
+    echo ""
+    echo "=== CONDA ENVIRONMENT LIST ==="
+    conda env list
+    echo "=== END CONDA ENV LIST ==="
 else
-    echo "Conda not found"
+    echo "=== CONDA NOT FOUND ==="
 fi
 
-# Check available environment managers
-which conda uv python3 2>/dev/null
-conda --version 2>/dev/null
+echo ""
+echo "=== OTHER ENVIRONMENT MANAGERS ==="
+# Check uv
+if command -v uv >/dev/null 2>&1; then
+    echo "UV_DETECTED: yes"
+    uv --version 2>/dev/null
+    ls -la .venv 2>/dev/null && echo "EXISTING_VENV: .venv found"
+else
+    echo "UV_DETECTED: no"
+fi
 
-# Check version managers (pyenv, nvm, rbenv)
-# pyenv (Python version manager)
+# Check system Python
+echo ""
+echo "=== PYTHON ==="
+which python3 python 2>/dev/null
+python3 --version 2>/dev/null || python --version 2>/dev/null
+
+# Check version managers
+echo ""
+echo "=== VERSION MANAGERS ==="
+# pyenv
 if [ -d "$HOME/.pyenv" ] || command -v pyenv >/dev/null 2>&1; then
-    echo "pyenv detected"
+    echo "PYENV_DETECTED: yes"
     pyenv --version 2>/dev/null
+    echo "--- pyenv versions ---"
     pyenv versions 2>/dev/null
+    echo "--- end pyenv versions ---"
+else
+    echo "PYENV_DETECTED: no"
 fi
 
-# nvm (Node version manager)
+# nvm
 if [ -d "$HOME/.nvm" ] || [ -n "$NVM_DIR" ]; then
-    echo "nvm detected"
-    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-    nvm --version 2>/dev/null
-    nvm list 2>/dev/null | head -10
+    echo "NVM_DETECTED: yes"
+else
+    echo "NVM_DETECTED: no"
 fi
 
-# rbenv (Ruby version manager)
+# rbenv
 if [ -d "$HOME/.rbenv" ] || command -v rbenv >/dev/null 2>&1; then
-    echo "rbenv detected"
-    rbenv --version 2>/dev/null
-    rbenv versions 2>/dev/null
+    echo "RBENV_DETECTED: yes"
+else
+    echo "RBENV_DETECTED: no"
 fi
 
-# asdf (Universal version manager)
+# asdf
 if [ -d "$HOME/.asdf" ] || command -v asdf >/dev/null 2>&1; then
-    echo "asdf detected"
-    asdf --version 2>/dev/null
-    asdf list 2>/dev/null | head -20
+    echo "ASDF_DETECTED: yes"
+else
+    echo "ASDF_DETECTED: no"
 fi
-uv --version 2>/dev/null
-
-# Check currently activated conda environment
-echo "Current conda environment: $CONDA_DEFAULT_ENV"
 ```
 
-#### 2-2. Output Selection Menu Then Stop
+#### 2-2. Output Selection Menu (Store Env List for Later!)
 
-**After executing the above command, you MUST output the selection menu in this format:**
+**After executing the above command:**
+1. Parse the output to get the conda environment list
+2. Store this list - you will use it immediately when user selects conda!
+3. Present the environment type selection menu
+
 ```
 ═══════════════════════════════════════════════════════════════
 📦 Virtual Environment Type Selection Required
@@ -353,6 +394,7 @@ echo "Current conda environment: $CONDA_DEFAULT_ENV"
 
 [Detected Environment Managers]
 conda: {Installed (version: X.Y.Z) / Not installed}
+       → {N} environments available (will show list if selected)
 uv: {Installed (version: X.Y.Z) / Not installed}
 python: {Installed (version: X.Y.Z)}
 
@@ -379,55 +421,35 @@ WAITING_FOR: ENV_TYPE_SELECTION
 ═══════════════════════════════════════════════════════════════
 ```
 
-#### 2-3. 🛑 Completely Stop Here (Important!)
+#### 2-3. 🛑 Stop and Wait for User Selection
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
-│  ★★★ Do not proceed further after outputting selection menu! ★★★  │
-│                                                             │
-│  - Do not proceed to STEP 3                                  │
-│  - Do not run conda env list                                │
-│  - Wait until user enters 1, 2, 3, 4, or 5                  │
+│  ★★★ Wait for user to enter 1, 2, 3, 4, or 5 ★★★            │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Only proceed to STEP 3 after user enters 1, 2, 3, 4, or 5.**
+### STEP 3: Environment Selection (IMMEDIATE - No Extra Detection Needed!)
 
-**⚠️ Invalid Input or Environment Manager Not Found - Retry:**
+**⚠️ When user's selection is received, IMMEDIATELY show the environment list!**
+**You already have the environment list from STEP 2-1 detection!**
+
 ```
-═══════════════════════════════════════════════════════════════
-❌ Invalid Input
-═══════════════════════════════════════════════════════════════
-
-Input: "{user_input}"
-Issue: {Number outside 1-5 / Selected environment manager not installed}
-
-Example: If conda was selected but conda is not installed:
-"Conda is not installed. Please select another option."
-
-Please select again:
-1. conda - {Installed/Not installed}
-2. uv    - {Installed/Not installed}
-3. venv  - Python built-in
-4. pyenv - {Installed/Not installed}
-5. none  - Use system Python
-
-➡️ Please enter a number [1-5]:
-═══════════════════════════════════════════════════════════════
+┌─────────────────────────────────────────────────────────────────────────┐
+│    🚀 CRITICAL: USE THE ENV LIST YOU ALREADY DETECTED IN STEP 2-1!      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  When user selects "1" (conda):                                         │
+│    → You ALREADY have the conda env list from STEP 2-1!                 │
+│    → DO NOT run `conda env list` again!                                 │
+│    → IMMEDIATELY present the list you detected earlier!                 │
+│                                                                          │
+│  This eliminates the unnecessary round trip!                             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
-
-**Retry Status:**
-```
-ENV_SETUP_RESULT: WAITING_INPUT
-WAITING_FOR: ENV_TYPE_SELECTION_RETRY
-RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
-```
-
-### STEP 3: Environment List Query and Selection (After Environment Type Selection Complete)
-
-**⚠️ Prerequisite: Only execute this step after user has selected environment type in STEP 2.**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -447,23 +469,9 @@ RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 3-1. When conda Selected - Query Environment List
+#### 3-1. When User Selects "1" (conda) - USE EXISTING LIST!
 
-```bash
-# Conda initialization
-for path in "$HOME/anaconda3" "$HOME/miniconda3" "$HOME/.conda" "/opt/conda"; do
-    [ -f "$path/etc/profile.d/conda.sh" ] && source "$path/etc/profile.d/conda.sh" && break
-done
-
-# Query environment list
-conda env list
-```
-
-#### 3-2. Output Selection Menu Then Stop (MANDATORY!)
-
-**After executing the above command, you MUST output the selection menu in this format:**
-
-**⚠️ DO NOT SKIP THIS MENU! DO NOT AUTO-SELECT! SHOW ALL OPTIONS AND WAIT!**
+**DO NOT run `conda env list` again! Use the list from STEP 2-1!**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -471,25 +479,25 @@ conda env list
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  The environment names below are PLACEHOLDERS!                           │
-│  You MUST replace them with ACTUAL environments from `conda env list`!  │
+│  You MUST use the ACTUAL environments from STEP 2-1 detection!          │
 │                                                                          │
 │  DO NOT output "ml-dev", "torch-cuda", "project-env" - these are FAKE!  │
-│  Output the REAL environment names you detected!                         │
+│  Output the REAL environment names you detected earlier!                 │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Template (Replace {placeholders} with ACTUAL detected values!):**
+**IMMEDIATELY output this menu (no extra Bash call needed!):**
 ```
 ═══════════════════════════════════════════════════════════════
 📋 Conda Environment Selection Required
 ═══════════════════════════════════════════════════════════════
 
-[Available conda environments - FROM ACTUAL `conda env list` OUTPUT]
-1. {ACTUAL_ENV_NAME_1_FROM_CONDA_ENV_LIST}
-2. {ACTUAL_ENV_NAME_2_FROM_CONDA_ENV_LIST}
-3. {ACTUAL_ENV_NAME_3_FROM_CONDA_ENV_LIST}
-... (list ALL environments from `conda env list`)
+[Available conda environments - FROM STEP 2-1 DETECTION]
+1. {ACTUAL_ENV_NAME_1_FROM_EARLIER_DETECTION}
+2. {ACTUAL_ENV_NAME_2_FROM_EARLIER_DETECTION}
+3. {ACTUAL_ENV_NAME_3_FROM_EARLIER_DETECTION}
+... (list ALL environments you detected in STEP 2-1)
 
 ⚠️ I cannot choose for you. Please tell me which environment to use.
 
@@ -501,16 +509,18 @@ WAITING_FOR: ENV_NAME_SELECTION
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Example - If `conda env list` shows:**
+**Example - If STEP 2-1 detection showed:**
 ```
+=== CONDA ENVIRONMENT LIST ===
 # conda environments:
 #
 base                     /home/user/miniconda3
 myproject                /home/user/miniconda3/envs/myproject
 data-analysis            /home/user/miniconda3/envs/data-analysis
+=== END CONDA ENV LIST ===
 ```
 
-**Then output:**
+**Then IMMEDIATELY output (no extra command needed!):**
 ```
 [Available conda environments]
 1. base
@@ -520,7 +530,7 @@ data-analysis            /home/user/miniconda3/envs/data-analysis
 ➡️ Please enter the environment number to use:
 ```
 
-#### 3-3. 🛑 Completely Stop Here (Important!)
+#### 3-2. 🛑 Completely Stop Here (Important!)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -546,7 +556,7 @@ Input: "{user_input}"
 Issue: {Number not in list / Environment does not exist}
 
 Available conda environments:
-(List ACTUAL environments from `conda env list` - NOT fake examples!)
+(List ACTUAL environments from earlier detection - NOT fake examples!)
 1. {ACTUAL_ENV_1}
 2. {ACTUAL_ENV_2}
 ...
@@ -563,7 +573,8 @@ WAITING_FOR: ENV_NAME_SELECTION_RETRY
 RETRY_REASON: {INVALID_INPUT/ENV_NOT_FOUND}
 ```
 
-**When uv Selected:**
+#### 3-3. When User Selects "2" (uv)
+
 ```bash
 ls -la .venv 2>/dev/null || echo "no venv"
 uv venv --help
@@ -582,7 +593,8 @@ uv virtual environment options:
 ═══════════════════════════════════════════════════════════════
 ```
 
-**When venv Selected:**
+#### 3-4. When User Selects "3" (venv)
+
 ```bash
 ls -la venv .venv 2>/dev/null || echo "no venv"
 ```
@@ -601,21 +613,19 @@ venv virtual environment options:
 ═══════════════════════════════════════════════════════════════
 ```
 
-**When pyenv Selected:**
-```bash
-# Check installed Python versions
-pyenv versions
-```
+#### 3-5. When User Selects "4" (pyenv) - USE EXISTING LIST!
+
+**Use the pyenv versions list from STEP 2-1 detection!**
 
 ```
 ═══════════════════════════════════════════════════════════════
 📋 pyenv Python Version Selection (User Input Required)
 ═══════════════════════════════════════════════════════════════
 
-[Installed Python versions via pyenv]
-1. {ACTUAL_VERSION_1_FROM_PYENV_VERSIONS}
-2. {ACTUAL_VERSION_2_FROM_PYENV_VERSIONS}
-3. {ACTUAL_VERSION_3_FROM_PYENV_VERSIONS}
+[Installed Python versions via pyenv - FROM STEP 2-1 DETECTION]
+1. {ACTUAL_VERSION_1_FROM_EARLIER_DETECTION}
+2. {ACTUAL_VERSION_2_FROM_EARLIER_DETECTION}
+3. {ACTUAL_VERSION_3_FROM_EARLIER_DETECTION}
 ...
 
 ⚠️ I cannot choose for you. Please tell me which version to use.
