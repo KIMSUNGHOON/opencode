@@ -110,6 +110,18 @@ ls -la
 PROJECT_ROOT = ""           # 절대 경로, 예: /home/user/project
 PROJECT_NAME = ""           # 프로젝트 이름, 예: torch_aim
 SRC_DIR = ""                # src 디렉토리 절대 경로 (존재하는 경우)
+
+# 환경 상태 변수 (env-setup에서 파싱, 이후 Agent에 전달)
+ENV_STATE = {
+    SHELL_TYPE: ""          # zsh/bash/sh
+    ENV_TYPE: ""            # conda/uv/venv/none
+    ENV_NAME: ""            # 환경 이름 (예: ml-dev)
+    ENV_PATH: ""            # 환경 절대 경로
+    ACTIVATE_CMD: ""        # 환경 활성화 명령 (예: source ~/conda.sh && conda activate ml-dev)
+    PYTHON_PATH: ""         # Python 실행 경로
+    PYTHON_VERSION: ""      # Python 버전
+    CUDA_VERSION: ""        # CUDA 버전 (없으면 "none")
+}
 ```
 
 ### 프로젝트 구조 감지 규칙
@@ -318,7 +330,28 @@ IF Task 결과에 "ENV_SETUP_RESULT: WAITING_INPUT" 포함:
     → 사용자가 입력하면 env-setup을 다시 호출합니다
 
 IF Task 결과에 "ENV_SETUP_RESULT: SUCCESS" 포함:
+    → [ENV_STATE_BEGIN]...[ENV_STATE_END] 블록 파싱
+    → ENV_STATE 변수에 저장
     → STEP 2로 진행
+```
+
+**ENV_STATE 파싱 예시:**
+```
+env-setup 결과에서 추출:
+
+[ENV_STATE_BEGIN]
+SHELL_TYPE: zsh
+ENV_TYPE: conda
+ENV_NAME: ml-dev
+ENV_PATH: /home/user/miniconda3/envs/ml-dev
+ACTIVATE_CMD: source /home/user/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev
+PYTHON_PATH: /home/user/miniconda3/envs/ml-dev/bin/python
+PYTHON_VERSION: 3.11.5
+CUDA_VERSION: 11.8
+[ENV_STATE_END]
+
+→ 이 값들을 ENV_STATE 변수에 저장
+→ 이후 build-tester, function-tester 호출 시 전달
 ```
 
 → 사용자 입력 완료 후 STEP 2로
@@ -421,7 +454,20 @@ ELSE IF 점수 < 70 OR "STATUS: FAIL" 포함:
 ### STEP 7: Build Test (사용자 확인 필수)
 Task 도구 호출:
 - subagent_type: "build-tester"
-- prompt: "빌드 테스트를 실행하세요. 먼저 현재 환경 상태(Shell, 가상환경, 런타임)를 보여주고 사용자의 확인을 받은 후에만 빌드를 진행하세요."
+- prompt: |
+    PROJECT_ROOT: {PROJECT_ROOT}
+
+    [ENV_STATE]
+    ACTIVATE_CMD: {ENV_STATE.ACTIVATE_CMD}
+    PYTHON_PATH: {ENV_STATE.PYTHON_PATH}
+    ENV_TYPE: {ENV_STATE.ENV_TYPE}
+    ENV_NAME: {ENV_STATE.ENV_NAME}
+    [/ENV_STATE]
+
+    빌드 테스트를 실행하세요.
+    먼저 현재 환경 상태를 보여주고 사용자의 확인을 받은 후에만 빌드를 진행하세요.
+
+    ⚠️ 빌드 명령 실행 전에 위 ACTIVATE_CMD로 환경을 활성화하세요.
 - description: "빌드 테스트"
 
 **⚠️ 사용자 입력 대기 처리:**
@@ -445,7 +491,20 @@ IF Task 결과에 "BUILD_RESULT: FAIL" 포함:
 ### STEP 8: Function Test (사용자 확인 필수)
 Task 도구 호출:
 - subagent_type: "function-tester"
-- prompt: "기능 테스트를 실행하세요. 먼저 테스트 파일을 탐지한 결과를 보여주고, 사용자에게 테스트 실행 여부를 확인받은 후에만 진행하세요."
+- prompt: |
+    PROJECT_ROOT: {PROJECT_ROOT}
+
+    [ENV_STATE]
+    ACTIVATE_CMD: {ENV_STATE.ACTIVATE_CMD}
+    PYTHON_PATH: {ENV_STATE.PYTHON_PATH}
+    ENV_TYPE: {ENV_STATE.ENV_TYPE}
+    ENV_NAME: {ENV_STATE.ENV_NAME}
+    [/ENV_STATE]
+
+    기능 테스트를 실행하세요.
+    먼저 테스트 파일을 탐지한 결과를 보여주고, 사용자에게 테스트 실행 여부를 확인받은 후에만 진행하세요.
+
+    ⚠️ 테스트 명령 실행 전에 위 ACTIVATE_CMD로 환경을 활성화하세요.
 - description: "기능 테스트"
 
 **⚠️ 사용자 입력 대기 처리:**

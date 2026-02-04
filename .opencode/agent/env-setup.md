@@ -463,37 +463,234 @@ venv 가상 환경 옵션:
 ═══════════════════════════════════════════════════════════════
 ```
 
-### STEP 4: 환경 활성화 확인
+### STEP 4: 환경 활성화 (Activation Flow with Error Recovery)
+
+**⚠️ 전제 조건: 사용자가 STEP 3에서 환경을 선택한 후에만 이 단계를 실행하세요.**
+
+#### 4-1. Conda 활성화 플로우 (conda 선택 시)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Conda Activation Flow                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  [1] conda.sh 초기화 ─────► [2] conda 명령 확인 ─────► [3] 환경 활성화   │
+│           │                          │                        │          │
+│           ▼                          ▼                        ▼          │
+│       [에러?]                    [에러?]                  [에러?]        │
+│           │                          │                        │          │
+│           ▼                          ▼                        ▼          │
+│      Recovery 1                 Recovery 2               Recovery 3      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Step 4-1-A: Conda 초기화 (Bash tool 호출)**
 
 ```bash
-# Conda 초기화
-for path in "$HOME/anaconda3" "$HOME/miniconda3" "$HOME/.conda" "/opt/conda"; do
-    [ -f "$path/etc/profile.d/conda.sh" ] && source "$path/etc/profile.d/conda.sh" && break
+# Conda 초기화 - 여러 경로 시도
+CONDA_SH=""
+CONDA_BASE=""
+for path in \
+    "$HOME/anaconda3" \
+    "$HOME/miniconda3" \
+    "$HOME/.conda" \
+    "/opt/conda" \
+    "/usr/local/anaconda3" \
+    "/usr/local/miniconda3" \
+    "/opt/miniconda3"
+do
+    if [ -f "$path/etc/profile.d/conda.sh" ]; then
+        CONDA_SH="$path/etc/profile.d/conda.sh"
+        CONDA_BASE="$path"
+        break
+    fi
 done
 
-# conda 환경 활성화 확인
-echo "Conda 환경: $CONDA_DEFAULT_ENV"
-
-# venv 환경 활성화 확인
-echo "Virtual Env: $VIRTUAL_ENV"
-
-# Python 경로 확인
-which python python3
+if [ -n "$CONDA_SH" ]; then
+    source "$CONDA_SH"
+    echo "CONDA_INIT_SUCCESS: $CONDA_BASE"
+    conda --version
+else
+    echo "CONDA_INIT_FAIL: conda.sh not found"
+fi
 ```
 
-**환경이 활성화되지 않은 경우 안내:**
+**Recovery 1 - conda.sh를 찾지 못한 경우:**
 ```
-⚠️ 선택한 환경이 활성화되지 않았습니다.
+═══════════════════════════════════════════════════════════════
+❌ Conda 초기화 실패
+═══════════════════════════════════════════════════════════════
 
-다음 명령으로 환경을 활성화해주세요:
+conda.sh 파일을 찾을 수 없습니다.
 
-# conda 환경:
-conda activate {env_name}
+다음 경로를 확인해주세요:
+- ~/anaconda3/etc/profile.d/conda.sh
+- ~/miniconda3/etc/profile.d/conda.sh
 
-# venv/uv 환경:
-source {venv_path}/bin/activate
+[선택지]
+1. conda 경로를 직접 입력 (예: /custom/path/to/conda)
+2. conda 없이 시스템 Python 사용
+3. 설정 취소
 
-환경 활성화 후 다시 실행해주세요.
+➡️ 선택해주세요 [1-3]:
+═══════════════════════════════════════════════════════════════
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: CONDA_PATH_INPUT
+═══════════════════════════════════════════════════════════════
+```
+
+**Step 4-1-B: 환경 활성화 시도**
+
+```bash
+# 사용자가 선택한 환경 활성화 (예: ml-dev)
+conda activate {selected_env_name}
+
+# 활성화 확인
+echo "CONDA_DEFAULT_ENV: $CONDA_DEFAULT_ENV"
+which python
+python --version
+```
+
+**Recovery 2 - 환경 활성화 실패:**
+```
+═══════════════════════════════════════════════════════════════
+❌ 환경 활성화 실패
+═══════════════════════════════════════════════════════════════
+
+환경 "{env_name}" 활성화에 실패했습니다.
+오류: {error_message}
+
+[가능한 원인]
+1. 환경 이름이 잘못됨
+2. 환경이 손상됨
+3. conda 초기화 문제
+
+[복구 옵션]
+1. 다른 환경 선택 (conda env list 다시 표시)
+2. 새 환경 생성 (conda create -n {name} python=3.11)
+3. base 환경 사용
+4. 시스템 Python 사용 (환경 없이 진행)
+
+➡️ 선택해주세요 [1-4]:
+═══════════════════════════════════════════════════════════════
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: ACTIVATION_RECOVERY
+═══════════════════════════════════════════════════════════════
+```
+
+**Step 4-1-C: 활성화 검증**
+
+```bash
+# 환경이 제대로 활성화되었는지 확인
+echo "=== Activation Verification ==="
+echo "CONDA_DEFAULT_ENV: $CONDA_DEFAULT_ENV"
+echo "CONDA_PREFIX: $CONDA_PREFIX"
+which python
+python --version
+pip --version 2>/dev/null || echo "pip not found"
+```
+
+**검증 성공 시 출력:**
+```
+═══════════════════════════════════════════════════════════════
+✅ Conda 환경 활성화 완료
+═══════════════════════════════════════════════════════════════
+
+환경: {env_name}
+경로: {conda_prefix}
+Python: {python_version}
+
+═══════════════════════════════════════════════════════════════
+```
+
+#### 4-2. venv/uv 활성화 플로우
+
+```bash
+# venv 활성화
+if [ -f "{venv_path}/bin/activate" ]; then
+    source "{venv_path}/bin/activate"
+    echo "VENV_ACTIVATED: $VIRTUAL_ENV"
+    which python
+    python --version
+else
+    echo "VENV_ACTIVATION_FAIL: activate script not found"
+fi
+```
+
+**Recovery - venv 활성화 실패:**
+```
+═══════════════════════════════════════════════════════════════
+❌ venv 활성화 실패
+═══════════════════════════════════════════════════════════════
+
+venv 경로: {venv_path}
+오류: activate 스크립트를 찾을 수 없습니다.
+
+[복구 옵션]
+1. 새 venv 생성 (python -m venv {path})
+2. 다른 venv 경로 입력
+3. 시스템 Python 사용 (venv 없이 진행)
+
+➡️ 선택해주세요 [1-3]:
+═══════════════════════════════════════════════════════════════
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: VENV_RECOVERY
+═══════════════════════════════════════════════════════════════
+```
+
+#### 4-3. Shell 검증 루틴
+
+**선택된 Shell이 올바르게 동작하는지 확인:**
+
+```bash
+# Shell 검증
+SELECTED_SHELL="{selected_shell}"  # zsh, bash, or sh
+
+# 1. Shell 실행 파일 존재 확인
+if ! which $SELECTED_SHELL >/dev/null 2>&1; then
+    echo "SHELL_VALIDATION_FAIL: $SELECTED_SHELL not found in PATH"
+    exit 1
+fi
+
+# 2. Shell 버전 확인
+$SELECTED_SHELL --version 2>/dev/null || echo "$SELECTED_SHELL version unknown"
+
+# 3. RC 파일 존재 확인
+case $SELECTED_SHELL in
+    zsh)  RC_FILE="$HOME/.zshrc" ;;
+    bash) RC_FILE="$HOME/.bashrc" ;;
+    sh)   RC_FILE="$HOME/.profile" ;;
+esac
+
+if [ -f "$RC_FILE" ]; then
+    echo "SHELL_RC_FILE: $RC_FILE (exists)"
+else
+    echo "SHELL_RC_FILE: $RC_FILE (not found)"
+fi
+
+echo "SHELL_VALIDATION_SUCCESS: $SELECTED_SHELL"
+```
+
+**Shell 검증 실패 시 Recovery:**
+```
+═══════════════════════════════════════════════════════════════
+❌ Shell 검증 실패
+═══════════════════════════════════════════════════════════════
+
+선택한 Shell: {selected_shell}
+오류: {error_message}
+
+[복구 옵션]
+1. 다른 Shell 선택
+2. 현재 Shell 사용 ($SHELL: {current_shell})
+3. /bin/sh 사용 (최소 기능)
+
+➡️ 선택해주세요 [1-3]:
+═══════════════════════════════════════════════════════════════
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: SHELL_RECOVERY
+═══════════════════════════════════════════════════════════════
 ```
 
 ### STEP 5: 더블 체크 (언어별 버전 확인)
@@ -619,15 +816,49 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.vers
 **반드시 마지막에 아래 형식으로 출력하세요:**
 
 **환경 확인 성공 (모든 선택 완료 후에만!):**
+
+⚠️ **중요: 이 환경 상태 데이터는 Orchestrator가 파싱하여 다른 Agent에 전달합니다.**
+
 ```
 ═══════════════════════════════════════════════════════════════
 ENV_SETUP_RESULT: SUCCESS
-SHELL_SELECTED: {zsh/bash/sh}
-ENV_TYPE: {conda/uv/venv/none}
-ENV_NAME: {환경 이름}
-ENV_STATUS: {ACTIVATED/NOT_ACTIVATED}
-PYTHON_VERSION: {버전}
 ═══════════════════════════════════════════════════════════════
+
+[ENV_STATE_BEGIN]
+# Shell Configuration
+SHELL_TYPE: {zsh/bash/sh}
+SHELL_PATH: {/bin/zsh, /bin/bash, etc.}
+SHELL_RC: {~/.zshrc, ~/.bashrc, etc.}
+
+# Virtual Environment
+ENV_TYPE: {conda/uv/venv/none}
+ENV_NAME: {환경 이름 또는 "none"}
+ENV_PATH: {환경 절대 경로 또는 "none"}
+ENV_STATUS: {ACTIVATED/NOT_ACTIVATED}
+
+# Activation Commands (다른 Agent가 환경 활성화 시 사용)
+CONDA_SH: {/path/to/conda.sh 또는 "none"}
+CONDA_BASE: {/path/to/conda 또는 "none"}
+ACTIVATE_CMD: {환경 활성화 명령, 예: source /path/conda.sh && conda activate ml-dev}
+
+# Runtime Versions
+PYTHON_VERSION: {3.11.5}
+PYTHON_PATH: {/path/to/python}
+CUDA_VERSION: {11.8 또는 "none"}
+PYTORCH_VERSION: {2.0.1 또는 "none"}
+[ENV_STATE_END]
+
+═══════════════════════════════════════════════════════════════
+```
+
+**Orchestrator가 파싱하여 다른 Agent에 전달할 환경 정보 예시:**
+```
+# build-tester, function-tester 등에 전달되는 환경 정보
+ENV_STATE:
+  ACTIVATE_CMD: source ~/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev
+  PYTHON_PATH: /home/user/miniconda3/envs/ml-dev/bin/python
+  ENV_TYPE: conda
+  ENV_NAME: ml-dev
 ```
 
 **환경 확인 실패:**
@@ -636,6 +867,9 @@ PYTHON_VERSION: {버전}
 ENV_SETUP_RESULT: FAIL
 ERROR: {에러 메시지}
 REQUIRED_ACTION: {사용자가 취해야 할 조치}
+RECOVERY_OPTIONS:
+1. {복구 옵션 1}
+2. {복구 옵션 2}
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -643,7 +877,8 @@ REQUIRED_ACTION: {사용자가 취해야 할 조치}
 ```
 ═══════════════════════════════════════════════════════════════
 ENV_SETUP_RESULT: WAITING_INPUT
-WAITING_FOR: {SHELL_SELECTION/ENV_TYPE_SELECTION/ENV_NAME_SELECTION}
+WAITING_FOR: {SHELL_SELECTION/ENV_TYPE_SELECTION/ENV_NAME_SELECTION/CONDA_PATH_INPUT/ACTIVATION_RECOVERY/VENV_RECOVERY/SHELL_RECOVERY}
+CURRENT_STEP: {1/2/3/4}
 ═══════════════════════════════════════════════════════════════
 ```
 
