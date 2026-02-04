@@ -290,14 +290,16 @@ git diff --stat
 
 📝 Auto-Fixed Issues
 ┌─────────────────────────────────────────────────────────────┐
-│ src/core/processor.py                                       │
+│ {수정된_파일_1}              ← ruff/eslint 자동 수정 결과   │
 │   - Removed unused import: os                               │
 │   - Fixed line length (E501)                                │
 │   - Sorted imports                                          │
 ├─────────────────────────────────────────────────────────────┤
-│ src/utils/helpers.py                                        │
+│ {수정된_파일_2}                                              │
 │   - Fixed trailing whitespace                               │
 └─────────────────────────────────────────────────────────────┘
+
+⚠️ Above paths are templates. Use actual file paths from linter output.
 
 📊 Summary
 ┌──────────────┬──────────────┐

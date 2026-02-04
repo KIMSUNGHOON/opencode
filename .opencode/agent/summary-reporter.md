@@ -289,26 +289,28 @@ prompt에서 QA 결과 데이터를 확인합니다.
 ## 주요 수정 사항
 
 ### 보안 (Critical)
-1. **SQL Injection 수정** - src/db/queries.py:45
+1. **SQL Injection 수정** - {절대경로}/file.py:45  ← 실제 수정 파일
    - 파라미터화된 쿼리로 변경
 
 ### 버그 (High)
-2. **Null 참조 수정** - src/core/processor.py:78
+2. **Null 참조 수정** - {절대경로}/file.py:78
    - Optional 체크 추가
 
-3. **리소스 누수 수정** - src/utils/file_handler.py:23
+3. **리소스 누수 수정** - {절대경로}/file.py:23
    - context manager 사용
+
+⚠️ Above paths are templates. Use actual file paths from QA results.
 
 ══════════════════════════════════════════════════════════════
 
 ## 권장 사항
 
 ### 추가 개선 필요
-- [ ] src/config.py의 매직 넘버를 상수로 추출 (Low)
+- [ ] {실제_파일}의 매직 넘버를 상수로 추출 (Low)
 - [ ] 테스트 커버리지 90% 이상 목표
 
 ### 기술 부채
-- src/legacy/ 디렉토리 리팩토링 검토
+- {해당되는_경우} 리팩토링 검토
 - 타입 힌트 추가 권장
 
 ══════════════════════════════════════════════════════════════

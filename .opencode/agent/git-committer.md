@@ -144,8 +144,8 @@ git diff
 
 📁 스테이징될 파일 ({count}개)
 ┌─────────────────────────────────────────────────────────────┐
-│ M  src/db/queries.py                                        │
-│ M  src/core/processor.py                                    │
+│ M  {변경된_파일_1}        ← 실제 git status 결과 표시       │
+│ M  {변경된_파일_2}                                          │
 │ ...                                                         │
 └─────────────────────────────────────────────────────────────┘
 
@@ -191,22 +191,22 @@ Code-QA: auto-fixed
 
 #### 새 커밋 (--working, --staged)
 ```bash
-# 변경 파일 스테이징
-git add src/db/queries.py src/core/processor.py
+# 변경 파일 스테이징 (실제 변경된 파일 사용)
+git add {변경된_파일_1} {변경된_파일_2}
 
 # 커밋
-git commit -m "fix(db): SQL injection 취약점 수정
+git commit -m "fix: {수정 내용 요약}
 
-- 파라미터화된 쿼리로 변경
-- 사용자 입력 검증 추가
+- {상세 내용 1}
+- {상세 내용 2}
 
 Code-QA: auto-fixed"
 ```
 
 #### Amend (--last, --branch)
 ```bash
-# 변경 파일 스테이징
-git add src/db/queries.py
+# 변경 파일 스테이징 (실제 변경된 파일 사용)
+git add {변경된_파일}
 
 # amend (사용자 확인 필요)
 git commit --amend --no-edit
@@ -227,9 +227,9 @@ git commit --amend --no-edit
 
 📁 Staged Files
 ┌─────────────────────────────────────────────────────────────┐
-│ M  src/db/queries.py                                        │
-│ M  src/core/processor.py                                    │
-│ M  src/utils/helpers.py                                     │
+│ M  {실제_스테이징된_파일_1}   ← git status 결과 표시        │
+│ M  {실제_스테이징된_파일_2}                                  │
+│ M  {실제_스테이징된_파일_3}                                  │
 └─────────────────────────────────────────────────────────────┘
 
 ✅ Commit Created

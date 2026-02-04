@@ -198,10 +198,12 @@ git diff <commit_a>..<commit_b> --name-only
 
 📁 Changed Files ({count} files)
 ┌─────────────────────────────────────────────────────────────┐
-│ src/core/processor.py                                       │
-│ src/utils/helpers.py                                        │
-│ tests/test_processor.py                                     │
+│ {절대경로}/file1.py           ← 실제 git diff 결과 표시     │
+│ {절대경로}/file2.py                                         │
+│ {절대경로}/test_file.py                                     │
 └─────────────────────────────────────────────────────────────┘
+
+⚠️ 위 경로는 템플릿입니다. git diff 결과의 실제 파일 경로를 사용하세요.
 
 ➡️ 다음 단계: Pre-Checker (Phase 1)
 

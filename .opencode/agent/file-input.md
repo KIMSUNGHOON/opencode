@@ -147,10 +147,12 @@ ls -1 src/*.py 2>/dev/null
 
 📁 Found Files ({count} files)
 ┌─────────────────────────────────────────────────────────────┐
-│ src/core/processor.py                                       │
-│ src/utils/helpers.py                                        │
-│ lib/common/utils.js                                         │
+│ {발견된_파일_1}            ← Glob 결과의 실제 경로 표시     │
+│ {발견된_파일_2}                                              │
+│ {발견된_파일_3}                                              │
 └─────────────────────────────────────────────────────────────┘
+
+⚠️ Above paths are templates. Use actual file paths from Glob results.
 
 ➡️ 다음 단계: Pre-Checker (Phase 1)
 

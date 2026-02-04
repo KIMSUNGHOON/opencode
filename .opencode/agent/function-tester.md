@@ -167,12 +167,13 @@ Glob 패턴: **/test*.*  또는  **/*test*.*  또는  **/*_test.*
 
 📁 테스트 파일 목록:
 ┌─────────────────────────────────────────────────────────────┐
-│ [Python]     tests/test_processor.py                        │
-│ [Python]     tests/test_utils.py                            │
-│ [JavaScript] __tests__/api.test.js                          │
-│ [Go]         pkg/handler_test.go                            │
+│ [Python]     {발견된_테스트_파일_1}                          │
+│ [Python]     {발견된_테스트_파일_2}                          │
+│ [JavaScript] {발견된_테스트_파일_3}                          │
 │ ...                                                         │
 └─────────────────────────────────────────────────────────────┘
+
+⚠️ 위 목록은 템플릿입니다. find/Glob 결과의 실제 파일을 표시하세요.
 
 🔧 감지된 설정 파일:
 - pytest.ini, jest.config.js, go.mod
@@ -302,12 +303,14 @@ swift test --verbose
 ┌─────────────────────────────────────────────────────────────┐
 │ Module                    Statements    Miss    Coverage    │
 ├─────────────────────────────────────────────────────────────┤
-│ src/core/processor.py     120           12      90%         │
-│ src/utils/helpers.py      85            8       91%         │
-│ src/db/queries.py         65            15      77%         │
+│ {파일1}                   120           12      90%         │
+│ {파일2}                   85            8       91%         │
+│ {파일3}                   65            15      77%         │
 ├─────────────────────────────────────────────────────────────┤
 │ TOTAL                     270           35      87%         │
 └─────────────────────────────────────────────────────────────┘
+
+⚠️ Coverage report shows actual file paths from test run.
 
 ➡️ 다음 단계: Git Committer (Phase 7)
 
@@ -331,24 +334,16 @@ swift test --verbose
 
 🔴 Failed Tests
 
-[FAIL] test_processor.py::test_calculate_total
+[FAIL] {테스트파일}::{테스트함수}   ← 실제 실패한 테스트 표시
 ┌─────────────────────────────────────────────────────────────┐
-│ AssertionError: assert 100 == 150                           │
+│ {에러 메시지}                                               │
 │                                                             │
-│ def test_calculate_total():                                 │
-│     result = calculate_total([10, 20, 30])                  │
-│ >   assert result == 150                                    │
-│ E   AssertionError: assert 100 == 150                       │
+│ {테스트 코드 스니펫}                                        │
 │                                                             │
-│ tests/test_processor.py:45                                  │
+│ {파일경로}:{라인번호}                                       │
 └─────────────────────────────────────────────────────────────┘
 
-[FAIL] test_processor.py::test_validate_input
-┌─────────────────────────────────────────────────────────────┐
-│ ValueError: Invalid input format                            │
-│                                                             │
-│ tests/test_processor.py:67                                  │
-└─────────────────────────────────────────────────────────────┘
+⚠️ Above is a template. Show actual failed test output.
 
 🔄 Code Fixer로 회귀 (시도 {n}/3)
 
@@ -360,11 +355,11 @@ swift test --verbose
 ### 변경된 파일 관련 테스트만 실행 (최적화)
 
 ```bash
-# pytest - 변경 파일 관련 테스트만
-python -m pytest tests/ -v --collect-only | grep -E "(test_processor|test_helpers)"
+# pytest - 변경 파일 관련 테스트만 (실제 테스트 파일 사용)
+python -m pytest tests/ -v --collect-only | grep -E "({관련_테스트_패턴})"
 
-# 특정 테스트만 실행
-python -m pytest tests/test_processor.py tests/test_helpers.py -v
+# 특정 테스트만 실행 (실제 발견된 테스트 파일 사용)
+python -m pytest {테스트파일1} {테스트파일2} -v
 ```
 
 ### 전체 테스트 실행
