@@ -85,7 +85,7 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 | code-qa | `.opencode/command/code-qa.md` | English | - | Orchestrator |
 | git-input | `.opencode/agent/git-input.md` | English | qwen/qwen3-next-80b-a3b-thinking | Git diff collection |
 | file-input | `.opencode/agent/file-input.md` | English | qwen/qwen3-next-80b-a3b-thinking | Direct file input |
-| env-setup | `.opencode/agent/env-setup.md` | English | qwen/qwen3-next-80b-a3b-thinking | Environment setup |
+| env-setup | `.opencode/agent/env-setup.md` | English | qwen/qwen3-next-80b-a3b-thinking | Environment setup (streamlined) |
 | pre-checker | `.opencode/agent/pre-checker.md` | English | qwen/qwen3-next-80b-a3b-thinking | Pre-review checks |
 | code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Code review |
 | code-fixer | `.opencode/agent/code-fixer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Auto-fix issues |
@@ -299,9 +299,68 @@ rm -rf node_modules
 
 ---
 
-## 8. Architecture Decisions
+## 8. Environment Setup Streamlining
 
-### 8.1 Why Result Tokens?
+### 8.1 Problem with Original Design
+
+The original env-setup agent required 4 rounds of user interaction:
+
+```
+Old Flow (4 WAITING_INPUTs):
+STEP 1: Shell selection → WAITING_INPUT
+STEP 2: Env type selection → WAITING_INPUT
+STEP 3: Env name selection → WAITING_INPUT
+STEP 4: Activation confirm → WAITING_INPUT
+```
+
+Issues:
+- Users already have their environment set up
+- Forcing shell selection when `$SHELL` already tells us
+- Asking env type when `$CONDA_DEFAULT_ENV` or `$VIRTUAL_ENV` already set
+- Too much friction for every `/code-qa` run
+
+### 8.2 Streamlined Design
+
+New flow with minimal interaction:
+
+```
+New Flow (1-2 WAITING_INPUTs):
+
+[Active env detected]
+  → "Use current env? [Y/n/list]"
+  → Y: SUCCESS (1 interaction)
+  → n: Show list → Select → SUCCESS (2 interactions)
+
+[No active env]
+  → Show env list → Select → SUCCESS (2 interactions)
+```
+
+### 8.3 Key Changes
+
+| Aspect | Old | New |
+|--------|-----|-----|
+| Shell selection | Explicit | Auto-detect (no selection) |
+| Env type | Must choose | Auto-detect from active env |
+| Env list | Always show | Only when changing |
+| Happy path | 4 interactions | 1 interaction |
+| Config support | Hint only | `auto_confirm: true` option |
+
+### 8.4 Unified Detection Command
+
+Single Bash call detects everything:
+- Current shell and version
+- Active environment (conda/venv)
+- All conda environments (full list)
+- Local .venv directories
+- Other managers (uv, poetry, pipenv, pyenv)
+- Language runtimes
+- GPU availability
+
+---
+
+## 9. Architecture Decisions
+
+### 9.1 Why Result Tokens?
 
 Result tokens provide:
 - **Deterministic parsing**: No ambiguity in state detection
@@ -309,14 +368,14 @@ Result tokens provide:
 - **Debugging**: Easy to trace workflow state
 - **Model independence**: Works across different LLM backends
 
-### 8.2 Why English?
+### 9.2 Why English?
 
 - Primary training language for most LLMs
 - Better tokenization efficiency
 - Wider community accessibility
 - Consistent terminology across codebase
 
-### 8.3 Why Visual Formatting?
+### 9.3 Why Visual Formatting?
 
 - Aids model comprehension of structure
 - Reduces ambiguity in complex instructions
@@ -325,7 +384,7 @@ Result tokens provide:
 
 ---
 
-## 9. Related Documentation
+## 10. Related Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -342,3 +401,4 @@ Result tokens provide:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-02-04 | Initial implementation summary |
+| 1.1 | 2025-02-04 | env-setup streamlining (4 steps → 1-2 steps) |
