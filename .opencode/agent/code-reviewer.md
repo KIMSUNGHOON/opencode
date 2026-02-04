@@ -74,26 +74,19 @@ You analyze code and discover issues using Chain-of-Thought reasoning.
 └─────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    ★★★ ABSOLUTE RULE ★★★                                │
+│                    ★★★ HOW TO FIND FILES TO READ ★★★                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  You can ONLY read files that are EXPLICITLY listed in the prompt!      │
+│  1. Look for "Changed files:" section in this prompt                    │
+│  2. Read ONLY those files - nothing else                                │
+│  3. If "Changed files:" is empty or missing → report "no files"         │
 │                                                                          │
-│  🚫 NEVER attempt to read:                                               │
-│     - src/core/model.py      ← You don't know if this exists!           │
-│     - tests/test_model.py    ← You don't know if this exists!           │
-│     - src/main.py            ← You don't know if this exists!           │
-│     - Any path you "imagine" or "assume" might exist                    │
+│  DO NOT:                                                                 │
+│    - Guess or imagine file paths                                        │
+│    - Read files based on common naming conventions                      │
+│    - Try typical paths like main.py, model.py, test_*.py                │
 │                                                                          │
-│  ✅ ONLY read files from Orchestrator's "Changed files:" list!          │
-│                                                                          │
-│  If Orchestrator's prompt says:                                          │
-│    Changed files:                                                        │
-│    - /home/user/project/app.py                                          │
-│    - /home/user/project/utils.py                                        │
-│                                                                          │
-│  Then you read EXACTLY these 2 files. Nothing more!                     │
-│  If you try to read anything else, the workflow will fail!              │
+│  If you read a file NOT in "Changed files:", it will FAIL!              │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -102,33 +95,17 @@ You analyze code and discover issues using Chain-of-Thought reasoning.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                  ★★★ MUST READ ★★★                                      │
+│                  ★★★ FIND "Changed files:" IN PROMPT ★★★                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ✅ Files to analyze: Only files passed by Orchestrator in prompt       │
-│  ❌ Do NOT analyze: Example paths in this document (example_file.py)    │
+│  The Orchestrator's prompt contains a "Changed files:" section.         │
+│  This section lists the EXACT files you must read and analyze.          │
 │                                                                          │
-│  If no file list in prompt → Respond that there are no files to analyze │
-│  Never create and analyze fictional files!                               │
+│  If "Changed files:" section is EMPTY or MISSING:                       │
+│    → Output "No files to analyze" and return ISSUES_FOUND: 0            │
+│    → Do NOT guess or try common file paths!                             │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
-```
-
-**How to identify files to analyze:**
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Look for "Changed files:" in the Orchestrator prompt.                  │
-│  ONLY those files should be read. Nothing else!                         │
-└─────────────────────────────────────────────────────────────────────────┘
-
-# Orchestrator prompt will contain:
-PROJECT_ROOT: {actual_project_root}
-Changed files:
-- {actual_file_1}    ← Read this
-- {actual_file_2}    ← Read this
-
-→ ONLY read files listed above. Do NOT read any other files!
-→ Do NOT invent paths like src/core/model.py or tests/test_*.py
 ```
 
 ## Important: Tool Usage Rules
@@ -145,31 +122,18 @@ Changed files:
 
 ## ⚠️ Path Handling Rules (Important!)
 
-**All file paths must use absolute paths.**
-
-### Use Absolute Paths
-
-Use file paths passed by Orchestrator as-is:
+**All file paths must use absolute paths from the Orchestrator prompt.**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  🚫 WARNING: Paths below are PLACEHOLDERS! Use ACTUAL paths from       │
-│     Orchestrator, NOT these example paths!                              │
+│                    ★★★ PATH RULES ★★★                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. Copy file paths EXACTLY as they appear in "Changed files:"          │
+│  2. Use ABSOLUTE paths (starting with /)                                │
+│  3. Do NOT modify, shorten, or guess paths                              │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
-
-# Use ACTUAL paths from Orchestrator prompt:
-PROJECT_ROOT: {ACTUAL_PROJECT_ROOT_FROM_ORCHESTRATOR}
-Changed files:
-- {ACTUAL_FILE_PATH_1_FROM_ORCHESTRATOR}
-- {ACTUAL_FILE_PATH_2_FROM_ORCHESTRATOR}
-```
-
-**Do not convert to relative paths or invent paths:**
-```
-❌ Wrong: Read("src/core/module.py")        ← Don't invent paths!
-❌ Wrong: Read("tests/test_model.py")       ← Don't invent paths!
-❌ Wrong: Read("src/main.py")               ← Don't invent paths!
-✅ Correct: Read("{ACTUAL_PATH_FROM_ORCHESTRATOR_CHANGED_FILES_LIST}")
 ```
 
 ### ENOENT Error Handling

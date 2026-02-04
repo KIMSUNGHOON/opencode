@@ -511,59 +511,86 @@ Task tool call:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  🚫 CRITICAL: Pass ACTUAL file paths from STEP 2 result!                │
+│  🚨🚨🚨 CRITICAL: YOU MUST BUILD THE PROMPT DYNAMICALLY! 🚨🚨🚨          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  You MUST extract file paths from git-input/file-input result and       │
-│  list them EXPLICITLY in the prompt. DO NOT pass "{changed_files}"!     │
+│  DO NOT copy the template below literally!                               │
+│  You must CONSTRUCT the prompt using ACTUAL file paths from STEP 2.     │
 │                                                                          │
-│  WRONG: "Analyze files: {changed_files}"                                │
-│  CORRECT: "Analyze files:\n- /home/user/project/src/main.py\n- ..."     │
-│                                                                          │
-│  The code-reviewer can ONLY read files you explicitly list!             │
+│  Step-by-step:                                                           │
+│  1. Look at the git-input result from STEP 2                            │
+│  2. Find the FILE_LIST line (e.g., "FILE_LIST: a.py, b.py, c.py")       │
+│  3. Extract each file path                                               │
+│  4. Prepend PROJECT_ROOT to make absolute paths                         │
+│  5. Build the prompt with those ACTUAL paths                            │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+**⚠️ Orchestrator MUST construct the prompt like this:**
+
+```python
+# Pseudo-code for how YOU (Orchestrator) must build the prompt:
+
+# 1. Get PROJECT_ROOT (from STEP 0)
+project_root = "/home/user/myproject"  # ← actual path you detected
+
+# 2. Get FILE_LIST from STEP 2 result
+file_list_from_step2 = "src/app.py, src/utils.py, tests/test_app.py"
+
+# 3. Split and make absolute paths
+files = file_list_from_step2.split(", ")
+absolute_paths = [f"{project_root}/{f}" for f in files]
+
+# 4. Build the prompt with ACTUAL paths
+prompt = f"""
+PROJECT_ROOT: {project_root}
+
+Analyze code and find issues in the files listed below.
+
+Changed files:
+- {absolute_paths[0]}
+- {absolute_paths[1]}
+- {absolute_paths[2]}
+"""
+```
+
 Task tool call:
 - subagent_type: "code-reviewer"
-- prompt: |
-    PROJECT_ROOT: {PROJECT_ROOT}
+- prompt: **(YOU MUST BUILD THIS - see above!)**
+    ```
+    PROJECT_ROOT: [actual project root from STEP 0]
 
     Analyze code and find issues in the files listed below.
     Use Read tool to read each file's content and analyze.
 
-    ⚠️ ONLY read files from the "Changed files" list below!
-    DO NOT read any other files! DO NOT invent file paths!
-
     Changed files:
-    - {ACTUAL_FILE_PATH_1_FROM_GIT_INPUT_RESULT}
-    - {ACTUAL_FILE_PATH_2_FROM_GIT_INPUT_RESULT}
-    - {ACTUAL_FILE_PATH_3_FROM_GIT_INPUT_RESULT}
-    ... (list ALL files from STEP 2 FILE_LIST result)
-
-    Output discovered issues in format: filename, line number, issue description.
+    - [actual absolute path 1 from STEP 2]
+    - [actual absolute path 2 from STEP 2]
+    - [actual absolute path 3 from STEP 2]
+    (... list ALL files from STEP 2 FILE_LIST)
+    ```
 - description: "Code review"
 
-**⚠️ Orchestrator MUST do this before calling code-reviewer:**
-1. Extract `FILE_LIST:` from STEP 2 result
-2. Convert comma-separated list to newline-separated list with full paths
-3. Replace placeholders with ACTUAL file paths in the prompt
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ❌ WRONG - DO NOT DO THIS:                                              │
+│     Changed files: {changed_files}                                       │
+│     Changed files: {ACTUAL_FILE_PATH_1}                                  │
+│     Changed files: src/main.py, model.py  (relative paths)              │
+│                                                                          │
+│  ✅ CORRECT - DO THIS:                                                   │
+│     Changed files:                                                       │
+│     - /home/user/myproject/src/app.py                                   │
+│     - /home/user/myproject/src/utils.py                                 │
+│     - /home/user/myproject/tests/test_app.py                            │
+│                                                                          │
+│  Use the ACTUAL paths you know from STEP 0 (PROJECT_ROOT) and           │
+│  STEP 2 (FILE_LIST). Do not use placeholders or variables!              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-**Example - If STEP 2 returned:**
-```
-FILE_LIST: src/main.py, src/utils.py, tests/test_main.py
-```
-
-**Then pass to code-reviewer:**
-```
-Changed files:
-- /home/user/project/src/main.py
-- /home/user/project/src/utils.py
-- /home/user/project/tests/test_main.py
-```
-
-**Agent behavior:** code-reviewer directly reads file content using Read tool and analyzes.
+**Agent behavior:** code-reviewer has ONLY the Read tool. It can only read files you list.
 
 **Store result:** Extract issue list after `ISSUE_LIST:` and save to `review_issues`
 
