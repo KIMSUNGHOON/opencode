@@ -364,8 +364,8 @@ ERROR: {error_description}
 ```
 ═══════════════════════════════════════════════════════════════
 WORKSPACE_ANALYSIS_RESULT: TIMEOUT
-WARNING: 프로젝트가 너무 커서 부분 분석만 완료되었습니다.
-         분석된 파일: {analyzed_count} / 전체: {total_count}
+WARNING: Project is too large; only partial analysis was completed.
+         Analyzed files: {analyzed_count} / Total: {total_count}
 ═══════════════════════════════════════════════════════════════
 
 📊 Partial Analysis Summary
@@ -382,7 +382,7 @@ CACHE_DATA:
 ```
 ═══════════════════════════════════════════════════════════════
 WORKSPACE_ANALYSIS_RESULT: EMPTY
-WARNING: 소스 파일이 없는 빈 프로젝트입니다.
+WARNING: Empty project with no source files.
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -396,75 +396,75 @@ WARNING: 소스 파일이 없는 빈 프로젝트입니다.
 
 ## Large Project Handling (10,000+ files)
 
-**파일 수 제한:**
+**File count limits:**
 ```
 IF total_files > 10,000:
-    1. 전체 파일 목록 대신 디렉토리 구조만 기록
-    2. 주요 디렉토리(src/, lib/, tests/)만 상세 분석
-    3. files.by_type에는 상위 100개 파일만 포함
-    4. 캐시에 "truncated": true 플래그 추가
-    5. 경고 메시지 출력
+    1. Record only directory structure instead of full file list
+    2. Analyze only main directories (src/, lib/, tests/) in detail
+    3. Include only top 100 files in files.by_type
+    4. Add "truncated": true flag to cache
+    5. Output warning message
 ```
 
-**타임아웃 처리:**
+**Timeout handling:**
 ```
-IF 분석 시간 > 60초:
-    → 현재까지 수집된 데이터로 캐시 생성
-    → WORKSPACE_ANALYSIS_RESULT: TIMEOUT 출력
-    → "partial_analysis": true 플래그 추가
+IF analysis_time > 60 seconds:
+    → Generate cache with data collected so far
+    → Output WORKSPACE_ANALYSIS_RESULT: TIMEOUT
+    → Add "partial_analysis": true flag
 ```
 
 ## Edge Case Handling
 
-### 빈 프로젝트
+### Empty Project
 ```
-IF 소스 파일이 0개:
+IF source_files == 0:
     → project.type = "empty"
-    → 경고: "소스 파일이 없습니다"
-    → 최소 캐시 생성 (디렉토리 구조만)
+    → Warning: "No source files found"
+    → Generate minimal cache (directory structure only)
 ```
 
-### 알 수 없는 프로젝트 타입
+### Unknown Project Type
 ```
-IF manifest 파일이 없음 (package.json, go.mod 등):
+IF no manifest files exist (package.json, go.mod, etc.):
     → project.type = "unknown"
-    → 파일 확장자 기반으로 languages 추론
+    → Infer languages from file extensions
     → build_system.type = "unknown"
 ```
 
-### 모노레포 (Monorepo)
+### Monorepo
 ```
-IF 루트에 여러 package.json 또는 여러 go.mod 존재:
+IF multiple package.json or multiple go.mod exist at root:
     → project.type = "monorepo"
-    → 각 서브프로젝트를 "subprojects" 배열에 기록
-    → 루트 레벨 분석만 수행 (서브프로젝트 상세 분석 안 함)
+    → Record each subproject in "subprojects" array
+    → Perform root-level analysis only (no detailed subproject analysis)
 ```
 
-### 심볼릭 링크
+### Symbolic Links
 ```
-IF 심볼릭 링크 발견:
-    → 링크 자체만 기록, 타겟 따라가지 않음
-    → 무한 루프 방지
+IF symbolic link found:
+    → Record the link itself, do not follow target
+    → Prevents infinite loops
 ```
 
 ### Git Submodules
 ```
-IF .gitmodules 파일 존재:
-    → submodules 목록 기록
-    → 서브모듈 내부는 분석하지 않음
+IF .gitmodules file exists:
+    → Record submodules list
+    → Do not analyze inside submodules
 ```
 
-### 권한 오류
+### Permission Errors
 ```
-IF 파일/디렉토리 읽기 권한 없음:
-    → 해당 경로 스킵
-    → errors 배열에 기록
-    → 분석 계속 진행
+IF no read permission for file/directory:
+    → Skip that path
+    → Record in errors array
+    → Continue analysis
 ```
 
-### 바이너리 파일
+### Binary Files
 ```
-확장자 기반 바이너리 파일 제외:
+Exclude binary files based on extension:
 - .exe, .dll, .so, .dylib
 - .zip, .tar, .gz, .rar
 - .png, .jpg, .gif, .ico, .svg
