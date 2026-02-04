@@ -108,13 +108,95 @@ You generate a list of files to inspect based on user's input options.
 
 ## Execution Steps
 
-### STEP 0: Git Repository Check (Required)
+### STEP 0: Git Repository & State Check (Required)
 
 **First verify if this is a Git repository:**
 
 ```bash
 # Check if .git directory exists
 git rev-parse --is-inside-work-tree 2>/dev/null
+```
+
+**Then check Git state for special conditions:**
+
+```bash
+# Check for detached HEAD
+git symbolic-ref HEAD 2>/dev/null || echo "DETACHED"
+
+# Check for merge conflict
+git ls-files -u 2>/dev/null | head -1
+
+# Check for rebase in progress
+ls .git/rebase-merge 2>/dev/null || ls .git/rebase-apply 2>/dev/null
+```
+
+**If Detached HEAD state:**
+```
+═══════════════════════════════════════════════════════════════
+⚠️ Detached HEAD State
+═══════════════════════════════════════════════════════════════
+
+Currently in Detached HEAD state (checked out to a specific commit).
+In this state, new commits won't be connected to any branch.
+
+Current commit: {commit_hash}
+
+[Options]
+1. Create new branch and continue
+   → Enter branch name (e.g., feature/my-fix)
+
+2. Run QA only (skip commit/push)
+   → Enter "qa-only" or "continue"
+
+3. Exit
+   → Enter "exit"
+
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: DETACHED_HEAD
+WAITING_FOR: USER_CHOICE
+═══════════════════════════════════════════════════════════════
+```
+
+**If Merge Conflict state:**
+```
+═══════════════════════════════════════════════════════════════
+⚠️ Merge Conflict Detected
+═══════════════════════════════════════════════════════════════
+
+Currently in merge conflict state.
+Please resolve conflicts before running Code QA.
+
+Conflicted files:
+{list of conflicted files from git ls-files -u}
+
+[Resolution Steps]
+1. Edit conflicted files
+2. git add <file>
+3. git commit (or git merge --continue)
+
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: MERGE_CONFLICT
+MESSAGE: Please resolve merge conflict and try again.
+═══════════════════════════════════════════════════════════════
+```
+
+**If Rebase in progress:**
+```
+═══════════════════════════════════════════════════════════════
+⚠️ Rebase In Progress
+═══════════════════════════════════════════════════════════════
+
+Rebase is currently in progress.
+Please complete or abort rebase before running Code QA.
+
+[Resolution Steps]
+- Continue: git rebase --continue
+- Abort: git rebase --abort
+
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: REBASE_IN_PROGRESS
+MESSAGE: Please complete rebase and try again.
+═══════════════════════════════════════════════════════════════
 ```
 
 **If not a Git repository:**
@@ -351,26 +433,26 @@ Extract options from $ARGUMENTS:
 
 ### STEP 2: Extract Changed Files with Status
 
-**중요: 파일 상태(Added/Modified/Deleted)를 함께 추출해야 합니다!**
+**Important: File status (Added/Modified/Deleted) must be extracted together!**
 
 ```bash
-# Default (working) - 상태 포함
+# Default (working) - with status
 git diff --name-status
 
-# staged - 상태 포함
+# staged - with status
 git diff --staged --name-status
 
-# last - 상태 포함
+# last - with status
 git diff HEAD~1 --name-status
 
-# branch (compared to main) - 상태 포함
+# branch (compared to main) - with status
 git diff main...HEAD --name-status
 
-# range - 상태 포함
+# range - with status
 git diff <commit_a>..<commit_b> --name-status
 ```
 
-**출력 형식:**
+**Output format:**
 ```
 M    src/modified_file.py      # Modified
 A    src/new_file.py          # Added
@@ -378,27 +460,27 @@ D    src/deleted_file.py      # Deleted
 R100 old_name.py new_name.py  # Renamed (with similarity %)
 ```
 
-**파일 상태 처리:**
+**File status handling:**
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  파일 상태별 처리 방법                                                   │
+│  How to handle each file status                                          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  A (Added):     분석 대상 ✅                                             │
-│  M (Modified):  분석 대상 ✅                                             │
-│  D (Deleted):   분석 제외 ❌ (파일이 없으므로 읽을 수 없음)              │
-│  R (Renamed):   새 경로로 분석 ✅ (old_name 제외, new_name 포함)         │
-│  C (Copied):    분석 대상 ✅                                             │
-│  T (Type changed): 분석 대상 ✅                                          │
+│  A (Added):     Include in analysis ✅                                   │
+│  M (Modified):  Include in analysis ✅                                   │
+│  D (Deleted):   Exclude from analysis ❌ (file doesn't exist, can't read)│
+│  R (Renamed):   Analyze at new path ✅ (exclude old_name, include new)   │
+│  C (Copied):    Include in analysis ✅                                   │
+│  T (Type changed): Include in analysis ✅                                │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**삭제된 파일이 있을 때:**
+**When deleted files exist:**
 ```
-IF 삭제된 파일(D) 존재:
-    → FILE_LIST에서 제외
-    → 결과에 DELETED_FILES 섹션 추가
+IF deleted files (D) exist:
+    → Exclude from FILE_LIST
+    → Add DELETED_FILES section to result
 ```
 
 ### STEP 3: File Filtering
@@ -482,10 +564,10 @@ Exclude:
 ```
 ═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: SUCCESS
-FILES_FOUND: {분석 대상 파일 수}
+FILES_FOUND: {number of files to analyze}
 FILE_LIST: {file1}, {file2}, {file3}, ...
-DELETED_FILES: {삭제된 파일들 - 있는 경우만}
-RENAMED_FILES: {old→new 형식 - 있는 경우만}
+DELETED_FILES: {deleted files - only if present}
+RENAMED_FILES: {old→new format - only if present}
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -494,7 +576,7 @@ RENAMED_FILES: {old→new 형식 - 있는 경우만}
 ═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: NO_CHANGES
 FILES_FOUND: 0
-MESSAGE: 변경된 파일이 없습니다. 워크플로우를 종료합니다.
+MESSAGE: No changed files. Ending workflow.
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -503,8 +585,8 @@ MESSAGE: 변경된 파일이 없습니다. 워크플로우를 종료합니다.
 ═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: DELETED_ONLY
 FILES_FOUND: 0
-DELETED_FILES: {삭제된 파일들}
-MESSAGE: 삭제된 파일만 있습니다. 분석할 파일이 없습니다.
+DELETED_FILES: {deleted files}
+MESSAGE: Only deleted files. No files to analyze.
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -513,7 +595,7 @@ MESSAGE: 삭제된 파일만 있습니다. 분석할 파일이 없습니다.
 ═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: NO_CODE_FILES
 FILES_FOUND: 0
-MESSAGE: 변경된 코드 파일이 없습니다. (설정/문서 파일만 변경됨)
+MESSAGE: No code files changed. (Only config/docs files changed)
 ═══════════════════════════════════════════════════════════════
 ```
 

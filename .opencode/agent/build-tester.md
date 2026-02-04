@@ -500,6 +500,64 @@ ls .build/debug/* .build/release/* 2>/dev/null
 ══════════════════════════════════════════════════════════════
 ```
 
+## On Dependency Error (FAIL_DEPS)
+
+**Detect dependency errors by checking error messages:**
+
+```
+Dependency error patterns:
+- Python: "ModuleNotFoundError", "ImportError", "No module named"
+- Node.js: "Cannot find module", "MODULE_NOT_FOUND", "npm ERR! missing"
+- Go: "cannot find package", "no required module provides package"
+- Rust: "error[E0463]: can't find crate", "failed to load manifest"
+- Java: "package does not exist", "ClassNotFoundException"
+- Ruby: "LoadError", "cannot load such file"
+```
+
+**When dependency error detected:**
+
+```
+══════════════════════════════════════════════════════════════
+                    Build Test Report
+══════════════════════════════════════════════════════════════
+
+📦 Build Result: ❌ FAILED (Dependency Issue)
+
+┌─────────────────────────────────────────────────────────────┐
+│ Error Type: DEPENDENCY_NOT_FOUND                            │
+│ Missing: {module/package name}                              │
+└─────────────────────────────────────────────────────────────┘
+
+🔧 Suggested Fix
+┌─────────────────────────────────────────────────────────────┐
+│ Python:   pip install -r requirements.txt                   │
+│           or: poetry install / pdm install                  │
+│                                                             │
+│ Node.js:  npm install                                       │
+│           or: yarn install / pnpm install                   │
+│                                                             │
+│ Go:       go mod download                                   │
+│           or: go mod tidy                                   │
+│                                                             │
+│ Rust:     cargo fetch                                       │
+│                                                             │
+│ Java:     mvn dependency:resolve                            │
+│           or: ./gradlew dependencies                        │
+│                                                             │
+│ Ruby:     bundle install                                    │
+└─────────────────────────────────────────────────────────────┘
+
+[Options]
+1. Retry after installing dependencies → Enter "retry" or "y"
+2. Skip build test → Enter "skip" or "n"
+
+══════════════════════════════════════════════════════════════
+BUILD_RESULT: FAIL_DEPS
+ERROR_TYPE: DEPENDENCY_NOT_FOUND
+SUGGESTED_FIX: {appropriate command for detected project type}
+══════════════════════════════════════════════════════════════
+```
+
 ## Docker Sandbox Setup (Optional)
 
 **⚠️ `.opencode/env-config.yaml` file is optional. It doesn't have to exist!**
@@ -558,12 +616,23 @@ MESSAGE: Build completed successfully.
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Build failure:**
+**Build failure (general):**
 ```
 ═══════════════════════════════════════════════════════════════
 BUILD_RESULT: FAIL
 EXIT_CODE: {exit code}
 ERROR: {error message summary}
+═══════════════════════════════════════════════════════════════
+```
+
+**Build failure (dependency issue):**
+```
+═══════════════════════════════════════════════════════════════
+BUILD_RESULT: FAIL_DEPS
+ERROR_TYPE: DEPENDENCY_NOT_FOUND
+MISSING: {module/package name if identifiable}
+SUGGESTED_FIX: {appropriate install command}
+MESSAGE: Dependencies not installed. Please install dependencies and retry.
 ═══════════════════════════════════════════════════════════════
 ```
 

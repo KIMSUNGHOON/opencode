@@ -1,282 +1,301 @@
 # Code QA Workflow Case Review
 
-이 문서는 Code QA 워크플로우의 다양한 시나리오를 검토하고, 누락된 케이스와 개선점을 식별합니다.
+This document reviews various scenarios in the Code QA workflow and identifies missing cases and improvements.
 
 ---
 
-## 1. 워크플로우 시나리오 매트릭스
+## 1. Workflow Scenario Matrix
 
-### 1.1 캐시 상태 × 옵션 조합
+### 1.1 Cache State × Option Combinations
 
-| 시나리오 | 캐시 상태 | 옵션 | 예상 동작 | 검증 |
-|----------|----------|------|----------|------|
-| S1 | 유효한 캐시 있음 | (기본) | 캐시 사용 | ✅ |
-| S2 | 유효한 캐시 있음 | --skip-cache | 캐시 무시 | ✅ |
-| S3 | 유효한 캐시 있음 | --with-analysis | 캐시 사용 (재분석 안 함) | ✅ |
-| S4 | 오래된 캐시 있음 | (기본) | 경고 + 캐시 없이 진행 | ✅ |
-| S5 | 오래된 캐시 있음 | --with-analysis | 재분석 실행 | ✅ |
-| S6 | 캐시 없음 | (기본) | 경고 + 캐시 없이 진행 | ✅ |
-| S7 | 캐시 없음 | --with-analysis | 분석 실행 | ✅ |
-| S8 | 캐시 없음 | --skip-cache | 캐시 무시 (분석 안 함) | ✅ |
+| Scenario | Cache State | Option | Expected Behavior | Verified |
+|----------|------------|--------|-------------------|----------|
+| S1 | Valid cache exists | (default) | Use cache | ✅ |
+| S2 | Valid cache exists | --skip-cache | Ignore cache | ✅ |
+| S3 | Valid cache exists | --with-analysis | Use cache (no re-analysis) | ✅ |
+| S4 | Stale cache exists | (default) | Warning + proceed without cache | ✅ |
+| S5 | Stale cache exists | --with-analysis | Run re-analysis | ✅ |
+| S6 | No cache | (default) | Warning + proceed without cache | ✅ |
+| S7 | No cache | --with-analysis | Run analysis | ✅ |
+| S8 | No cache | --skip-cache | Ignore cache (no analysis) | ✅ |
 
-### 1.2 입력 모드 × 캐시 조합
+### 1.2 Input Mode × Cache Combinations
 
-| 시나리오 | 입력 모드 | 캐시 상태 | 예상 동작 | 검증 |
-|----------|----------|----------|----------|------|
-| I1 | Git (--working) | 캐시 있음 | 캐시 컨텍스트 + git diff | ✅ |
-| I2 | Git (--working) | 캐시 없음 | git diff만 | ✅ |
-| I3 | Git (--staged) | 캐시 있음 | 캐시 컨텍스트 + staged | ✅ |
-| I4 | Git (--last) | 캐시 있음 | 캐시 컨텍스트 + last commit | ✅ |
-| I5 | Git (--branch) | 캐시 있음 | 캐시 컨텍스트 + branch diff | ✅ |
-| I6 | --files | 캐시 있음 | 캐시 컨텍스트 + 지정 파일 | ✅ |
-| I7 | --files | 캐시 없음 | 지정 파일만 | ✅ |
-
----
-
-## 2. Edge Case 검토
-
-### 2.1 파일 관련 Edge Cases
-
-| 케이스 | 현재 처리 | 문제점 | 개선 필요 |
-|--------|----------|--------|----------|
-| 변경 파일 0개 | ⚠️ 미정의 | git diff가 비어있으면? | **YES** |
-| 변경 파일 1000개+ | ⚠️ 미정의 | 너무 많은 파일 | **YES** |
-| 바이너리 파일만 변경 | ⚠️ 미정의 | 분석할 코드 없음 | **YES** |
-| 삭제된 파일 | ⚠️ 미정의 | 읽을 수 없음 | **YES** |
-| 이름 변경된 파일 | ⚠️ 미정의 | 경로 추적 | **YES** |
-
-### 2.2 Git 관련 Edge Cases
-
-| 케이스 | 현재 처리 | 문제점 | 개선 필요 |
-|--------|----------|--------|----------|
-| Git 저장소 아님 | ✅ 처리됨 | NO_GIT_REPO → 사용자 선택 | NO |
-| Detached HEAD | ⚠️ 미정의 | 브랜치 정보 없음 | **YES** |
-| Merge conflict 상태 | ⚠️ 미정의 | 커밋 불가 | **YES** |
-| Dirty working tree | ⚠️ 미정의 | --last 실행 시 충돌 | **YES** |
-| Shallow clone | ⚠️ 미정의 | 히스토리 부족 | **YES** |
-
-### 2.3 환경 관련 Edge Cases
-
-| 케이스 | 현재 처리 | 문제점 | 개선 필요 |
-|--------|----------|--------|----------|
-| Docker 없음 | ⚠️ 부분 처리 | --no-sandbox로 대체 | NO |
-| Python/Node 없음 | ⚠️ 미정의 | 빌드/테스트 실패 | **YES** |
-| 의존성 미설치 | ⚠️ 미정의 | 빌드 실패 | **YES** |
-| 네트워크 없음 | ⚠️ 미정의 | push 실패 | **YES** |
+| Scenario | Input Mode | Cache State | Expected Behavior | Verified |
+|----------|-----------|-------------|-------------------|----------|
+| I1 | Git (--working) | Cache exists | Cache context + git diff | ✅ |
+| I2 | Git (--working) | No cache | git diff only | ✅ |
+| I3 | Git (--staged) | Cache exists | Cache context + staged | ✅ |
+| I4 | Git (--last) | Cache exists | Cache context + last commit | ✅ |
+| I5 | Git (--branch) | Cache exists | Cache context + branch diff | ✅ |
+| I6 | --files | Cache exists | Cache context + specified files | ✅ |
+| I7 | --files | No cache | Specified files only | ✅ |
 
 ---
 
-## 3. 발견된 문제점
+## 2. Edge Case Review
 
-### 3.1 CRITICAL: 변경 파일 0개 처리 누락
+### 2.1 File-Related Edge Cases
 
-**문제**: git diff 결과가 비어있을 때 워크플로우가 어떻게 동작하는지 정의되지 않음
+| Case | Current Handling | Issue | Improvement Needed | Status |
+|------|-----------------|-------|-------------------|--------|
+| 0 changed files | ✅ Implemented | Empty git diff | NO | ✅ RESOLVED |
+| 1000+ changed files | ✅ Implemented | Too many files | NO | ✅ RESOLVED |
+| Only binary files changed | ✅ Implemented | No code to analyze | NO | ✅ RESOLVED |
+| Deleted files | ✅ Implemented | Cannot read | NO | ✅ RESOLVED |
+| Renamed files | ✅ Implemented | Path tracking | NO | ✅ RESOLVED |
 
-**현재 상태**:
+### 2.2 Git-Related Edge Cases
+
+| Case | Current Handling | Issue | Improvement Needed | Status |
+|------|-----------------|-------|-------------------|--------|
+| Not a Git repo | ✅ Implemented | NO_GIT_REPO → user choice | NO | ✅ RESOLVED |
+| Detached HEAD | ✅ Implemented | No branch info | NO | ✅ RESOLVED |
+| Merge conflict state | ✅ Implemented | Cannot commit | NO | ✅ RESOLVED |
+| Rebase in progress | ✅ Implemented | Cannot commit | NO | ✅ RESOLVED |
+| Dirty working tree | ⚠️ Partial | Conflict with --last | LOW | - |
+| Shallow clone | ⚠️ Partial | Insufficient history | LOW | - |
+
+### 2.3 Environment-Related Edge Cases
+
+| Case | Current Handling | Issue | Improvement Needed | Status |
+|------|-----------------|-------|-------------------|--------|
+| Docker not available | ✅ Implemented | --no-sandbox fallback | NO | ✅ RESOLVED |
+| Python/Node not installed | ⚠️ Partial | Build/test fails | LOW | - |
+| Dependencies not installed | ✅ Implemented | Build fails | NO | ✅ RESOLVED |
+| No network | ⚠️ Partial | Push fails | LOW | - |
+
+---
+
+## 3. Issues Found and Resolved
+
+### 3.1 CRITICAL: No Changed Files Handling ✅ RESOLVED
+
+**Issue**: Workflow behavior was undefined when git diff result is empty
+
+**Solution Implemented**:
+- git-input returns `GIT_INPUT_RESULT: NO_CHANGES` token
+- code-qa orchestrator gracefully exits with success message
+
+### 3.2 CRITICAL: Deleted Files Handling ✅ RESOLVED
+
+**Issue**: code-reviewer would try to Read deleted files
+
+**Solution Implemented**:
+- git-input uses `git diff --name-status` to track file status (A/M/D/R)
+- Deleted files (D) are excluded from analysis
+- Returns `DELETED_FILES` section in result
+- Returns `GIT_INPUT_RESULT: DELETED_ONLY` if all files are deleted
+
+### 3.3 HIGH: Large File Count Handling ✅ RESOLVED
+
+**Issue**: No handling for hundreds/thousands of changed files
+
+**Solution Implemented**:
+- Warning when >100 files changed
+- Binary file auto-filtering
+- Recommendation to filter to source files only
+
+### 3.4 MEDIUM: Detached HEAD Handling ✅ RESOLVED
+
+**Issue**: Common in CI/CD environments, no handling defined
+
+**Solution Implemented**:
+- git-input detects detached HEAD state
+- User options: create branch, continue QA-only, or exit
+- `skip_commit_push` flag skips STEP 9 and 11
+
+### 3.5 MEDIUM: Dependency Install Guidance ✅ RESOLVED
+
+**Issue**: Build fails when dependencies not installed
+
+**Solution Implemented**:
+- build-tester detects dependency errors by error message patterns
+- Returns `BUILD_RESULT: FAIL_DEPS` token
+- Provides language-specific install suggestions
+- User can retry or skip build
+
+### 3.6 MEDIUM: Merge Conflict Handling ✅ RESOLVED
+
+**Issue**: Cannot commit when merge conflicts exist
+
+**Solution Implemented**:
+- git-input detects merge conflict state with `git ls-files -u`
+- Returns `GIT_INPUT_RESULT: MERGE_CONFLICT` token
+- Provides resolution guidance
+
+### 3.7 MEDIUM: Rebase In Progress Handling ✅ RESOLVED
+
+**Issue**: Cannot commit when rebase is in progress
+
+**Solution Implemented**:
+- git-input detects rebase state by checking `.git/rebase-merge` or `.git/rebase-apply`
+- Returns `GIT_INPUT_RESULT: REBASE_IN_PROGRESS` token
+- Provides resolution guidance
+
+---
+
+## 4. Implemented Modifications
+
+### 4.1 git-input Agent Modifications
+
 ```
-STEP 2: git-input → FILE_LIST 반환
-STEP 3: pre-checker 호출 (빈 파일 목록으로?)
-STEP 4: code-reviewer 호출 (분석할 파일 없음?)
+Extended result tokens:
+- GIT_INPUT_RESULT: SUCCESS (files exist)
+- GIT_INPUT_RESULT: NO_CHANGES (no changes)
+- GIT_INPUT_RESULT: DELETED_ONLY (only deleted files)
+- GIT_INPUT_RESULT: NO_CODE_FILES (only config/docs)
+- GIT_INPUT_RESULT: NO_GIT_REPO (not a Git repo)
+- GIT_INPUT_RESULT: DETACHED_HEAD (detached HEAD state)
+- GIT_INPUT_RESULT: MERGE_CONFLICT (merge conflict)
+- GIT_INPUT_RESULT: REBASE_IN_PROGRESS (rebase in progress)
+- GIT_INPUT_RESULT: ABORTED (user cancelled)
+
+Extended FILE_LIST format:
+FILE_LIST: file1.py, file2.py, ...
+DELETED_FILES: deleted1.py, deleted2.py, ...
+RENAMED_FILES: old→new, ...
 ```
 
-**필요한 처리**:
+### 4.2 code-qa Orchestrator Modifications
+
 ```
-IF changed_files.length == 0:
-    → 경고 출력: "변경된 파일이 없습니다."
-    → 워크플로우 종료 (성공)
-```
+STEP 2 result handling:
+- NO_CHANGES → End workflow (success)
+- DELETED_ONLY → Skip to STEP 9
+- NO_CODE_FILES → End workflow (success)
+- DETACHED_HEAD → User choice, set skip_commit_push flag
+- MERGE_CONFLICT → End workflow (blocked)
+- REBASE_IN_PROGRESS → End workflow (blocked)
 
-### 3.2 CRITICAL: 삭제된 파일 처리 누락
+STEP 2.5 file validation:
+- Binary file auto-filtering
+- Large file count warning (>100)
 
-**문제**: git diff에 삭제된 파일이 포함될 수 있음
-
-**현재 상태**:
-- code-reviewer가 삭제된 파일을 Read하려고 시도
-- 파일이 없어서 에러 발생
-
-**필요한 처리**:
-```
-git diff 결과에서:
-- 추가된 파일 (A): 분석 대상
-- 수정된 파일 (M): 분석 대상
-- 삭제된 파일 (D): 분석 제외
-- 이름 변경 (R): 새 경로로 분석
+STEP 7 build failure handling:
+- FAIL_DEPS → Show dependency install guidance
 ```
 
-### 3.3 HIGH: 대량 파일 변경 처리 누락
+### 4.3 build-tester Agent Modifications
 
-**문제**: 수백~수천 개 파일이 변경된 경우 처리 방법 없음
-
-**필요한 처리**:
 ```
-IF changed_files.length > 100:
-    → 경고 출력: "변경 파일이 {N}개입니다. 주요 파일만 분석합니다."
-    → 소스 파일만 필터링 (테스트, 설정 파일 제외)
-    → 또는 사용자에게 범위 축소 요청
-```
+Extended build failure tokens:
+- BUILD_RESULT: FAIL (general failure)
+- BUILD_RESULT: FAIL_DEPS (dependency issue)
 
-### 3.4 MEDIUM: Detached HEAD 처리 누락
-
-**문제**: CI/CD에서 detached HEAD 상태가 흔함
-
-**필요한 처리**:
-```
-IF git branch --show-current 결과가 비어있음:
-    → detached HEAD 상태임을 알림
-    → 커밋/푸시 단계에서 적절히 처리
-```
-
-### 3.5 MEDIUM: 의존성 미설치 시 빌드 실패
-
-**문제**: 의존성이 설치되지 않은 상태에서 빌드 시도
-
-**필요한 처리**:
-```
-빌드 실패 시:
-IF 에러 메시지에 "ModuleNotFoundError" 또는 "Cannot find module" 포함:
-    → 의존성 설치 안내: "npm install 또는 pip install -r requirements.txt 실행"
-    → 사용자에게 재시도 또는 스킵 선택
+Dependency error detection patterns:
+- Python: ModuleNotFoundError, ImportError, No module named
+- Node.js: Cannot find module, MODULE_NOT_FOUND
+- Go: cannot find package
+- Rust: can't find crate
+- Java: package does not exist
 ```
 
 ---
 
-## 4. 권장 수정 사항
+## 5. Test Scenarios
 
-### 4.1 git-input 에이전트 수정
-
-```
-결과 토큰 확장:
-- GIT_INPUT_RESULT: SUCCESS (파일 있음)
-- GIT_INPUT_RESULT: NO_CHANGES (변경 없음) ← 새로 추가
-- GIT_INPUT_RESULT: NO_GIT_REPO (Git 아님)
-- GIT_INPUT_RESULT: ABORTED (사용자 취소)
-
-FILE_LIST 형식 확장:
-FILE_LIST:
-  added: [file1.py, file2.py]
-  modified: [file3.py]
-  deleted: [file4.py]        ← 삭제된 파일 표시
-  renamed: [{old: x.py, new: y.py}]
-```
-
-### 4.2 code-qa 오케스트레이터 수정
-
-```
-STEP 2 이후 추가 체크:
-
-IF changed_files 전체 길이 == 0:
-    → "변경된 파일이 없습니다. 워크플로우를 종료합니다."
-    → 워크플로우 종료
-
-IF 분석 가능한 파일 == 0 (모두 삭제됨):
-    → "분석할 파일이 없습니다. (삭제된 파일만 있음)"
-    → STEP 9로 건너뛰기 (커밋 단계)
-
-IF changed_files.length > 100:
-    → 사용자 경고 및 확인 요청
-```
-
-### 4.3 build-tester 에이전트 수정
-
-```
-빌드 실패 시 에러 분류:
-- BUILD_RESULT: FAIL_DEPS (의존성 문제)
-- BUILD_RESULT: FAIL_SYNTAX (문법 오류)
-- BUILD_RESULT: FAIL_RUNTIME (런타임 오류)
-- BUILD_RESULT: FAIL_UNKNOWN (기타)
-
-의존성 문제 시:
-→ 자동으로 의존성 설치 시도 또는 사용자에게 안내
-```
-
----
-
-## 5. 테스트 시나리오
-
-### 5.1 Happy Path 테스트
+### 5.1 Happy Path Tests
 
 ```bash
-# T1: 기본 Git 모드
+# T1: Default Git mode
 /code-qa
 
-# T2: Staged 변경만
+# T2: Staged changes only
 git add src/app.py
 /code-qa --staged
 
-# T3: 파일 직접 지정
+# T3: Direct file specification
 /code-qa --files src/
 
-# T4: 캐시 사용
+# T4: With cache
 /analyze
 /code-qa
 
-# T5: 캐시 + 분석 동시
+# T5: Cache + analysis at once
 /code-qa --with-analysis
 ```
 
-### 5.2 Edge Case 테스트
+### 5.2 Edge Case Tests
 
 ```bash
-# T6: 변경 없음
+# T6: No changes
 git status  # clean
-/code-qa    # → "변경 파일 없음" 메시지 기대
+/code-qa    # → "No changed files" message expected
 
-# T7: 파일 삭제만
+# T7: Only deleted files
 git rm old_file.py
-/code-qa --staged  # → 삭제 처리 확인
+/code-qa --staged  # → Deleted file handling confirmed
 
-# T8: 대량 파일
-# 100+ 파일 변경 후
-/code-qa  # → 경고 및 필터링 확인
+# T8: Large file count
+# After changing 100+ files
+/code-qa  # → Warning and filtering confirmed
 
-# T9: Non-Git 디렉토리
+# T9: Non-Git directory
 cd /tmp/non-git-project
-/code-qa  # → NO_GIT_REPO 처리 확인
+/code-qa  # → NO_GIT_REPO handling confirmed
 
-# T10: 빈 프로젝트
-/analyze  # → EMPTY 결과 확인
+# T10: Empty project
+/analyze  # → EMPTY result confirmed
+
+# T11: Detached HEAD
+git checkout HEAD~1
+/code-qa  # → DETACHED_HEAD handling confirmed
+
+# T12: Merge conflict
+git merge feature --no-commit  # create conflict
+/code-qa  # → MERGE_CONFLICT handling confirmed
 ```
 
-### 5.3 에러 시나리오 테스트
+### 5.3 Error Scenario Tests
 
 ```bash
-# T11: 의존성 미설치
+# T13: Dependencies not installed
 rm -rf node_modules
-/code-qa  # → 빌드 실패 + 안내 메시지
+/code-qa  # → Build failure + guidance message
 
-# T12: Docker 없음
-# Docker 중지 후
-/code-qa  # → --no-sandbox 대체 안내
+# T14: Docker not available
+# After stopping Docker
+/code-qa  # → --no-sandbox fallback guidance
 
-# T13: 네트워크 없음
-# 오프라인 상태에서
-/code-qa  # → Push 단계에서 적절한 에러 처리
+# T15: No network
+# In offline state
+/code-qa  # → Appropriate error handling at Push step
 ```
 
 ---
 
-## 6. 결론
+## 6. Conclusion
 
-### 발견된 Critical Issues (즉시 수정 필요)
+### Resolved Critical Issues ✅
 
-1. **변경 파일 0개 처리 누락** - 워크플로우가 비정상 동작 가능
-2. **삭제된 파일 처리 누락** - code-reviewer 에러 발생 가능
+1. **No changed files handling** - Graceful workflow exit
+2. **Deleted file handling** - Proper exclusion from analysis
 
-### 발견된 High Priority Issues
+### Resolved High Priority Issues ✅
 
-3. **대량 파일 변경 처리 없음** - 성능 문제 및 타임아웃 가능
-4. **파일 상태 구분 없음** - added/modified/deleted 구분 필요
+3. **Large file count handling** - Warning and filtering
+4. **File status differentiation** - A/M/D/R status tracking
 
-### 발견된 Medium Priority Issues
+### Resolved Medium Priority Issues ✅
 
-5. Detached HEAD 처리
-6. 의존성 미설치 시 안내
-7. Merge conflict 상태 처리
+5. **Detached HEAD handling** - User options provided
+6. **Dependency install guidance** - FAIL_DEPS token and suggestions
+7. **Merge conflict handling** - Detection and blocking
+8. **Rebase in progress handling** - Detection and blocking
+
+### Remaining Low Priority Issues
+
+- Dirty working tree handling (partial)
+- Shallow clone handling (partial)
+- Python/Node not installed (partial)
+- No network (partial)
 
 ---
 
-## 변경 이력
+## Change History
 
-| 버전 | 날짜 | 변경 내용 |
-|------|------|----------|
-| 1.0 | 2024-01-15 | 초기 케이스 리뷰 문서 |
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2024-01-15 | Initial case review document |
+| 2.0 | 2025-02-04 | All critical/high/medium issues resolved, translated to English |

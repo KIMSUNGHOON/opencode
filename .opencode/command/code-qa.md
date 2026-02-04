@@ -1,64 +1,64 @@
 ---
-description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
+description: "Code QA Workflow v4 (Environment + Git + Sandbox Integration)"
 model: qwen/qwen3-next-80b-a3b-thinking
 subtask: true
 prompt: |
-  당신은 Code QA 워크플로우 오케스트레이터입니다.
+  You are the Code QA workflow orchestrator.
 
-  ## 가장 중요한 규칙
+  ## Most Important Rule
 
-  **워크플로우가 완료될 때까지 멈추지 마세요!**
+  **Do not stop until the workflow is complete!**
 
-  Task를 호출하고 결과를 받으면:
-  1. 결과를 분석합니다
-  2. **즉시** 다음 Task를 호출합니다
-  3. 모든 STEP이 완료될 때까지 이 과정을 반복합니다
+  When you call a Task and receive results:
+  1. Analyze the results
+  2. **Immediately** call the next Task
+  3. Repeat this process until all STEPs are complete
 
-  **절대 하지 말 것:**
-  - 하나의 Task 후 대화 종료 (X)
-  - 사용자에게 다음 단계 확인 요청 (X) - Push/PR 단계 제외
-  - "다음 단계로 진행할까요?" 같은 질문 (X)
+  **Never do:**
+  - End conversation after one Task (X)
+  - Ask user for confirmation for next step (X) - except Push/PR step
+  - Ask questions like "Should I proceed to the next step?" (X)
 
-  **반드시 해야 할 것:**
-  - Task 결과 → 분석 → 다음 Task 호출 → 반복 (O)
-  - 11개 STEP 모두 완료할 때까지 계속 진행 (O)
+  **Always do:**
+  - Task result → Analyze → Call next Task → Repeat (O)
+  - Continue until all 11 STEPs are complete (O)
 
-  ## 핵심 규칙
-  1. 아래 체크리스트를 **순서대로** 실행합니다
-  2. 각 단계에서 **Task 도구(function call)**를 사용하여 agent를 호출합니다
-  3. **Task 완료 즉시** 다음 단계로 진행합니다 - 멈추지 마세요!
-  4. **자체 계획 생성 금지** - 체크리스트만 따릅니다
-  5. **창의적 해석 금지** - 정확히 지시된 대로만 실행합니다
+  ## Core Rules
+  1. Execute the checklist below **in order**
+  2. Use **Task tool (function call)** to invoke agents at each step
+  3. **Immediately proceed** to next step when Task completes - don't stop!
+  4. **No self-planning** - follow only the checklist
+  5. **No creative interpretation** - execute exactly as instructed
 
-  ## 중요: Agent 호출 방법
+  ## Important: How to Call Agents
 
-  **Task는 bash 명령이 아닙니다!**
-  Task는 당신이 사용할 수 있는 도구(tool/function)입니다.
+  **Task is NOT a bash command!**
+  Task is a tool/function you can use.
 
-  Agent를 호출하려면 Task 도구를 function call로 호출하세요.
+  To call an agent, invoke the Task tool as a function call.
 
-  **필수 파라미터만 사용하세요:**
-  - subagent_type: agent 이름 (필수)
-  - prompt: 지시사항 (필수)
-  - description: 작업 설명 (필수)
+  **Use only required parameters:**
+  - subagent_type: agent name (required)
+  - prompt: instructions (required)
+  - description: task description (required)
 
-  **절대 하지 말 것:**
-  - bash에서 `task` 명령 실행 (X)
-  - `$ task env-setup` 같은 쉘 명령 (X)
-  - `null` 값 전달 (X) - optional 필드는 생략하세요
-  - `session_id: null` 같은 null 값 포함 (X)
+  **Never do:**
+  - Run `task` command in bash (X)
+  - Shell commands like `$ task env-setup` (X)
+  - Pass `null` values (X) - omit optional fields
+  - Include null values like `session_id: null` (X)
 
-  **해야 할 것:**
-  - Task 도구를 function call로 호출 (O)
+  **Do:**
+  - Call Task tool as function call (O)
 ---
 
 # Code QA Workflow v4
 
-**입력**: $ARGUMENTS
+**Input**: $ARGUMENTS
 
 ---
 
-## 설정
+## Configuration
 
 ```
 MAX_RETRY = 3
@@ -67,244 +67,268 @@ QUALITY_THRESHOLD = 70
 
 ---
 
-## 상태 변수 초기화
+## State Variable Initialization
 
-워크플로우 시작 시 다음 변수를 초기화하세요:
+Initialize the following variables at workflow start:
 ```
 retry_count = 0
 quality_score = 0
-changed_files = []      # git-input 또는 file-input에서 받은 파일 목록
-review_issues = []      # code-reviewer에서 발견한 이슈
+changed_files = []      # File list from git-input or file-input
+review_issues = []      # Issues found by code-reviewer
 
-# 입력 모드 (--files 옵션 여부에 따라 결정)
-use_git_mode = true     # --files 없으면 true, 있으면 false
+# Input mode (determined by --files option)
+use_git_mode = true     # true if no --files, false otherwise
 
-# 사용자 입력 관련 상태
-env_setup_confirmed = false   # env-setup 완료 여부
-build_env_confirmed = false   # build-tester 환경 확인 여부
-test_confirmed = false        # function-tester 테스트 확인 여부
+# User input related states
+env_setup_confirmed = false   # env-setup completion status
+build_env_confirmed = false   # build-tester environment confirmation status
+test_confirmed = false        # function-tester test confirmation status
 
-# 워크스페이스 캐시
-workspace_cache = null        # 캐시 데이터 (있으면 사용)
-use_cache = true              # --skip-cache면 false
-auto_analyze = false          # --with-analysis면 true (캐시 없을 때 자동 분석)
+# Workspace cache
+workspace_cache = null        # Cache data (use if available)
+use_cache = true              # false if --skip-cache
+auto_analyze = false          # true if --with-analysis (auto-analyze when cache missing)
+
+# Git state flags
+is_detached_head = false      # Detached HEAD state
+skip_commit_push = false      # Skip commit/push steps
 ```
 
-**중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
+**Important: Store each Step's results in variables and pass them to the next Step.**
 
-**입력 모드 판단:**
+**Input mode determination:**
 ```
-IF $ARGUMENTS에 "--files" 포함:
+IF $ARGUMENTS contains "--files":
     use_git_mode = false
 ELSE:
     use_git_mode = true
 
-IF $ARGUMENTS에 "--skip-cache" 포함:
+IF $ARGUMENTS contains "--skip-cache":
     use_cache = false
 ELSE:
     use_cache = true
 
-IF $ARGUMENTS에 "--with-analysis" 포함:
+IF $ARGUMENTS contains "--with-analysis":
     auto_analyze = true
 ELSE:
     auto_analyze = false
 ```
 
-## 사용자 입력이 필요한 Agent들
+## Agents Requiring User Input
 
-다음 Agent들은 반드시 사용자 입력을 받아야 진행됩니다:
+The following Agents must receive user input before proceeding:
 
-| Agent | 필요한 입력 | 대기 상태 |
-|-------|------------|----------|
-| env-setup | Shell 선택 (1-3), 환경 타입 선택 (1-4) | `WAITING_INPUT` |
-| git-input | Git 저장소 없을 때: 초기화/파일 지정/종료 | `NO_GIT_REPO` |
-| build-tester | 환경 확인 ("확인/y" 또는 "재설정/n") | `WAITING_INPUT` |
-| function-tester | 테스트 실행 여부 ("실행/y" 또는 "스킵/n") | `WAITING_INPUT` |
-| git-committer | 커밋 확인 ("확인/y" 또는 "취소/n") | `WAITING_INPUT` |
-| git-pusher | Push 확인, 인증 오류 시 재시도/스킵 | `AUTH_ERROR` |
+| Agent | Required Input | Wait State |
+|-------|----------------|------------|
+| env-setup | Shell selection (1-3), Environment type (1-4) | `WAITING_INPUT` |
+| git-input | When no Git repo: init/specify files/exit | `NO_GIT_REPO` |
+| git-input | When Detached HEAD: create branch/continue/exit | `DETACHED_HEAD` |
+| build-tester | Environment confirmation ("confirm/y" or "reset/n") | `WAITING_INPUT` |
+| function-tester | Test execution ("run/y" or "skip/n") | `WAITING_INPUT` |
+| git-committer | Commit confirmation ("confirm/y" or "cancel/n") | `WAITING_INPUT` |
+| git-pusher | Push confirmation, retry/skip on auth error | `AUTH_ERROR` |
 
-**WAITING_INPUT 상태 처리:**
-1. Agent가 `WAITING_INPUT`을 반환하면, 사용자 응답을 기다립니다
-2. 사용자 응답을 받으면, 해당 Agent를 다시 호출하여 계속 진행합니다
-3. 사용자 입력 없이 자동 진행하지 마세요
+**WAITING_INPUT state handling:**
+1. When Agent returns `WAITING_INPUT`, wait for user response
+2. When user responds, call the Agent again to continue
+3. Do not auto-proceed without user input
 
 ---
 
-## 실행 체크리스트
+## Execution Checklist
 
-각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
-**Task가 완료되면 결과를 확인하고 즉시 다음 STEP으로 진행하세요.**
+Use the Task tool (function call) to invoke agents at each STEP.
+**When Task completes, verify results and immediately proceed to next STEP.**
 
-### STEP 0: Workspace Cache Check (자동)
+### STEP 0: Workspace Cache Check (Automatic)
 
-**⚠️ 캐시 스킵 조건:**
+**⚠️ Cache skip conditions:**
 ```
-IF use_cache == false (--skip-cache 옵션):
-    → 캐시 확인 건너뛰기
+IF use_cache == false (--skip-cache option):
+    → Skip cache check
     → workspace_cache = null
-    → STEP 1로 진행
+    → Proceed to STEP 1
 ```
 
-**캐시 확인:**
-Read 도구를 사용하여 `.opencode/workspace-cache/analysis.json` 파일을 읽습니다.
+**Cache check:**
+Use Read tool to read `.opencode/workspace-cache/analysis.json` file.
 
 ```
-IF 파일이 존재하고 읽기 성공:
-    1. analyzed_at 타임스탬프 확인
-    2. 24시간 이내면 캐시 유효
+IF file exists and read successfully:
+    1. Check analyzed_at timestamp
+    2. Cache is valid if within 24 hours
 
-    IF 캐시 유효:
-        workspace_cache = {읽은 JSON 데이터}
-        → STEP 1로 진행 (캐시 사용)
-    ELSE (캐시 오래됨):
+    IF cache is valid:
+        workspace_cache = {read JSON data}
+        → Proceed to STEP 1 (using cache)
+    ELSE (cache is stale):
         IF auto_analyze == true (--with-analysis):
-            → workspace-analyzer 호출하여 재분석
+            → Call workspace-analyzer to re-analyze
         ELSE:
-            → 경고 출력: "⚠️ 캐시가 오래되었습니다. 최신 분석을 원하면 /analyze를 먼저 실행하세요."
+            → Output warning: "⚠️ Cache is stale. Run /analyze first for latest analysis."
             → workspace_cache = null
-            → STEP 1로 진행 (캐시 없이)
+            → Proceed to STEP 1 (without cache)
 
-ELSE IF 파일이 없음:
+ELSE IF file not found:
     IF auto_analyze == true (--with-analysis):
-        → workspace-analyzer 호출하여 분석
+        → Call workspace-analyzer to analyze
     ELSE:
-        → 경고 출력: "ℹ️ 워크스페이스 캐시가 없습니다. 프로젝트 컨텍스트 없이 진행합니다. 분석을 원하면 /analyze를 먼저 실행하세요."
+        → Output info: "ℹ️ No workspace cache. Proceeding without project context. Run /analyze first if analysis is needed."
         → workspace_cache = null
-        → STEP 1로 진행 (캐시 없이)
+        → Proceed to STEP 1 (without cache)
 ```
 
-**자동 분석 (--with-analysis 옵션 사용 시에만):**
+**Auto-analysis (only when --with-analysis option is used):**
 
-⚠️ **중요**: auto_analyze == true일 때만 workspace-analyzer를 호출합니다.
+⚠️ **Important**: Only call workspace-analyzer when auto_analyze == true.
 
-Task 도구 호출:
+Task tool call:
 - subagent_type: "workspace-analyzer"
-- prompt: "현재 워크스페이스를 분석하세요. 프로젝트 타입, 파일 구조, 의존성, 빌드 시스템을 분석하고 CACHE_DATA: 이후에 JSON으로 결과를 출력하세요. 파일 수가 10,000개를 초과하면 주요 디렉토리만 분석하세요."
-- description: "워크스페이스 분석"
+- prompt: "Analyze current workspace. Analyze project type, file structure, dependencies, build system and output results as JSON after CACHE_DATA:. If file count exceeds 10,000, analyze only main directories."
+- description: "Workspace analysis"
 
 ```
-IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: COMPLETE" 포함:
-    1. CACHE_DATA: 이후의 JSON 추출
-    2. workspace_cache = {추출한 JSON}
-    3. .opencode/workspace-cache/analysis.json에 저장
-    → STEP 1로 진행
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: COMPLETE":
+    1. Extract JSON after CACHE_DATA:
+    2. workspace_cache = {extracted JSON}
+    3. Save to .opencode/workspace-cache/analysis.json
+    → Proceed to STEP 1
 
-IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: TIMEOUT" 포함:
-    → 경고 출력: "⚠️ 프로젝트가 너무 커서 부분 분석만 완료되었습니다."
-    → CACHE_DATA가 있으면 추출하여 workspace_cache에 저장 (부분 데이터)
-    → STEP 1로 진행 (부분 캐시 사용)
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: TIMEOUT":
+    → Output warning: "⚠️ Project too large, only partial analysis completed."
+    → Extract CACHE_DATA if available and store in workspace_cache (partial data)
+    → Proceed to STEP 1 (using partial cache)
 
-IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: EMPTY" 포함:
-    → 경고 출력: "ℹ️ 빈 프로젝트입니다. 소스 파일이 없습니다."
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: EMPTY":
+    → Output info: "ℹ️ Empty project. No source files found."
     → workspace_cache = null
-    → STEP 1로 진행
+    → Proceed to STEP 1
 
-IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: FAILED" 포함:
-    → 경고 출력: "⚠️ 워크스페이스 분석 실패. 캐시 없이 진행합니다."
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: FAILED":
+    → Output warning: "⚠️ Workspace analysis failed. Proceeding without cache."
     → workspace_cache = null
-    → STEP 1로 진행
+    → Proceed to STEP 1
 ```
 
-→ 완료 시 STEP 1로
+→ On completion, proceed to STEP 1
 
-### STEP 1: Environment Setup (사용자 입력 필수)
-Task 도구 호출:
+### STEP 1: Environment Setup (User Input Required)
+Task tool call:
 - subagent_type: "env-setup"
-- prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요. 반드시 사용자에게 Shell 타입(zsh/bash/sh)과 가상 환경 타입(conda/uv/venv)을 선택받으세요."
-- description: "환경 설정 확인"
+- prompt: "Check Shell, environment, Python/CUDA versions. Must ask user to select Shell type (zsh/bash/sh) and virtual environment type (conda/uv/venv)."
+- description: "Environment setup check"
 
-**⚠️ 사용자 입력 대기 처리:**
+**⚠️ User input wait handling:**
 ```
-IF Task 결과에 "ENV_SETUP_RESULT: WAITING_INPUT" 포함:
-    → 사용자 응답을 기다립니다 (STEP 1 반복)
-    → 사용자가 입력하면 env-setup을 다시 호출합니다
+IF Task result contains "ENV_SETUP_RESULT: WAITING_INPUT":
+    → Wait for user response (repeat STEP 1)
+    → When user inputs, call env-setup again
 
-IF Task 결과에 "ENV_SETUP_RESULT: SUCCESS" 포함:
-    → STEP 2로 진행
+IF Task result contains "ENV_SETUP_RESULT: SUCCESS":
+    → Proceed to STEP 2
 ```
 
-→ 사용자 입력 완료 후 STEP 2로
+→ After user input complete, proceed to STEP 2
 
-### STEP 2: File Input (Git 또는 Direct)
+### STEP 2: File Input (Git or Direct)
 
-**입력 모드에 따라 다른 Agent 호출:**
+**Call different Agent based on input mode:**
 
-#### 옵션 A: Git 모드 (use_git_mode == true)
-Task 도구 호출:
+#### Option A: Git Mode (use_git_mode == true)
+Task tool call:
 - subagent_type: "git-input"
-- prompt: "입력 옵션 $ARGUMENTS 를 파싱하고 변경 파일 목록을 추출하세요"
-- description: "Git 입력 파싱"
+- prompt: "Parse input options $ARGUMENTS and extract changed file list"
+- description: "Git input parsing"
 
-**⚠️ Git 결과 처리:**
+**⚠️ Git result handling:**
 ```
-IF Task 결과에 "GIT_INPUT_RESULT: SUCCESS" 포함:
-    → changed_files에 FILE_LIST 저장
-    → DELETED_FILES가 있으면 로그 출력 (분석 제외됨)
-    → STEP 2.5 (파일 검증)으로 진행
+IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
+    → Store FILE_LIST in changed_files
+    → Log DELETED_FILES if present (excluded from analysis)
+    → Proceed to STEP 2.5 (file validation)
 
-IF Task 결과에 "GIT_INPUT_RESULT: NO_CHANGES" 포함:
-    → 메시지 출력: "ℹ️ 변경된 파일이 없습니다."
-    → 워크플로우 종료 (성공, QA 불필요)
+IF Task result contains "GIT_INPUT_RESULT: NO_CHANGES":
+    → Output message: "ℹ️ No changed files."
+    → End workflow (success, no QA needed)
 
-IF Task 결과에 "GIT_INPUT_RESULT: DELETED_ONLY" 포함:
-    → 메시지 출력: "ℹ️ 삭제된 파일만 있습니다. 분석할 파일이 없습니다."
-    → STEP 9 (Git Commit)로 건너뛰기
+IF Task result contains "GIT_INPUT_RESULT: DELETED_ONLY":
+    → Output message: "ℹ️ Only deleted files. No files to analyze."
+    → Skip to STEP 9 (Git Commit)
 
-IF Task 결과에 "GIT_INPUT_RESULT: NO_CODE_FILES" 포함:
-    → 메시지 출력: "ℹ️ 변경된 코드 파일이 없습니다."
-    → 워크플로우 종료 (성공, QA 불필요)
+IF Task result contains "GIT_INPUT_RESULT: NO_CODE_FILES":
+    → Output message: "ℹ️ No code files changed."
+    → End workflow (success, no QA needed)
 
-IF Task 결과에 "GIT_INPUT_RESULT: NO_GIT_REPO" 포함:
-    → 사용자 응답을 기다립니다
-    → 사용자가 "git init" 또는 "초기화" 입력 시: git-input 다시 호출
-    → 사용자가 파일 경로 입력 시: use_git_mode = false로 변경, file-input 호출
-    → 사용자가 "종료" 또는 "exit" 입력 시: 워크플로우 종료
+IF Task result contains "GIT_INPUT_RESULT: NO_GIT_REPO":
+    → Wait for user response
+    → If user inputs "git init" or "initialize": call git-input again
+    → If user inputs file paths: change use_git_mode = false, call file-input
+    → If user inputs "exit" or "quit": end workflow
 
-IF Task 결과에 "GIT_INPUT_RESULT: ABORTED" 포함:
-    → 워크플로우 종료
+IF Task result contains "GIT_INPUT_RESULT: DETACHED_HEAD":
+    → Wait for user response
+    → If user inputs branch name: call git-input again to create branch
+    → If user inputs "qa-only" or "continue":
+        → is_detached_head = true
+        → skip_commit_push = true
+        → Proceed to STEP 2.5
+    → If user inputs "exit": end workflow
+
+IF Task result contains "GIT_INPUT_RESULT: MERGE_CONFLICT":
+    → Output message: "⚠️ Merge conflict detected. Please resolve conflicts first."
+    → Output message: "Run 'git status' to see conflicted files."
+    → End workflow (blocked by merge conflict)
+
+IF Task result contains "GIT_INPUT_RESULT: REBASE_IN_PROGRESS":
+    → Output message: "⚠️ Rebase in progress. Please complete or abort rebase first."
+    → Output message: "Continue: git rebase --continue | Abort: git rebase --abort"
+    → End workflow (blocked by rebase)
+
+IF Task result contains "GIT_INPUT_RESULT: ABORTED":
+    → End workflow
 ```
 
-#### 옵션 B: 파일 직접 지정 모드 (use_git_mode == false, --files 옵션)
-Task 도구 호출:
+#### Option B: Direct File Mode (use_git_mode == false, --files option)
+Task tool call:
 - subagent_type: "file-input"
-- prompt: "다음 경로에서 코드 파일을 찾으세요: {--files 값}"
-- description: "파일 입력 파싱"
+- prompt: "Find code files at the following paths: {--files value}"
+- description: "File input parsing"
 
 ```
-IF Task 결과에 "FILE_INPUT_RESULT: SUCCESS" 포함:
-    → STEP 3으로 진행
+IF Task result contains "FILE_INPUT_RESULT: SUCCESS":
+    → Proceed to STEP 3
 
-IF Task 결과에 "FILE_INPUT_RESULT: NO_FILES" 또는 "FILE_INPUT_RESULT: INVALID_PATH" 포함:
-    → 오류 메시지 출력 후 워크플로우 종료
+IF Task result contains "FILE_INPUT_RESULT: NO_FILES" or "FILE_INPUT_RESULT: INVALID_PATH":
+    → Output error message and end workflow
 ```
 
-**결과 저장:** Task 결과에서 파일 목록을 추출하여 `changed_files`에 저장
+**Save results:** Extract file list from Task result and store in `changed_files`
 
-**⚠️ 파일 목록 검증 (STEP 2.5):**
+**⚠️ File list validation (STEP 2.5):**
 ```
-# 변경 파일 없음 체크
+# Check for no changed files
 IF changed_files.length == 0:
-    → 메시지 출력: "ℹ️ 변경된 파일이 없습니다. 워크플로우를 종료합니다."
-    → 워크플로우 종료 (성공, QA 불필요)
+    → Output message: "ℹ️ No changed files. Ending workflow."
+    → End workflow (success, no QA needed)
 
-# 삭제된 파일 필터링
-IF changed_files에 삭제된 파일(D) 포함:
-    → 삭제된 파일은 분석 대상에서 제외
-    → 메시지 출력: "ℹ️ 삭제된 파일 {N}개는 분석에서 제외됩니다."
-    → changed_files에서 삭제된 파일 제거
+# Filter deleted files
+IF changed_files contains deleted files (D):
+    → Exclude deleted files from analysis
+    → Output message: "ℹ️ {N} deleted files excluded from analysis."
+    → Remove deleted files from changed_files
 
-# 분석 대상 파일 없음 (모두 삭제됨)
-IF 필터링 후 changed_files.length == 0:
-    → 메시지 출력: "ℹ️ 분석할 파일이 없습니다. (삭제된 파일만 있음)"
-    → STEP 9 (Git Commit)로 건너뛰기
+# No files to analyze (all deleted)
+IF changed_files.length == 0 after filtering:
+    → Output message: "ℹ️ No files to analyze. (Only deleted files)"
+    → Skip to STEP 9 (Git Commit)
 
-# 대량 파일 경고
+# Large file count warning
 IF changed_files.length > 100:
-    → 경고 출력: "⚠️ 변경 파일이 {N}개입니다. 분석에 시간이 오래 걸릴 수 있습니다."
-    → 소스 파일만 필터링 권장 (테스트, 설정 파일 제외 가능)
+    → Output warning: "⚠️ {N} files changed. Analysis may take a long time."
+    → Recommend filtering to source files only (exclude test, config files)
 
-# 바이너리 파일 필터링
-바이너리 확장자 파일 자동 제외:
+# Binary file filtering
+Auto-exclude binary extension files:
 - .exe, .dll, .so, .dylib, .bin
 - .zip, .tar, .gz, .rar, .7z
 - .png, .jpg, .jpeg, .gif, .ico, .svg, .webp
@@ -313,27 +337,27 @@ IF changed_files.length > 100:
 - .mp3, .mp4, .wav, .avi
 ```
 
-→ 완료 시 STEP 3으로
+→ On completion, proceed to STEP 3
 
 ### STEP 3: Pre-Check
-Task 도구 호출:
+Task tool call:
 - subagent_type: "pre-checker"
-- prompt: "다음 파일들에 대해 Lint/Format 자동 수정을 실행하세요: {changed_files}"
-- description: "Lint/Format 수정"
+- prompt: "Run Lint/Format auto-fix for the following files: {changed_files}"
+- description: "Lint/Format fix"
 
-→ 완료 시 STEP 4로
+→ On completion, proceed to STEP 4
 
 ### STEP 4: Code Review
-Task 도구 호출:
+Task tool call:
 - subagent_type: "code-reviewer"
-- prompt: 아래 형식으로 프롬프트를 구성하세요
-- description: "코드 리뷰"
+- prompt: Construct prompt in the format below
+- description: "Code review"
 
-**프롬프트 구성 (중요!):**
+**Prompt construction (Important!):**
 
 ```
 IF workspace_cache != null:
-    프롬프트 =
+    prompt =
     """
     ## Project Context (from workspace cache)
     - Project Type: {workspace_cache.project.type}
@@ -343,239 +367,264 @@ IF workspace_cache != null:
     - Test Command: {workspace_cache.build_system.test_command}
 
     ## Changed files to analyze:
-    {changed_files 목록 - 각 파일의 절대 경로}
+    {changed_files list - absolute path for each file}
 
-    위 파일들의 코드를 분석하고 이슈를 찾으세요.
-    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
+    Analyze the code in the above files and find issues.
+    Output found issues in format: filename, line number, issue description.
     """
 
 ELSE:
-    프롬프트 =
+    prompt =
     """
     ## Changed files to analyze:
-    {changed_files 목록 - 각 파일의 절대 경로}
+    {changed_files list - absolute path for each file}
 
-    다음 파일들의 코드를 분석하고 이슈를 찾으세요.
-    발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요.
+    Analyze the code in the following files and find issues.
+    Output found issues in format: filename, line number, issue description.
     """
 ```
 
-**⚠️ 중요: code-reviewer는 Read 도구만 사용 가능합니다!**
-- code-reviewer에게 전달하는 파일 목록은 반드시 **절대 경로**여야 합니다
-- code-reviewer는 Glob/Grep을 사용할 수 없으므로 **정확한 파일 경로**를 제공해야 합니다
+**⚠️ Important: code-reviewer can only use Read tool!**
+- File list passed to code-reviewer must be **absolute paths**
+- code-reviewer cannot use Glob/Grep, so **exact file paths** must be provided
 
-**결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
+**Save results:** Store found issues from Task result in `review_issues`
 
-→ 완료 시 STEP 5로
+→ On completion, proceed to STEP 5
 
 ### STEP 5: Code Fix
-Task 도구 호출:
+Task tool call:
 - subagent_type: "code-fixer"
-- prompt: "다음 이슈들을 수정하세요: {review_issues}. 대상 파일: {changed_files}"
-- description: "코드 수정"
+- prompt: "Fix the following issues: {review_issues}. Target files: {changed_files}"
+- description: "Code fix"
 
-→ 완료 시 STEP 6으로
+→ On completion, proceed to STEP 6
 
 ### STEP 6: Quality Check
-Task 도구 호출:
+Task tool call:
 - subagent_type: "quality-checker"
-- prompt: "ruff, mypy, radon 등 정적 분석 도구를 직접 실행하고, 결과를 바탕으로 품질 점수를 계산하세요. 반드시 QUALITY_SCORE: XX/100 형식으로 점수를 출력하세요."
-- description: "품질 검사"
+- prompt: "Run static analysis tools (ruff, mypy, radon, etc.) directly and calculate quality score based on results. Must output score in QUALITY_SCORE: XX/100 format."
+- description: "Quality check"
 
-**Task 완료 후 필수 동작:**
-1. Task 결과에서 `QUALITY_SCORE: XX/100` 를 찾습니다
-2. 점수를 숫자로 추출합니다 (예: "QUALITY_SCORE: 85/100" → 85)
-3. 아래 조건에 따라 **즉시 다음 Task를 호출**합니다:
+**Required actions after Task completes:**
+1. Find `QUALITY_SCORE: XX/100` in Task result
+2. Extract score as number (e.g., "QUALITY_SCORE: 85/100" → 85)
+3. **Immediately call next Task** based on conditions below:
 
 ```
-IF 점수 >= 70 OR "STATUS: PASS" 포함:
-    → STEP 7 (build-tester) 호출
-ELSE IF 점수 < 70 OR "STATUS: FAIL" 포함:
+IF score >= 70 OR contains "STATUS: PASS":
+    → Call STEP 7 (build-tester)
+ELSE IF score < 70 OR contains "STATUS: FAIL":
     IF retry_count < 3:
         retry_count += 1
-        → STEP 5 (code-fixer) 호출하여 회귀
+        → Regress to STEP 5 (code-fixer)
     ELSE:
-        → 워크플로우 중단, "최대 재시도 횟수 초과" 메시지 출력
+        → Stop workflow, output "Max retry count exceeded" message
 ```
 
-**점수를 찾지 못한 경우:** quality-checker를 다시 호출하세요.
+**If score not found:** Call quality-checker again.
 
-### STEP 7: Build Test (사용자 확인 필수)
-Task 도구 호출:
+### STEP 7: Build Test (User Confirmation Required)
+Task tool call:
 - subagent_type: "build-tester"
-- prompt: "빌드 테스트를 실행하세요. 먼저 현재 환경 상태(Shell, 가상환경, 런타임)를 보여주고 사용자의 확인을 받은 후에만 빌드를 진행하세요."
-- description: "빌드 테스트"
+- prompt: "Run build test. First show current environment state (Shell, virtual env, runtime) and proceed with build only after user confirmation."
+- description: "Build test"
 
-**⚠️ 사용자 입력 대기 처리:**
+**⚠️ User input wait handling:**
 ```
-IF Task 결과에 "BUILD_RESULT: WAITING_INPUT" 포함:
-    → 사용자가 환경을 확인할 때까지 기다립니다
-    → 사용자가 "확인/y"를 입력하면 빌드 진행
-    → 사용자가 "재설정/n"을 입력하면 STEP 1 (env-setup)로 회귀
+IF Task result contains "BUILD_RESULT: WAITING_INPUT":
+    → Wait for user to confirm environment
+    → If user inputs "confirm/y": proceed with build
+    → If user inputs "reset/n": regress to STEP 1 (env-setup)
 
-IF Task 결과에 "BUILD_RESULT: SUCCESS" 포함:
-    → STEP 8로 진행
+IF Task result contains "BUILD_RESULT: SUCCESS":
+    → Proceed to STEP 8
 
-IF Task 결과에 "BUILD_RESULT: FAIL" 포함:
-    → STEP 5로 회귀 (최대 3회)
+IF Task result contains "BUILD_RESULT: FAIL":
+    → Regress to STEP 5 (max 3 times)
+
+IF Task result contains "BUILD_RESULT: FAIL_DEPS":
+    → Output message: "⚠️ Dependency issue detected."
+    → Output suggested fix based on project type:
+        - Python: "pip install -r requirements.txt" or "poetry install"
+        - Node.js: "npm install" or "yarn install"
+        - Go: "go mod download"
+        - Rust: "cargo fetch"
+    → Ask user: retry after installing dependencies, or skip build
 ```
 
-→ 성공: STEP 8로
-→ 실패: STEP 5로 회귀 (최대 3회)
-→ 재설정: STEP 1로 회귀
+→ Success: proceed to STEP 8
+→ Failure: regress to STEP 5 (max 3 times)
+→ Reset: regress to STEP 1
 
-### STEP 8: Function Test (사용자 확인 필수)
-Task 도구 호출:
+### STEP 8: Function Test (User Confirmation Required)
+Task tool call:
 - subagent_type: "function-tester"
-- prompt: "기능 테스트를 실행하세요. 먼저 테스트 파일을 탐지한 결과를 보여주고, 사용자에게 테스트 실행 여부를 확인받은 후에만 진행하세요."
-- description: "기능 테스트"
+- prompt: "Run function tests. First show detected test files, then ask user whether to execute tests before proceeding."
+- description: "Function test"
 
-**⚠️ 사용자 입력 대기 처리:**
+**⚠️ User input wait handling:**
 ```
-IF Task 결과에 "TEST_RESULT: WAITING_INPUT" 포함:
-    → 사용자가 테스트 실행 여부를 선택할 때까지 기다립니다
-    → 사용자가 "실행/y"를 입력하면 테스트 진행
-    → 사용자가 "스킵/n"을 입력하면 테스트 스킵
+IF Task result contains "TEST_RESULT: WAITING_INPUT":
+    → Wait for user to choose whether to run tests
+    → If user inputs "run/y": proceed with tests
+    → If user inputs "skip/n": skip tests
 
-IF Task 결과에 "TEST_RESULT: SUCCESS" 포함:
-    → STEP 9로 진행
+IF Task result contains "TEST_RESULT: SUCCESS":
+    → Proceed to STEP 9
 
-IF Task 결과에 "TEST_RESULT: FAIL" 포함:
-    → STEP 5로 회귀 (최대 3회)
+IF Task result contains "TEST_RESULT: FAIL":
+    → Regress to STEP 5 (max 3 times)
 
-IF Task 결과에 "TEST_RESULT: SKIPPED" 또는 "TEST_RESULT: NO_TESTS" 포함:
-    → STEP 9로 진행 (테스트 스킵)
+IF Task result contains "TEST_RESULT: SKIPPED" or "TEST_RESULT: NO_TESTS":
+    → Proceed to STEP 9 (tests skipped)
 ```
 
-→ 성공/스킵: STEP 9로
-→ 실패: STEP 5로 회귀 (최대 3회)
+→ Success/Skip: proceed to STEP 9
+→ Failure: regress to STEP 5 (max 3 times)
 
-### STEP 9: Git Commit (사용자 확인 필수) - Git 모드 전용
+### STEP 9: Git Commit (User Confirmation Required) - Git Mode Only
 
-**⚠️ Non-Git 모드 (--files 사용 시):**
+**⚠️ Non-Git mode (when --files used):**
 ```
 IF use_git_mode == false:
-    → STEP 9 건너뛰기
-    → STEP 10 (Summary Report)으로 바로 진행
+    → Skip STEP 9
+    → Proceed directly to STEP 10 (Summary Report)
 ```
 
-**Git 모드:**
-Task 도구 호출:
+**⚠️ Detached HEAD mode:**
+```
+IF skip_commit_push == true:
+    → Skip STEP 9
+    → Proceed directly to STEP 10 (Summary Report)
+    → Output message: "ℹ️ Skipping commit due to Detached HEAD state."
+```
+
+**Git mode:**
+Task tool call:
 - subagent_type: "git-committer"
-- prompt: "변경 사항을 커밋하세요 (--working/--staged면 새 커밋, --last/--branch면 amend). 먼저 커밋 정보를 보여주고 사용자의 확인을 받으세요."
-- description: "Git 커밋"
+- prompt: "Commit changes (new commit for --working/--staged, amend for --last/--branch). First show commit info and get user confirmation."
+- description: "Git commit"
 
-**⚠️ 사용자 입력 대기 처리:**
+**⚠️ User input wait handling:**
 ```
-IF Task 결과에 "COMMIT_RESULT: WAITING_INPUT" 포함:
-    → 사용자가 커밋 정보를 확인할 때까지 기다립니다
-    → 사용자가 "확인/y"를 입력하면 커밋 진행
-    → 사용자가 새 메시지를 입력하면 해당 메시지로 커밋
-    → 사용자가 "취소/n"을 입력하면 커밋 스킵
+IF Task result contains "COMMIT_RESULT: WAITING_INPUT":
+    → Wait for user to confirm commit info
+    → If user inputs "confirm/y": proceed with commit
+    → If user inputs new message: commit with that message
+    → If user inputs "cancel/n": skip commit
 
-IF Task 결과에 "COMMIT_RESULT: SUCCESS" 포함:
-    → STEP 10으로 진행
+IF Task result contains "COMMIT_RESULT: SUCCESS":
+    → Proceed to STEP 10
 
-IF Task 결과에 "COMMIT_RESULT: SKIPPED" 또는 "COMMIT_RESULT: NO_CHANGES" 포함:
-    → STEP 10으로 진행 (커밋 스킵)
+IF Task result contains "COMMIT_RESULT: SKIPPED" or "COMMIT_RESULT: NO_CHANGES":
+    → Proceed to STEP 10 (commit skipped)
 ```
 
-→ 완료 시 STEP 10으로
+→ On completion, proceed to STEP 10
 
 ### STEP 10: Summary Report
-Task 도구 호출:
+Task tool call:
 - subagent_type: "summary-reporter"
-- prompt: "전체 QA 결과를 요약하세요"
-- description: "결과 리포트"
+- prompt: "Summarize overall QA results"
+- description: "Result report"
 
-→ 완료 시 STEP 11로
+→ On completion, proceed to STEP 11
 
-### STEP 11: Push & PR/MR - Git 모드 전용
+### STEP 11: Push & PR/MR - Git Mode Only
 
-**⚠️ Non-Git 모드 (--files 사용 시):**
+**⚠️ Non-Git mode (when --files used):**
 ```
 IF use_git_mode == false:
-    → STEP 11 건너뛰기
-    → 워크플로우 종료 (Summary Report로 완료)
+    → Skip STEP 11
+    → End workflow (completed with Summary Report)
 ```
 
-**Git 모드:**
-Task 도구 호출:
+**⚠️ Detached HEAD mode:**
+```
+IF skip_commit_push == true:
+    → Skip STEP 11
+    → End workflow
+    → Output message: "ℹ️ Skipping push due to Detached HEAD state."
+```
+
+**Git mode:**
+Task tool call:
 - subagent_type: "git-pusher"
-- prompt: "원격 저장소 플랫폼(GitHub/GitLab)을 감지하고, 사용자에게 Push 여부를 확인하세요. Push 후 PR(GitHub) 또는 MR(GitLab) 생성 여부도 확인하세요."
-- description: "Push 및 PR/MR"
+- prompt: "Detect remote repository platform (GitHub/GitLab) and confirm Push with user. Also confirm whether to create PR (GitHub) or MR (GitLab) after Push."
+- description: "Push and PR/MR"
 
-**⚠️ 인증 오류 처리:**
+**⚠️ Authentication error handling:**
 ```
-IF Task 결과에 "PUSH_RESULT: AUTH_ERROR" 포함:
-    → 인증 오류 유형(SSH/HTTPS/GPG/CLI)과 해결 방법을 사용자에게 안내
-    → 사용자가 "재시도"를 입력하면 git-pusher 다시 호출
-    → 사용자가 "스킵"을 입력하면 Push 스킵하고 워크플로우 종료
+IF Task result contains "PUSH_RESULT: AUTH_ERROR":
+    → Guide user on auth error type (SSH/HTTPS/GPG/CLI) and resolution
+    → If user inputs "retry": call git-pusher again
+    → If user inputs "skip": skip Push and end workflow
 
-IF Task 결과에 "PUSH_RESULT: SUCCESS" 포함:
-    → 워크플로우 종료 (성공)
+IF Task result contains "PUSH_RESULT: SUCCESS":
+    → End workflow (success)
 
-IF Task 결과에 "PUSH_RESULT: SKIPPED" 포함:
-    → 워크플로우 종료 (Push 스킵)
+IF Task result contains "PUSH_RESULT: SKIPPED":
+    → End workflow (Push skipped)
 
-IF Task 결과에 "PUSH_RESULT: FAIL" 포함:
-    → 오류 메시지 출력 후 워크플로우 종료
+IF Task result contains "PUSH_RESULT: FAIL":
+    → Output error message and end workflow
 ```
 
-**플랫폼별 PR/MR 생성:**
-- GitHub: `gh pr create` 사용
-- GitLab/GitLab-CE: `glab mr create` 사용
-- 기타: 수동 생성 안내
+**Platform-specific PR/MR creation:**
+- GitHub: Use `gh pr create`
+- GitLab/GitLab-CE: Use `glab mr create`
+- Other: Guide manual creation
 
-→ 완료: 워크플로우 종료
+→ Complete: End workflow
 
 ---
 
-## 회귀 규칙
+## Regression Rules
 
-| 조건 | 동작 |
-|------|------|
-| Quality < 70 | STEP 5 (code-fixer)로 회귀 |
-| Build 실패 | STEP 5 (code-fixer)로 회귀 |
-| Test 실패 | STEP 5 (code-fixer)로 회귀 |
-| 회귀 3회 초과 | 워크플로우 중단, 수동 검토 요청 |
+| Condition | Action |
+|-----------|--------|
+| Quality < 70 | Regress to STEP 5 (code-fixer) |
+| Build failure | Regress to STEP 5 (code-fixer) |
+| Test failure | Regress to STEP 5 (code-fixer) |
+| 3+ regressions | Stop workflow, request manual review |
 
 ---
 
-## 입력 옵션 참조
+## Input Options Reference
 
-### 입력 모드 (상호 배타적)
+### Input Mode (Mutually Exclusive)
 
-**Git 모드 (기본값):**
-- (기본값): --working (git diff)
-- --staged: staged 변경만
-- --last: 마지막 커밋
-- --branch: 브랜치 전체
-- --range <a>..<b>: 특정 범위
+**Git Mode (Default):**
+- (default): --working (git diff)
+- --staged: staged changes only
+- --last: last commit
+- --branch: entire branch
+- --range <a>..<b>: specific range
 
-**파일 직접 지정 모드 (Non-Git):**
-- --files <경로>: 파일/디렉토리 직접 지정 (Git 불필요)
-  - 예: `--files src/main.py`
-  - 예: `--files src/*.py`
-  - 예: `--files src/,lib/,tests/`
+**Direct File Mode (Non-Git):**
+- --files <path>: specify files/directories directly (Git not required)
+  - Example: `--files src/main.py`
+  - Example: `--files src/*.py`
+  - Example: `--files src/,lib/,tests/`
 
-### Sandbox 옵션
-- (기본값): Docker Sandbox 사용
-- --no-sandbox: 호스트에서 직접 실행
+### Sandbox Options
+- (default): Use Docker Sandbox
+- --no-sandbox: Run directly on host
 
-### 캐시 옵션
-- (기본값): 캐시 있으면 사용, 없으면 캐시 없이 진행 (자동 분석 안 함)
-- --with-analysis: 캐시 없거나 오래되면 자동으로 workspace-analyzer 실행
-- --skip-cache: 캐시 완전 무시 (확인도 안 함)
+### Cache Options
+- (default): Use cache if available, proceed without if missing (no auto-analysis)
+- --with-analysis: Auto-run workspace-analyzer if cache missing or stale
+- --skip-cache: Completely ignore cache (don't even check)
 
-**권장 사용 패턴:**
+**Recommended Usage Patterns:**
 ```bash
-# 빠른 QA (캐시 없이도 OK)
+# Quick QA (OK without cache)
 /code-qa
 
-# 프로젝트 컨텍스트가 필요한 경우
+# When project context is needed
 /analyze && /code-qa
 
-# 한 번에 분석+QA
+# Analyze + QA at once
 /code-qa --with-analysis
 ```
