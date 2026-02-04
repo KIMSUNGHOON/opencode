@@ -436,7 +436,24 @@ ls .build/debug/* .build/release/* 2>/dev/null
 ══════════════════════════════════════════════════════════════
 ```
 
-## Docker Sandbox 설정
+## Docker Sandbox 설정 (선택사항)
+
+**⚠️ `.opencode/env-config.yaml` 파일은 선택사항입니다. 없어도 됩니다!**
+
+### Config 파일이 없는 경우 (기본 동작)
+
+1. **STEP 0에서 감지한 환경 정보를 사용합니다**
+2. Docker Sandbox가 설정되어 있지 않으면 호스트에서 직접 빌드
+3. **Config 파일을 읽으려다 실패해도 에러로 처리하지 마세요**
+
+```
+IF .opencode/env-config.yaml 또는 .opencode/docker/Dockerfile.sandbox 없음:
+    → Sandbox 비활성화, 호스트에서 직접 빌드
+    → "ENOENT" 또는 "no such file" 에러 발생해도 정상 진행
+    → env-setup에서 확인된 환경을 그대로 사용
+```
+
+### Config 파일이 있는 경우
 
 `.opencode/env-config.yaml`:
 ```yaml
@@ -449,6 +466,11 @@ sandbox:
     CUDA_VERSION: "11.8.0"
     PYTHON_VERSION: "3.11"
 ```
+
+**절대 하지 말 것:**
+- Config 파일이 없다고 에러를 출력하지 마세요 (X)
+- "env-config.yaml not found" 같은 메시지 표시하지 마세요 (X)
+- Config 파일을 읽으려다 ENOENT 에러가 나면 무시하세요
 
 ## 필수 응답 형식
 

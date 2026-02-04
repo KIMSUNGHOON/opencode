@@ -82,6 +82,74 @@ Task tool을 호출할 때 필요한 파라미터:
 
 ---
 
+## 프로젝트 루트 및 경로 관리 (중요!)
+
+**⚠️ 모든 파일 경로는 반드시 절대 경로를 사용해야 합니다.**
+
+### 워크플로우 시작 전 필수 작업
+
+STEP 1 실행 전에 반드시 다음 정보를 먼저 수집하세요:
+
+```bash
+# 1. 현재 작업 디렉토리 (절대 경로)
+pwd
+# 예: /home/sean5192.kim/ai_codes/torch_aim
+
+# 2. Git 루트 디렉토리 (Git 프로젝트인 경우)
+git rev-parse --show-toplevel 2>/dev/null || pwd
+
+# 3. 프로젝트 구조 파악 (src, lib, tests 등의 실제 위치)
+find . -maxdepth 3 -type d -name "src" -o -name "lib" -o -name "tests" 2>/dev/null | head -20
+ls -la
+```
+
+### 핵심 상태 변수 (추가)
+
+```
+# 경로 관련 변수 (모든 Agent에 전달)
+PROJECT_ROOT = ""           # 절대 경로, 예: /home/user/project
+PROJECT_NAME = ""           # 프로젝트 이름, 예: torch_aim
+SRC_DIR = ""                # src 디렉토리 절대 경로 (존재하는 경우)
+```
+
+### 프로젝트 구조 감지 규칙
+
+1. **중첩 구조 감지**: 프로젝트명과 동일한 하위 디렉토리가 있는 경우
+   ```
+   torch_aim/              ← PROJECT_ROOT
+   └── torch_aim/          ← 실제 소스 코드 위치
+       └── src/
+           └── core/
+   ```
+   이 경우 `SRC_DIR = {PROJECT_ROOT}/torch_aim/src`
+
+2. **일반 구조**: src가 루트 바로 아래에 있는 경우
+   ```
+   myproject/              ← PROJECT_ROOT
+   └── src/
+       └── core/
+   ```
+   이 경우 `SRC_DIR = {PROJECT_ROOT}/src`
+
+### Agent에 경로 전달 방법
+
+**모든 Agent 호출 시 prompt에 절대 경로 포함:**
+
+```
+PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+변경된 파일 (절대 경로):
+- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/utils/helper.py
+```
+
+**상대 경로 사용 금지:**
+```
+❌ 잘못된 예: src/core/module.py
+✅ 올바른 예: /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+```
+
+---
+
 ## 입력 옵션
 
 사용자가 입력한 옵션을 확인하세요:
@@ -192,10 +260,55 @@ ELSE:
 각 STEP에서 Task 도구(function call)를 사용하여 agent를 호출하세요.
 **Task가 완료되면 결과를 확인하고 즉시 다음 STEP으로 진행하세요.**
 
+### STEP 0: 프로젝트 루트 감지 (자동)
+
+**⚠️ 이 단계는 Orchestrator가 직접 실행합니다. Task 호출 없음.**
+
+```bash
+# 1. 현재 디렉토리 (절대 경로)
+pwd
+# → PROJECT_ROOT 저장
+
+# 2. 프로젝트 이름 추출
+basename $(pwd)
+# → PROJECT_NAME 저장
+
+# 3. 프로젝트 구조 파악
+ls -la
+find . -maxdepth 3 -type d \( -name "src" -o -name "lib" -o -name "tests" \) 2>/dev/null
+```
+
+**중첩 구조 감지:**
+```
+IF 디렉토리에 PROJECT_NAME과 동일한 하위 폴더가 있음:
+    # 예: torch_aim/torch_aim/src
+    SRC_DIR = PROJECT_ROOT + "/" + PROJECT_NAME + "/src"
+ELSE IF "src" 디렉토리가 루트에 있음:
+    # 예: myproject/src
+    SRC_DIR = PROJECT_ROOT + "/src"
+ELSE:
+    SRC_DIR = PROJECT_ROOT
+```
+
+**결과 저장 (모든 Agent에 전달):**
+```
+PROJECT_ROOT = /home/sean5192.kim/ai_codes/torch_aim
+PROJECT_NAME = torch_aim
+SRC_DIR = /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src  # 중첩 구조 감지됨
+```
+
+→ 완료 시 STEP 1로
+
 ### STEP 1: Environment Setup (사용자 입력 필수)
 Task 도구 호출:
 - subagent_type: "env-setup"
-- prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요. 반드시 사용자에게 Shell 타입(zsh/bash/sh)과 가상 환경 타입(conda/uv/venv)을 선택받으세요."
+- prompt: |
+    PROJECT_ROOT: {PROJECT_ROOT}
+
+    Shell, 환경, Python/CUDA 버전을 확인하세요.
+    반드시 사용자에게 Shell 타입(zsh/bash/sh)과 가상 환경 타입(conda/uv/venv)을 선택받으세요.
+
+    참고: .opencode/env-config.yaml 파일이 없어도 됩니다. 런타임에서 직접 감지하세요.
 - description: "환경 설정 확인"
 
 **⚠️ 사용자 입력 대기 처리:**

@@ -46,6 +46,50 @@ Chain-of-Thought 추론을 사용하여 전체 QA 과정을 분석하고 종합 
 오케스트레이터가 prompt에 모든 QA 결과를 전달합니다.
 전달받은 데이터가 부족한 경우, Bash tool로 git log 등을 확인할 수 있습니다.
 
+## ⚠️ 경로 처리 규칙 (중요!)
+
+**모든 파일 경로는 절대 경로를 사용해야 합니다.**
+
+### 절대 경로 사용
+
+Orchestrator가 전달하는 PROJECT_ROOT를 기준으로 절대 경로 사용:
+
+```
+PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+
+# 파일 읽기 전 경로 확인
+ls -la /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core
+```
+
+### 경로 검증 후 파일 읽기
+
+파일을 읽기 전에 반드시 경로가 존재하는지 확인:
+
+```bash
+# 잘못된 방법 (X)
+cat src/core/module.py
+
+# 올바른 방법 (O)
+# 1. 먼저 경로 존재 확인
+ls /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py 2>/dev/null
+# 2. 존재하면 읽기
+```
+
+### ENOENT 에러 처리
+
+파일을 읽다가 "ENOENT: no such file or directory" 에러가 발생하면:
+
+1. **상대 경로를 사용했을 가능성** → PROJECT_ROOT 기준 절대 경로로 변환
+2. **중첩 구조일 가능성** → `{PROJECT_ROOT}/{PROJECT_NAME}/` 하위 확인
+3. **파일이 실제로 없음** → 해당 정보 없이 리포트 생성
+
+```
+IF 경로 에러 발생:
+    # 중첩 구조 시도
+    ls {PROJECT_ROOT}/{PROJECT_NAME}/{relative_path}
+    # 성공하면 해당 경로 사용
+```
+
 ```
 QA 결과 데이터:
 

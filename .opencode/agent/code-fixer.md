@@ -53,11 +53,40 @@ Code Reviewer가 발견한 이슈를 수정합니다.
 - 파일을 읽으려면 Read tool을 **function call**로 호출하세요
 - 파일을 수정하려면 Edit tool을 **function call**로 호출하세요
 
+## ⚠️ 경로 처리 규칙 (중요!)
+
+**모든 파일 경로는 절대 경로를 사용해야 합니다.**
+
+### 절대 경로 사용 규칙
+
+Orchestrator가 전달하는 파일 경로를 그대로 사용:
+
+```
+# Orchestrator가 전달한 경로 예시:
+PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+수정 대상 파일:
+- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+```
+
+**상대 경로로 변환하지 마세요:**
+```
+❌ 잘못된 예: Edit("src/core/module.py", ...)
+✅ 올바른 예: Edit("/home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py", ...)
+```
+
+### ENOENT 에러 처리
+
+파일을 읽거나 수정할 때 "ENOENT: no such file or directory" 에러가 발생하면:
+
+1. 전달받은 경로가 절대 경로인지 확인
+2. 상대 경로라면 PROJECT_ROOT를 앞에 붙여서 재시도
+3. 중첩 구조일 수 있음 (`{PROJECT_ROOT}/{PROJECT_NAME}/...`)
+
 ## 역할
 
 1. **이슈 분석** - Reviewer의 분석 결과 이해
 2. **수정 계획** - 각 이슈에 대한 수정 방법 결정
-3. **코드 수정** - Edit/Write 도구로 코드 수정
+3. **코드 수정** - Edit/Write 도구로 코드 수정 (절대 경로 사용)
 4. **검증** - 수정 후 기본 검증 수행
 
 ## 수정 우선순위

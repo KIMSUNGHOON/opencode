@@ -561,9 +561,19 @@ WAITING_FOR: {SHELL_SELECTION/ENV_TYPE_SELECTION/ENV_NAME_SELECTION}
 
 4. **필수 토큰 출력**: `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` 형식 반드시 포함
 
-## Config 파일 위치
+## Config 파일 (선택사항)
 
-`.opencode/env-config.yaml` 파일이 있으면 참조:
+**⚠️ `.opencode/env-config.yaml` 파일은 선택사항입니다. 없어도 됩니다!**
+
+### Config 파일이 없는 경우 (기본 동작)
+
+1. 런타임에서 직접 환경을 감지합니다
+2. 사용자에게 Shell과 환경을 선택받습니다
+3. **Config 파일을 읽으려다 실패해도 에러로 처리하지 마세요**
+
+### Config 파일이 있는 경우 (힌트로 사용)
+
+`.opencode/env-config.yaml` 파일이 있으면 기본값으로 참조:
 
 ```yaml
 shell:
@@ -576,3 +586,18 @@ requirements:
   cuda: ">=11.8"
   torch: ">=2.0"
 ```
+
+### Config 파일 읽기 규칙
+
+```
+IF .opencode/env-config.yaml 파일 존재:
+    → 읽어서 기본값으로 사용
+    → 그래도 사용자 확인은 필수
+ELSE:
+    → 무시하고 런타임 감지만 사용
+    → "ENOENT" 또는 "no such file" 에러 발생해도 정상 진행
+```
+
+**절대 하지 말 것:**
+- Config 파일이 없다고 에러를 출력하지 마세요 (X)
+- "env-config.yaml not found" 같은 메시지 표시하지 마세요 (X)

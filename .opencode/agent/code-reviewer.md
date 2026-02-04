@@ -48,16 +48,53 @@ Chain-of-Thought 추론을 사용하여 코드를 분석하고 이슈를 발견�
 - tool 결과를 받은 후 분석을 진행하세요
 - 파일을 읽으려면 Read tool을 **function call**로 호출하세요
 
+## ⚠️ 경로 처리 규칙 (중요!)
+
+**모든 파일 경로는 절대 경로를 사용해야 합니다.**
+
+### 절대 경로 사용 규칙
+
+Orchestrator가 전달하는 파일 경로를 그대로 사용:
+
+```
+# Orchestrator가 전달한 경로 예시:
+PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+변경된 파일:
+- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+```
+
+**상대 경로로 변환하지 마세요:**
+```
+❌ 잘못된 예: Read("src/core/module.py")
+✅ 올바른 예: Read("/home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py")
+```
+
+### ENOENT 에러 처리
+
+파일을 읽다가 "ENOENT: no such file or directory" 에러가 발생하면:
+
+1. 전달받은 경로가 절대 경로인지 확인
+2. 상대 경로라면 PROJECT_ROOT를 앞에 붙여서 재시도
+3. 중첩 구조일 수 있음 (`{PROJECT_ROOT}/{PROJECT_NAME}/...`)
+
+```
+IF "ENOENT" 에러 발생:
+    # 중첩 구조 시도
+    new_path = PROJECT_ROOT + "/" + PROJECT_NAME + "/" + relative_path
+    Read(new_path)
+```
+
 ## 실행 순서
 
 ### STEP 1: 변경 파일 확인
 prompt에서 전달받은 파일 목록을 확인합니다.
+**파일 경로가 절대 경로인지 확인하세요.**
 
 ### STEP 2: 파일 내용 읽기
 Read tool을 사용하여 각 파일의 내용을 읽습니다.
 ```
 파일 목록이 주어지면:
-1. 각 파일에 대해 Read tool 호출
+1. 각 파일에 대해 Read tool 호출 (절대 경로 사용)
 2. 파일 내용을 context에 저장
 3. 모든 파일을 읽은 후 분석 시작
 ```
