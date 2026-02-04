@@ -1,0 +1,427 @@
+# Code QA Permission Templates
+# Agent에서 사용할 수 있는 공통 Bash 권한 템플릿입니다.
+#
+# 사용 방법:
+# Agent 파일에서 "extends: template_name" 형식으로 참조
+# 예: extends: read_only_git
+
+# =============================================================================
+# 기본 템플릿 (모든 Agent 공통)
+# =============================================================================
+templates:
+
+  # ---------------------------------------------------------------------------
+  # 기본 탐색 권한 (대부분의 Agent에서 사용)
+  # ---------------------------------------------------------------------------
+  base_exploration:
+    description: "기본 파일/디렉토리 탐색 권한"
+    bash:
+      "ls *": allow
+      "which *": allow
+      "echo *": allow
+
+  # ---------------------------------------------------------------------------
+  # Git 읽기 전용 권한
+  # ---------------------------------------------------------------------------
+  git_read_only:
+    description: "Git 상태/이력 조회만 허용"
+    bash:
+      "git status *": allow
+      "git diff *": allow
+      "git log *": allow
+      "git show *": allow
+      "git branch *": allow
+      "git rev-parse *": allow
+      # 차단
+      "git push *": deny
+      "git reset *": deny
+      "git checkout *": deny
+      "git merge *": deny
+      "git rebase *": deny
+
+  # ---------------------------------------------------------------------------
+  # Git 커밋 권한 (git-committer용)
+  # ---------------------------------------------------------------------------
+  git_commit:
+    description: "Git add/commit 허용, push 차단"
+    extends: git_read_only
+    bash:
+      "git add *": allow
+      "git commit *": allow
+      "git commit --amend *": ask
+
+  # ---------------------------------------------------------------------------
+  # Git Push 권한 (git-pusher용)
+  # ---------------------------------------------------------------------------
+  git_push:
+    description: "Git push 및 GitHub CLI 허용"
+    extends: git_read_only
+    bash:
+      "git remote *": allow
+      "git push *": ask
+      "git push --force-with-lease *": ask
+      "gh pr create *": ask
+      "gh pr view *": allow
+      "gh pr list *": allow
+      "gh auth status *": allow
+      # 차단
+      "git push --force *": deny
+
+  # ---------------------------------------------------------------------------
+  # Python Lint/Format 권한 (pre-checker용)
+  # ---------------------------------------------------------------------------
+  python_lint_format:
+    description: "Python Lint/Format 도구 실행"
+    bash:
+      "ruff check * --fix": allow
+      "ruff format *": allow
+      "black *": allow
+      "isort *": allow
+      "pylint *": allow
+      "flake8 *": allow
+      "mypy *": allow
+
+  # ---------------------------------------------------------------------------
+  # JavaScript/TypeScript Lint/Format 권한
+  # ---------------------------------------------------------------------------
+  js_lint_format:
+    description: "JS/TS Lint/Format 도구 실행"
+    bash:
+      "eslint * --fix": allow
+      "prettier * --write": allow
+      "npx eslint * --fix": allow
+      "npx prettier * --write": allow
+      "tsc --noEmit *": allow
+      "npx tsc *": allow
+
+  # ---------------------------------------------------------------------------
+  # C/C++ 도구 권한
+  # ---------------------------------------------------------------------------
+  cpp_tools:
+    description: "C/C++ 빌드 및 정적 분석"
+    bash:
+      "clang-format *": allow
+      "clang-tidy *": allow
+      "cppcheck *": allow
+      "cmake *": allow
+      "make *": allow
+      "ninja *": allow
+      "gcc *": allow
+      "g++ *": allow
+      "clang *": allow
+      "clang++ *": allow
+
+  # ---------------------------------------------------------------------------
+  # Java 도구 권한
+  # ---------------------------------------------------------------------------
+  java_tools:
+    description: "Java 빌드 및 정적 분석"
+    bash:
+      "mvn *": allow
+      "gradle *": allow
+      "./gradlew *": allow
+      "javac *": allow
+      "checkstyle *": allow
+      "pmd *": allow
+      "spotbugs *": allow
+      "google-java-format *": allow
+
+  # ---------------------------------------------------------------------------
+  # Go 도구 권한
+  # ---------------------------------------------------------------------------
+  go_tools:
+    description: "Go 빌드, 테스트, 정적 분석"
+    bash:
+      "go build *": allow
+      "go test *": allow
+      "go vet *": allow
+      "go mod *": allow
+      "gofmt *": allow
+      "goimports *": allow
+      "staticcheck *": allow
+      "golint *": allow
+      "golangci-lint *": allow
+
+  # ---------------------------------------------------------------------------
+  # Rust 도구 권한
+  # ---------------------------------------------------------------------------
+  rust_tools:
+    description: "Rust 빌드, 테스트, 정적 분석"
+    bash:
+      "cargo build *": allow
+      "cargo test *": allow
+      "cargo check *": allow
+      "cargo clippy *": allow
+      "cargo fmt *": allow
+      "rustfmt *": allow
+
+  # ---------------------------------------------------------------------------
+  # Ruby 도구 권한
+  # ---------------------------------------------------------------------------
+  ruby_tools:
+    description: "Ruby 빌드, 테스트, 정적 분석"
+    bash:
+      "bundle install *": allow
+      "bundle exec rspec *": allow
+      "rspec *": allow
+      "rake *": allow
+      "rubocop *": allow
+      "gem build *": allow
+
+  # ---------------------------------------------------------------------------
+  # PHP 도구 권한
+  # ---------------------------------------------------------------------------
+  php_tools:
+    description: "PHP 빌드, 테스트, 정적 분석"
+    bash:
+      "composer install *": allow
+      "composer build *": allow
+      "phpunit *": allow
+      "./vendor/bin/phpunit *": allow
+      "phpcs *": allow
+      "phpcbf *": allow
+      "phpstan *": allow
+      "psalm *": allow
+      "php-cs-fixer *": allow
+
+  # ---------------------------------------------------------------------------
+  # Swift 도구 권한
+  # ---------------------------------------------------------------------------
+  swift_tools:
+    description: "Swift 빌드, 테스트, 정적 분석"
+    bash:
+      "swift build *": allow
+      "swift test *": allow
+      "swiftformat *": allow
+      "swiftlint *": allow
+      "xcodebuild *": allow
+
+  # ---------------------------------------------------------------------------
+  # Kotlin 도구 권한
+  # ---------------------------------------------------------------------------
+  kotlin_tools:
+    description: "Kotlin 빌드, 테스트, 정적 분석"
+    bash:
+      "kotlinc *": allow
+      "ktlint *": allow
+      "detekt *": allow
+
+  # ---------------------------------------------------------------------------
+  # Python 테스트 권한
+  # ---------------------------------------------------------------------------
+  python_test:
+    description: "Python 테스트 프레임워크 실행"
+    bash:
+      "python -m pytest *": allow
+      "pytest *": allow
+      "python -m unittest *": allow
+      "nose2 *": allow
+      "coverage *": allow
+
+  # ---------------------------------------------------------------------------
+  # Node.js 테스트 권한
+  # ---------------------------------------------------------------------------
+  node_test:
+    description: "Node.js 테스트 프레임워크 실행"
+    bash:
+      "npm test *": allow
+      "npm run test *": allow
+      "npx jest *": allow
+      "npx mocha *": allow
+      "yarn test *": allow
+      "pnpm test *": allow
+      "nyc *": allow
+
+  # ---------------------------------------------------------------------------
+  # Docker 권한
+  # ---------------------------------------------------------------------------
+  docker_sandbox:
+    description: "Docker Sandbox 빌드/실행"
+    bash:
+      "docker build *": allow
+      "docker run *": allow
+      "docker images *": allow
+      "docker ps *": allow
+      # 차단
+      "docker rm *": deny
+      "docker rmi *": deny
+
+  # ---------------------------------------------------------------------------
+  # 환경 감지 권한 (env-setup용)
+  # ---------------------------------------------------------------------------
+  env_detection:
+    description: "Shell 및 런타임 환경 감지"
+    bash:
+      "echo $SHELL": allow
+      "echo $0": allow
+      "echo $CONDA_DEFAULT_ENV": allow
+      "echo $VIRTUAL_ENV": allow
+      "echo $PATH": allow
+      "*sh --version": allow
+      "python --version": allow
+      "python3 --version": allow
+      "python -c *": allow
+      "python3 -c *": allow
+      "node --version": allow
+      "go version": allow
+      "rustc --version": allow
+      "cargo --version": allow
+      "java --version": allow
+      "javac --version": allow
+      "gcc --version": allow
+      "g++ --version": allow
+      "clang --version": allow
+      "nvidia-smi *": allow
+      "nvcc --version": allow
+
+  # ---------------------------------------------------------------------------
+  # Conda 환경 관리 권한
+  # ---------------------------------------------------------------------------
+  conda_env:
+    description: "Conda 환경 조회 및 활성화"
+    bash:
+      "conda --version": allow
+      "conda info *": allow
+      "conda env list": allow
+      "conda list *": allow
+      "conda run *": allow
+      "source */conda.sh": allow
+      "source */profile.d/conda.sh": allow
+      "conda activate *": ask
+      # 차단
+      "conda remove *": deny
+
+  # ---------------------------------------------------------------------------
+  # 공통 위험 명령 차단 (모든 Agent에 적용)
+  # ---------------------------------------------------------------------------
+  dangerous_commands_deny:
+    description: "위험한 명령 차단"
+    bash:
+      "rm -rf *": deny
+      "rm -r *": deny
+      "rm *": deny
+      "git push --force *": deny
+      "git reset --hard *": deny
+      "git clean -f *": deny
+      "chmod 777 *": deny
+      "curl * | sh": deny
+      "curl * | bash": deny
+      "wget * | sh": deny
+      "wget * | bash": deny
+      "> /dev/*": deny
+      "dd if=*": deny
+      "mkfs *": deny
+      "fdisk *": deny
+      ":(){:|:&};:": deny
+
+# =============================================================================
+# Agent별 권한 조합
+# =============================================================================
+agent_permissions:
+
+  env-setup:
+    extends:
+      - base_exploration
+      - env_detection
+      - conda_env
+      - dangerous_commands_deny
+
+  git-input:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  pre-checker:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  code-reviewer:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  code-fixer:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_test
+      - node_test
+      - dangerous_commands_deny
+
+  quality-checker:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  build-tester:
+    extends:
+      - base_exploration
+      - env_detection
+      - docker_sandbox
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  function-tester:
+    extends:
+      - base_exploration
+      - docker_sandbox
+      - python_test
+      - node_test
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - dangerous_commands_deny
+
+  git-committer:
+    extends:
+      - base_exploration
+      - git_commit
+      - dangerous_commands_deny
+
+  summary-reporter:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  git-pusher:
+    extends:
+      - base_exploration
+      - git_push
+      - dangerous_commands_deny

@@ -12,6 +12,9 @@
 6. [사용 방법](#6-사용-방법)
 7. [제거](#7-제거)
 8. [문제 해결](#8-문제-해결)
+9. [부록 A: Agent Tool 권한 매트릭스](#부록-a-agent-tool-권한-매트릭스)
+10. [부록 B: 결과 토큰 및 상태 관리](#부록-b-결과-토큰-및-상태-관리)
+11. [부록 C: 파일 체크리스트](#부록-c-파일-체크리스트)
 
 ---
 
@@ -27,6 +30,7 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 - **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
 - **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
 - **회귀 루프**: 품질 기준 미달 시 자동 재시도 (최대 3회)
+- **구조화된 상태 관리**: 결과 토큰 파싱을 통한 Agent간 데이터 전달
 - **GitLab-CE 지원**: GitHub 및 GitLab 모두 지원 (gh/glab CLI)
 - **인증 오류 처리**: SSH/HTTPS/GPG/CLI 인증 문제 감지 및 안내
 
@@ -714,7 +718,79 @@ glab auth login --hostname your-gitlab.example.com
 
 ---
 
-## 부록: 파일 체크리스트
+## 부록 A: Agent Tool 권한 매트릭스
+
+각 Agent가 사용할 수 있는 Tool 목록입니다:
+
+| Agent | Bash | Read | Edit | Write | Glob | Grep | 주요 역할 |
+|-------|:----:|:----:|:----:|:-----:|:----:|:----:|----------|
+| env-setup | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 환경 감지 |
+| git-input | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | Git 파싱 |
+| pre-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | Lint/Format |
+| code-reviewer | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 코드 분석 |
+| code-fixer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 코드 수정 |
+| quality-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 품질 검사 |
+| build-tester | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | 빌드 테스트 |
+| function-tester | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 기능 테스트 |
+| git-committer | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | Git 커밋 |
+| summary-reporter | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | 리포트 생성 |
+| git-pusher | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | Push/PR |
+
+**주요 권한 설명:**
+- **code-fixer**: 유일하게 Edit/Write 권한을 가짐 (코드 수정 필요)
+- **code-reviewer, summary-reporter**: Bash/Read 권한으로 파일 내용 분석 가능
+- **모든 Agent**: 위험한 명령 (rm -rf, git push --force 등) 차단됨
+
+---
+
+## 부록 B: 결과 토큰 및 상태 관리
+
+### 결과 토큰 형식
+
+각 Agent는 실행 완료 시 다음 형식의 토큰을 출력합니다:
+
+| Agent | 출력 토큰 | 예시 |
+|-------|----------|------|
+| env-setup | `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `ENV_SETUP_RESULT: SUCCESS` |
+| git-input | `FILE_LIST: {파일목록}` | `FILE_LIST: src/app.py, src/utils.py` |
+| pre-checker | `PRE_CHECK_RESULT: SUCCESS/PARTIAL` | `PRE_CHECK_RESULT: SUCCESS` |
+| code-reviewer | `ISSUE_LIST: {이슈목록}` | `ISSUE_LIST: [H001] Null ref...` |
+| code-fixer | `FIX_RESULT: SUCCESS/PARTIAL` | `FIX_RESULT: SUCCESS` |
+| quality-checker | `QUALITY_SCORE: XX/100` | `QUALITY_SCORE: 85/100` |
+| build-tester | `BUILD_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `BUILD_RESULT: SUCCESS` |
+| function-tester | `TEST_RESULT: SUCCESS/FAIL/SKIPPED/NO_TESTS` | `TEST_RESULT: SUCCESS` |
+| git-committer | `COMMIT_RESULT: SUCCESS/NO_CHANGES` | `COMMIT_RESULT: SUCCESS` |
+| git-pusher | `PUSH_RESULT: SUCCESS/SKIPPED/FAIL` | `PUSH_RESULT: SUCCESS` |
+
+### 오케스트레이터 상태 변수
+
+오케스트레이터(mode/code-qa.md)가 추적하는 상태 변수:
+
+```
+retry_count = 0              # 회귀 횟수 (최대 3)
+quality_score = 0            # 품질 점수
+
+env_result = ""              # 환경 설정 결과
+changed_files = []           # 변경 파일 목록
+review_issues = []           # 리뷰 이슈 목록
+fix_result = ""              # 수정 결과
+build_result = ""            # 빌드 결과
+test_result = ""             # 테스트 결과
+commit_result = ""           # 커밋 결과
+```
+
+### 회귀 조건
+
+| 조건 | 동작 |
+|------|------|
+| `QUALITY_SCORE < 70` | STEP 5 (code-fixer)로 회귀 |
+| `BUILD_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
+| `TEST_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
+| `retry_count >= 3` | 워크플로우 중단, 수동 검토 요청 |
+
+---
+
+## 부록 C: 파일 체크리스트
 
 ### 글로벌 설정 파일 (필수)
 
