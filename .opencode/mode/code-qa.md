@@ -33,6 +33,56 @@ When you call a Task and receive a result:
 4. **Do NOT generate your own plan** - follow the checklist only
 5. **No creative interpretation** - execute exactly as instructed
 
+## 🚨🚨🚨 CRITICAL: NO PLACEHOLDERS IN PROMPTS! 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│          YOU MUST BUILD ALL PROMPTS WITH ACTUAL VALUES!                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  This document contains templates like:                                  │
+│    {changed_files}, {review_issues}, {ENV_STATE.ACTIVATE_CMD}           │
+│                                                                          │
+│  These are NOT auto-replaced! YOU must replace them manually!           │
+│                                                                          │
+│  ❌ WRONG - Passing placeholders literally:                              │
+│     prompt: "Fix issues: {review_issues}"                               │
+│     prompt: "Files: {changed_files}"                                    │
+│     prompt: "ACTIVATE_CMD: {ENV_STATE.ACTIVATE_CMD}"                    │
+│                                                                          │
+│  ✅ CORRECT - Using actual values you collected:                         │
+│     prompt: "Fix issues: [C001] /path/file.py:45 - SQL injection"       │
+│     prompt: "Files:\n- /home/user/project/src/app.py"                   │
+│     prompt: "ACTIVATE_CMD: source ~/miniconda3/.../conda.sh && ..."     │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    STATE VARIABLES YOU MUST TRACK                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  After each STEP, extract and REMEMBER these values:                    │
+│                                                                          │
+│  From STEP 0:                                                            │
+│    PROJECT_ROOT = "/home/user/myproject"  (actual path from pwd)        │
+│                                                                          │
+│  From STEP 1 (env-setup):                                               │
+│    ENV_STATE.ACTIVATE_CMD = "source .../conda.sh && conda activate X"   │
+│    ENV_STATE.PYTHON_PATH = "/path/to/python"                            │
+│    ENV_STATE.ENV_TYPE = "conda"                                         │
+│    ENV_STATE.ENV_NAME = "myenv"                                         │
+│                                                                          │
+│  From STEP 2 (git-input):                                               │
+│    changed_files = ["src/app.py", "src/utils.py", ...]                  │
+│                                                                          │
+│  From STEP 4 (code-reviewer):                                           │
+│    review_issues = "[C001] file:line - description\n..."                │
+│                                                                          │
+│  When building prompts for later STEPs, use these ACTUAL values!        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## Important: How to Call Tools
 
 ### Forbidden Actions
@@ -500,9 +550,18 @@ IF Task result contains "FILE_INPUT_RESULT: NO_FILES" or "FILE_INPUT_RESULT: INV
 → On completion, go to STEP 3
 
 ### STEP 3: Pre-Check
+
+**⚠️ Build prompt with ACTUAL file paths from STEP 2!**
+
 Task tool call:
 - subagent_type: "pre-checker"
-- prompt: "Run Lint/Format auto-fix on the following files: {changed_files}"
+- prompt: **(Build with actual values!)**
+    ```
+    Run Lint/Format auto-fix on the following files:
+    - [actual absolute path 1 from STEP 2]
+    - [actual absolute path 2 from STEP 2]
+    ...
+    ```
 - description: "Lint/Format fix"
 
 → On completion, go to STEP 4
@@ -597,9 +656,25 @@ Task tool call:
 → On completion, go to STEP 5
 
 ### STEP 5: Code Fix
+
+**⚠️ Build prompt with ACTUAL issues from STEP 4 and file paths from STEP 2!**
+
 Task tool call:
 - subagent_type: "code-fixer"
-- prompt: "Fix the following issues: {review_issues}. Target files: {changed_files}"
+- prompt: **(Build with actual values!)**
+    ```
+    Fix the following issues discovered in code review:
+
+    [ISSUE_LIST from STEP 4 - copy the actual issues here]
+    - [C001] /actual/path/file.py:45 - SQL injection vulnerability
+    - [H001] /actual/path/file.py:78 - Null reference possible
+    ...
+
+    Target files:
+    - [actual absolute path 1]
+    - [actual absolute path 2]
+    ...
+    ```
 - description: "Code fix"
 
 → On completion, go to STEP 6
@@ -629,22 +704,27 @@ ELSE IF score < 70 OR contains "STATUS: FAIL":
 **If score not found:** Call quality-checker again.
 
 ### STEP 7: Build Test (User Confirmation Required)
+
+**⚠️ Build prompt with ACTUAL ENV_STATE values from STEP 1!**
+
 Task tool call:
 - subagent_type: "build-tester"
-- prompt: |
-    PROJECT_ROOT: {PROJECT_ROOT}
+- prompt: **(Build with actual values from STEP 1!)**
+    ```
+    PROJECT_ROOT: [actual path from STEP 0, e.g., /home/user/myproject]
 
     [ENV_STATE]
-    ACTIVATE_CMD: {ENV_STATE.ACTIVATE_CMD}
-    PYTHON_PATH: {ENV_STATE.PYTHON_PATH}
-    ENV_TYPE: {ENV_STATE.ENV_TYPE}
-    ENV_NAME: {ENV_STATE.ENV_NAME}
+    ACTIVATE_CMD: [actual command from STEP 1, e.g., source ~/miniconda3/etc/profile.d/conda.sh && conda activate myenv]
+    PYTHON_PATH: [actual path from STEP 1, e.g., /home/user/miniconda3/envs/myenv/bin/python]
+    ENV_TYPE: [actual type from STEP 1, e.g., conda]
+    ENV_NAME: [actual name from STEP 1, e.g., myenv]
     [/ENV_STATE]
 
     Run build test.
     First show current environment status and get user confirmation before proceeding with build.
 
     ⚠️ Activate environment using ACTIVATE_CMD above before running build commands.
+    ```
 - description: "Build test"
 
 **⚠️ User input wait handling:**
@@ -666,22 +746,27 @@ IF Task result contains "BUILD_RESULT: FAIL":
 → Reset: regress to STEP 1
 
 ### STEP 8: Function Test (User Confirmation Required)
+
+**⚠️ Build prompt with ACTUAL ENV_STATE values from STEP 1!**
+
 Task tool call:
 - subagent_type: "function-tester"
-- prompt: |
-    PROJECT_ROOT: {PROJECT_ROOT}
+- prompt: **(Build with actual values from STEP 1!)**
+    ```
+    PROJECT_ROOT: [actual path from STEP 0, e.g., /home/user/myproject]
 
     [ENV_STATE]
-    ACTIVATE_CMD: {ENV_STATE.ACTIVATE_CMD}
-    PYTHON_PATH: {ENV_STATE.PYTHON_PATH}
-    ENV_TYPE: {ENV_STATE.ENV_TYPE}
-    ENV_NAME: {ENV_STATE.ENV_NAME}
+    ACTIVATE_CMD: [actual command from STEP 1, e.g., source ~/miniconda3/etc/profile.d/conda.sh && conda activate myenv]
+    PYTHON_PATH: [actual path from STEP 1, e.g., /home/user/miniconda3/envs/myenv/bin/python]
+    ENV_TYPE: [actual type from STEP 1, e.g., conda]
+    ENV_NAME: [actual name from STEP 1, e.g., myenv]
     [/ENV_STATE]
 
     Run function tests.
     First show test file detection results, then get user confirmation before proceeding.
 
     ⚠️ Activate environment using ACTIVATE_CMD above before running test commands.
+    ```
 - description: "Function test"
 
 **⚠️ User input wait handling:**
