@@ -99,22 +99,42 @@ Task tool을 호출할 때 필요한 파라미터:
 
 ---
 
-## 상태 변수 초기화
+## 워크플로우 상태 관리
 
-워크플로우 시작 시 다음 변수를 초기화하세요:
+### 결과 추적 방법
+
+각 Agent의 결과에서 다음 토큰을 추출하여 기억하세요:
+
 ```
-retry_count = 0
-quality_score = 0
-changed_files = []      # git-input에서 받은 파일 목록
-review_issues = []      # code-reviewer에서 발견한 이슈
+# 핵심 상태 변수
+retry_count = 0              # 회귀 횟수 (최대 3)
+quality_score = 0            # 품질 점수
 
-# 사용자 입력 관련 상태
-env_setup_confirmed = false   # env-setup 완료 여부
-build_env_confirmed = false   # build-tester 환경 확인 여부
-test_confirmed = false        # function-tester 테스트 확인 여부
+# Agent 결과 저장 (토큰 추출)
+env_result = ""              # ENV_SETUP_RESULT: SUCCESS 이후 내용
+changed_files = []           # FILE_LIST: 이후 파일 목록
+review_issues = []           # ISSUE_LIST: 이후 이슈 목록
+fix_result = ""              # FIX_RESULT: 이후 내용
+build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
+test_result = ""             # TEST_RESULT: SUCCESS/FAIL/SKIPPED
+commit_result = ""           # COMMIT_RESULT: SUCCESS 이후 내용
 ```
 
-**중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
+### 결과 토큰 파싱 규칙
+
+각 Agent 결과에서 다음 패턴을 찾아 저장:
+
+| Agent | 추출할 토큰 | 저장 위치 |
+|-------|------------|----------|
+| env-setup | `ENV_SETUP_RESULT:` 이후 전체 | `env_result` |
+| git-input | `FILE_LIST:` 이후 쉼표 구분 파일 | `changed_files` |
+| code-reviewer | `ISSUE_LIST:` 이후 줄바꿈 구분 | `review_issues` |
+| quality-checker | `QUALITY_SCORE: XX/100` 의 숫자 | `quality_score` |
+| build-tester | `BUILD_RESULT:` 이후 | `build_result` |
+| function-tester | `TEST_RESULT:` 이후 | `test_result` |
+| git-committer | `COMMIT_RESULT:` 이후 전체 | `commit_result` |
+
+**중요: 각 Step 완료 후 결과 토큰을 추출하여 기억하고, 다음 Step에 전달하세요.**
 
 ## 사용자 입력이 필요한 Agent들
 
@@ -177,10 +197,12 @@ Task 도구 호출:
 ### STEP 4: Code Review
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
+- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. Read tool을 사용하여 각 파일 내용을 읽고 분석하세요. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
 - description: "코드 리뷰"
 
-**결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
+**Agent 동작:** code-reviewer가 Read tool로 파일 내용을 직접 읽고 분석합니다.
+
+**결과 저장:** Task 결과에서 `ISSUE_LIST:` 이후의 이슈 목록을 `review_issues`에 저장
 
 → 완료 시 STEP 5로
 
@@ -275,32 +297,39 @@ Task 도구 호출:
 → 완료 시 STEP 10으로
 
 ### STEP 10: Summary Report
+**오케스트레이터 사전 작업:**
+1. 지금까지 저장한 모든 결과 변수를 prompt에 포함
+2. 실제 값으로 placeholder를 치환
+
 Task 도구 호출:
 - subagent_type: "summary-reporter"
 - prompt: |
     다음 QA 결과를 분석하고 종합 리포트를 생성하세요.
+    필요 시 git log, git diff 명령으로 추가 정보를 확인할 수 있습니다.
 
     === 환경 정보 ===
-    {env_setup_result}
+    {env_result 변수의 실제 내용}
 
-    === 변경 파일 ({changed_files 개수}개) ===
-    {changed_files 목록}
+    === 변경 파일 ===
+    {changed_files 변수의 실제 파일 목록}
 
     === 코드 리뷰 결과 ===
-    {review_issues}
+    {review_issues 변수의 실제 이슈 목록}
 
     === 품질 점수 ===
     {quality_score}/100
 
     === 빌드 결과 ===
-    {build_result}
+    {build_result 변수의 실제 내용}
 
     === 테스트 결과 ===
-    {test_result}
+    {test_result 변수의 실제 내용}
 
     === 커밋 정보 ===
-    {commit_info}
+    {commit_result 변수의 실제 내용}
 - description: "결과 리포트"
+
+**Agent 동작:** summary-reporter가 전달받은 데이터로 리포트 생성. 부족한 정보는 Bash tool로 git log 등을 확인.
 
 → 완료 시 STEP 11로
 
@@ -326,6 +355,32 @@ Task 도구 호출:
 ---
 
 ## 설정
+
+**설정 파일 위치:** `.opencode/config/workflow-settings.yaml`
+
+모든 설정 값은 위 파일에서 관리됩니다. 주요 설정:
+
+```yaml
+# 핵심 설정 요약 (workflow-settings.yaml 참조)
+timeout:
+  agent:
+    code-reviewer: 300000   # 5분
+    build-tester: 600000    # 10분
+    function-tester: 600000 # 10분
+  workflow: 3600000         # 1시간
+
+retry:
+  task:
+    max_attempts: 3
+    delay_ms: 2000
+  regression:
+    max_attempts: 3
+
+quality:
+  threshold: 70
+```
+
+**설정 파일이 없는 경우 기본값:**
 
 ```
 MAX_RETRY = 3
@@ -409,22 +464,140 @@ IF task_retry_count >= max_task_retry:
     → 워크플로우 중단, 사용자에게 알림
 ```
 
+### 에러 코드 정의
+
+| 코드 | 에러 유형 | 설명 |
+|------|----------|------|
+| E001 | TIMEOUT | Task 응답 시간 초과 |
+| E002 | NETWORK | 네트워크 연결 실패 |
+| E003 | OOM | 메모리 부족 (Context 초과) |
+| E004 | PARSE | 결과 토큰 파싱 실패 |
+| E005 | TOOL_DENIED | Tool 권한 거부 |
+| E006 | INVALID_INPUT | 잘못된 사용자 입력 |
+| E007 | GIT_ERROR | Git 명령 실패 |
+| E008 | BUILD_ERROR | 빌드 실패 |
+| E009 | TEST_ERROR | 테스트 실패 |
+| E010 | AGENT_ERROR | Agent 내부 오류 |
+
 ### 에러 유형별 처리
 
-| 에러 유형 | 처리 방법 |
-|----------|----------|
-| pending/timeout | 재시도 (최대 3회) |
-| 응답 끊김 | 재시도 (최대 3회) |
-| OOM | Context 길이 줄여서 재시도 |
-| 네트워크 에러 | 재시도 (최대 3회) |
+| 에러 유형 | 처리 방법 | 재시도 |
+|----------|----------|:------:|
+| TIMEOUT | 재시도 후 Context 축소 | ✅ 3회 |
+| NETWORK | 지수 백오프 재시도 | ✅ 3회 |
+| OOM | Context 50% 축소 후 재시도 | ✅ 1회 |
+| PARSE | 동일 Agent 재호출 | ✅ 2회 |
+| TOOL_DENIED | 사용자에게 권한 확인 요청 | ❌ |
+| INVALID_INPUT | 재입력 요청 | ✅ 무제한 |
+| GIT_ERROR | 에러 메시지 분석 후 안내 | ❌ |
+| BUILD_ERROR | code-fixer로 회귀 | ✅ 3회 |
+| TEST_ERROR | code-fixer로 회귀 | ✅ 3회 |
+| AGENT_ERROR | 재시도 후 워크플로우 중단 | ✅ 2회 |
+
+### Agent별 에러 처리
+
+#### env-setup 에러
+```
+IF 에러 유형 == INVALID_INPUT:
+    → 재입력 요청 (WAITING_INPUT + _RETRY)
+    → 최대 3회 후 FAIL 반환
+ELSE IF 에러 유형 == TOOL_DENIED:
+    → "환경 확인 권한이 필요합니다" 메시지 출력
+    → 워크플로우 중단
+```
+
+#### git-input 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "not a git repository":
+        → "Git 저장소가 아닙니다. git init을 실행하세요."
+    ELSE IF "no changes":
+        → GIT_INPUT_RESULT: NO_FILES 반환
+        → 워크플로우 정상 종료
+```
+
+#### code-reviewer 에러
+```
+IF 에러 유형 == PARSE (ISSUE_LIST 없음):
+    → 재호출 (최대 2회)
+    → 실패 시 빈 이슈 목록으로 진행
+IF 에러 유형 == TOOL_DENIED:
+    → "파일 읽기 권한이 필요합니다" 메시지 출력
+```
+
+#### quality-checker 에러
+```
+IF 에러 유형 == PARSE (QUALITY_SCORE 없음):
+    → 재호출하여 점수 재계산 요청
+    → 2회 실패 시 기본값 50점 사용
+IF 에러 유형 == TOOL_DENIED:
+    → 사용 가능한 도구만으로 점수 계산
+```
+
+#### build-tester / function-tester 에러
+```
+IF 에러 유형 == BUILD_ERROR OR TEST_ERROR:
+    IF retry_count < 3:
+        → code-fixer로 회귀
+    ELSE:
+        → 워크플로우 중단
+        → 수동 수정 요청
+IF 에러 유형 == INVALID_INPUT:
+    → 재입력 요청 (y/n/재설정)
+```
+
+#### git-committer 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "nothing to commit":
+        → COMMIT_RESULT: NO_CHANGES 반환
+    ELSE IF "conflict":
+        → "충돌이 발생했습니다. 수동으로 해결하세요."
+        → 워크플로우 중단
+```
+
+#### git-pusher 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "rejected" OR "non-fast-forward":
+        → "원격과 충돌이 있습니다. git pull 후 다시 시도하세요."
+    ELSE IF "permission denied":
+        → "Push 권한이 없습니다. 저장소 권한을 확인하세요."
+IF 에러 유형 == TOOL_DENIED:
+    → 사용자 확인 후 재시도
+```
 
 ### 실패 로그 출력
 
 Task 실패 시 다음 형식으로 로그 출력:
 
 ```
+═══════════════════════════════════════════════════════════════
 ⚠️ Task 실패: {agent_name}
-- 시도: {retry_count}/3
-- 에러: {error_message}
-- 다음 동작: {retry/abort}
+═══════════════════════════════════════════════════════════════
+에러 코드: {error_code}
+에러 유형: {error_type}
+시도 횟수: {retry_count}/{max_retry}
+에러 메시지: {error_message}
+
+복구 동작: {recovery_action}
+═══════════════════════════════════════════════════════════════
+```
+
+### 복구 불가 시 최종 처리
+
+```
+═══════════════════════════════════════════════════════════════
+❌ 워크플로우 중단
+═══════════════════════════════════════════════════════════════
+실패 단계: {step_name} (Phase {phase_number})
+에러 코드: {error_code}
+에러 메시지: {error_message}
+
+수동 조치 필요:
+1. {action_1}
+2. {action_2}
+
+워크플로우를 다시 시작하려면 /code-qa를 실행하세요.
+═══════════════════════════════════════════════════════════════
 ```
