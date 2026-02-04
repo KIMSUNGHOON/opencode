@@ -307,6 +307,60 @@ ELSE:
     SRC_DIR = PROJECT_ROOT
 ```
 
+**Auto-detect project type and primary language:**
+```bash
+# 4. Detect project type from config files
+ls -la pyproject.toml setup.py requirements.txt 2>/dev/null  # Python
+ls -la package.json 2>/dev/null                               # JavaScript/TypeScript
+ls -la Cargo.toml 2>/dev/null                                 # Rust
+ls -la go.mod 2>/dev/null                                     # Go
+ls -la pom.xml build.gradle build.gradle.kts 2>/dev/null      # Java/Kotlin
+ls -la CMakeLists.txt Makefile 2>/dev/null                    # C/C++
+ls -la Gemfile 2>/dev/null                                    # Ruby
+ls -la composer.json 2>/dev/null                              # PHP
+ls -la Package.swift 2>/dev/null                              # Swift
+ls -la *.csproj *.fsproj 2>/dev/null                          # .NET
+```
+
+**Project type detection rules:**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PROJECT_TYPE Detection (check in order, first match wins)              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  pyproject.toml / setup.py / requirements.txt  → PROJECT_TYPE = python  │
+│  package.json                                  → PROJECT_TYPE = node    │
+│  Cargo.toml                                    → PROJECT_TYPE = rust    │
+│  go.mod                                        → PROJECT_TYPE = go      │
+│  pom.xml / build.gradle / build.gradle.kts    → PROJECT_TYPE = java    │
+│  CMakeLists.txt / Makefile (with .c/.cpp)     → PROJECT_TYPE = cpp     │
+│  Gemfile                                       → PROJECT_TYPE = ruby    │
+│  composer.json                                 → PROJECT_TYPE = php     │
+│  Package.swift                                 → PROJECT_TYPE = swift   │
+│  *.csproj / *.fsproj                          → PROJECT_TYPE = dotnet  │
+│  None found                                    → PROJECT_TYPE = unknown │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Auto-detect build/test commands based on PROJECT_TYPE:**
+```
+┌────────────┬─────────────────────────────┬────────────────────────────┐
+│ Type       │ Build Command               │ Test Command               │
+├────────────┼─────────────────────────────┼────────────────────────────┤
+│ python     │ pip install -e . / poetry   │ pytest / python -m pytest  │
+│ node       │ npm install / yarn / pnpm   │ npm test / jest / mocha    │
+│ rust       │ cargo build                 │ cargo test                 │
+│ go         │ go build ./...              │ go test ./...              │
+│ java       │ mvn compile / gradle build  │ mvn test / gradle test     │
+│ cpp        │ cmake --build . / make      │ ctest / make test          │
+│ ruby       │ bundle install              │ rspec / rake test          │
+│ php        │ composer install            │ phpunit                    │
+│ swift      │ swift build                 │ swift test                 │
+│ dotnet     │ dotnet build                │ dotnet test                │
+└────────────┴─────────────────────────────┴────────────────────────────┘
+```
+
 **Store results (passed to all Agents):**
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -316,6 +370,9 @@ ELSE:
 PROJECT_ROOT = {ACTUAL_PATH_FROM_PWD}
 PROJECT_NAME = {ACTUAL_PROJECT_NAME_FROM_DIRECTORY}
 SRC_DIR = {ACTUAL_SRC_PATH_DETECTED}
+PROJECT_TYPE = {DETECTED_PROJECT_TYPE}
+BUILD_CMD = {AUTO_DETECTED_BUILD_COMMAND}
+TEST_CMD = {AUTO_DETECTED_TEST_COMMAND}
 ```
 
 → On completion, go to STEP 1

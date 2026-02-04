@@ -307,6 +307,36 @@ fi
 # Check available environment managers
 which conda uv python3 2>/dev/null
 conda --version 2>/dev/null
+
+# Check version managers (pyenv, nvm, rbenv)
+# pyenv (Python version manager)
+if [ -d "$HOME/.pyenv" ] || command -v pyenv >/dev/null 2>&1; then
+    echo "pyenv detected"
+    pyenv --version 2>/dev/null
+    pyenv versions 2>/dev/null
+fi
+
+# nvm (Node version manager)
+if [ -d "$HOME/.nvm" ] || [ -n "$NVM_DIR" ]; then
+    echo "nvm detected"
+    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+    nvm --version 2>/dev/null
+    nvm list 2>/dev/null | head -10
+fi
+
+# rbenv (Ruby version manager)
+if [ -d "$HOME/.rbenv" ] || command -v rbenv >/dev/null 2>&1; then
+    echo "rbenv detected"
+    rbenv --version 2>/dev/null
+    rbenv versions 2>/dev/null
+fi
+
+# asdf (Universal version manager)
+if [ -d "$HOME/.asdf" ] || command -v asdf >/dev/null 2>&1; then
+    echo "asdf detected"
+    asdf --version 2>/dev/null
+    asdf list 2>/dev/null | head -20
+fi
 uv --version 2>/dev/null
 
 # Check currently activated conda environment
@@ -321,18 +351,27 @@ echo "Current conda environment: $CONDA_DEFAULT_ENV"
 📦 Virtual Environment Type Selection Required
 ═══════════════════════════════════════════════════════════════
 
-[Detected Information]
+[Detected Environment Managers]
 conda: {Installed (version: X.Y.Z) / Not installed}
 uv: {Installed (version: X.Y.Z) / Not installed}
 python: {Installed (version: X.Y.Z)}
 
-[Options]
+[Detected Version Managers (Info only)]
+pyenv: {Installed / Not found}
+nvm: {Installed / Not found}
+rbenv: {Installed / Not found}
+asdf: {Installed / Not found}
+
+[Options - Python Environment]
 1. conda - Anaconda/Miniconda environment manager
 2. uv    - Fast Python package manager
 3. venv  - Python built-in virtual environment
-4. none  - Use system Python directly
+4. pyenv - Use pyenv-managed Python (if detected)
+5. none  - Use system Python directly
 
-➡️ Please enter the environment manager number to use [1-4]:
+⚠️ I cannot choose for you. Please tell me which environment to use.
+
+➡️ Please enter the environment manager number to use [1-5]:
 
 ═══════════════════════════════════════════════════════════════
 ENV_SETUP_RESULT: WAITING_INPUT
@@ -349,12 +388,12 @@ WAITING_FOR: ENV_TYPE_SELECTION
 │                                                             │
 │  - Do not proceed to STEP 3                                  │
 │  - Do not run conda env list                                │
-│  - Wait until user enters 1, 2, 3, or 4                     │
+│  - Wait until user enters 1, 2, 3, 4, or 5                  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Only proceed to STEP 3 after user enters 1, 2, 3, or 4.**
+**Only proceed to STEP 3 after user enters 1, 2, 3, 4, or 5.**
 
 **⚠️ Invalid Input or Environment Manager Not Found - Retry:**
 ```
@@ -363,7 +402,7 @@ WAITING_FOR: ENV_TYPE_SELECTION
 ═══════════════════════════════════════════════════════════════
 
 Input: "{user_input}"
-Issue: {Number outside 1-4 / Selected environment manager not installed}
+Issue: {Number outside 1-5 / Selected environment manager not installed}
 
 Example: If conda was selected but conda is not installed:
 "Conda is not installed. Please select another option."
@@ -372,9 +411,10 @@ Please select again:
 1. conda - {Installed/Not installed}
 2. uv    - {Installed/Not installed}
 3. venv  - Python built-in
-4. none  - Use system Python
+4. pyenv - {Installed/Not installed}
+5. none  - Use system Python
 
-➡️ Please enter a number [1-4]:
+➡️ Please enter a number [1-5]:
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -558,6 +598,32 @@ venv virtual environment options:
 3. Create new venv (python -m venv venv)
 
 ➡️ Please enter a number [1-3]:
+═══════════════════════════════════════════════════════════════
+```
+
+**When pyenv Selected:**
+```bash
+# Check installed Python versions
+pyenv versions
+```
+
+```
+═══════════════════════════════════════════════════════════════
+📋 pyenv Python Version Selection (User Input Required)
+═══════════════════════════════════════════════════════════════
+
+[Installed Python versions via pyenv]
+1. {ACTUAL_VERSION_1_FROM_PYENV_VERSIONS}
+2. {ACTUAL_VERSION_2_FROM_PYENV_VERSIONS}
+3. {ACTUAL_VERSION_3_FROM_PYENV_VERSIONS}
+...
+
+⚠️ I cannot choose for you. Please tell me which version to use.
+
+➡️ Please enter the version number to use:
+═══════════════════════════════════════════════════════════════
+ENV_SETUP_RESULT: WAITING_INPUT
+WAITING_FOR: PYENV_VERSION_SELECTION
 ═══════════════════════════════════════════════════════════════
 ```
 
