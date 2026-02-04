@@ -78,16 +78,22 @@ You fix issues discovered by Code Reviewer.
 Use file paths passed by Orchestrator as-is:
 
 ```
-# Path example passed by Orchestrator:
-PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Paths below are PLACEHOLDERS! Use ACTUAL paths from       │
+│     Orchestrator, NOT these example paths!                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+# Use ACTUAL paths from Orchestrator prompt:
+PROJECT_ROOT: {ACTUAL_PROJECT_ROOT_FROM_ORCHESTRATOR}
 Files to fix:
-- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+- {ACTUAL_FILE_PATH_1_FROM_ORCHESTRATOR}
+- {ACTUAL_FILE_PATH_2_FROM_ORCHESTRATOR}
 ```
 
 **Do not convert to relative paths:**
 ```
 ❌ Wrong: Edit("src/core/module.py", ...)
-✅ Correct: Edit("/home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py", ...)
+✅ Correct: Edit("{ACTUAL_ABSOLUTE_PATH_FROM_ORCHESTRATOR}", ...)
 ```
 
 ### ENOENT Error Handling

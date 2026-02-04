@@ -55,10 +55,15 @@ If data is insufficient, you can use Bash tool to check git log, etc.
 Use absolute paths based on PROJECT_ROOT passed by Orchestrator:
 
 ```
-PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Paths below are PLACEHOLDERS! Use ACTUAL PROJECT_ROOT     │
+│     from Orchestrator, NOT these example paths!                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+PROJECT_ROOT: {ACTUAL_PROJECT_ROOT_FROM_ORCHESTRATOR}
 
 # Verify path before reading files
-ls -la /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core
+ls -la {PROJECT_ROOT}/{path_to_check}
 ```
 
 ### Verify Path Before Reading Files
@@ -70,8 +75,8 @@ Always verify path exists before reading files:
 cat src/core/module.py
 
 # Correct (O)
-# 1. First verify path exists
-ls /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py 2>/dev/null
+# 1. First verify path exists (use ACTUAL PROJECT_ROOT!)
+ls {PROJECT_ROOT}/{relative_path} 2>/dev/null
 # 2. Read if exists
 ```
 
@@ -173,11 +178,16 @@ Information to collect from each Phase:
 ### STEP 2: Comprehensive Analysis
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Values below are EXAMPLE FORMAT ONLY!                      │
+│     Use ACTUAL QA results from previous phases, NOT these examples!     │
+└─────────────────────────────────────────────────────────────────────────┘
+
 [Analysis Process]
 
 1. Environment Setup
-   - Environment used: conda/ml-dev
-   - Python 3.11, CUDA 11.8, PyTorch 2.0
+   - Environment used: {ACTUAL_ENV_FROM_PHASE_-1}
+   - {ACTUAL_PYTHON_VERSION}, {ACTUAL_CUDA_VERSION}, {ACTUAL_PYTORCH_VERSION}
 
 2. Code Change Scope
    - Total 3 files, 45 lines changed
@@ -201,6 +211,14 @@ Information to collect from each Phase:
 
 ### STEP 3: Output Report
 
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Report template below shows FORMAT ONLY!                   │
+│     Replace ALL values with ACTUAL QA results from previous phases!     │
+│     Do NOT copy these example values (3 files, 85/100, ml-dev, etc.)!   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ```markdown
 ══════════════════════════════════════════════════════════════
                  Code QA Summary Report
@@ -208,28 +226,28 @@ Information to collect from each Phase:
 
 ## Executive Summary
 
-✅ **QA Complete** - All checks passed
+{STATUS} **QA {RESULT}** - {SUMMARY_MESSAGE}
 
 | Item | Result |
 |------|--------|
-| Files Checked | 3 |
-| Issues Found | 7 |
-| Issues Fixed | 6 |
-| Quality Score | 85/100 |
-| Build | ✅ Success |
-| Tests | ✅ 45/45 passed |
+| Files Checked | {ACTUAL_FILE_COUNT} |
+| Issues Found | {ACTUAL_ISSUES_FOUND} |
+| Issues Fixed | {ACTUAL_ISSUES_FIXED} |
+| Quality Score | {ACTUAL_SCORE}/100 |
+| Build | {ACTUAL_BUILD_RESULT} |
+| Tests | {ACTUAL_TEST_RESULT} |
 
 ══════════════════════════════════════════════════════════════
 
 ## Phase-by-Phase Results
 
-### Phase -1: Environment Setup ✅
+### Phase -1: Environment Setup {STATUS}
 ┌──────────────┬─────────────────────────────────────────────┐
-│ Shell        │ zsh                                         │
-│ Environment  │ conda/ml-dev                                │
-│ Python       │ 3.11.5                                      │
-│ CUDA         │ 11.8                                        │
-│ PyTorch      │ 2.0.1                                       │
+│ Shell        │ {ACTUAL_SHELL}                              │
+│ Environment  │ {ACTUAL_ENV_TYPE}/{ACTUAL_ENV_NAME}         │
+│ Python       │ {ACTUAL_PYTHON_VERSION}                     │
+│ CUDA         │ {ACTUAL_CUDA_VERSION_OR_NONE}               │
+│ PyTorch      │ {ACTUAL_PYTORCH_VERSION_OR_NONE}            │
 └──────────────┴─────────────────────────────────────────────┘
 
 ### Phase 0: Git Input ✅

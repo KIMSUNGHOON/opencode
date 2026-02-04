@@ -80,11 +80,16 @@ You run tests in Docker Sandbox or host environment.
 Use the ENV_STATE passed by the Orchestrator in the prompt to activate the environment.
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Values below are PLACEHOLDERS! Use ACTUAL values from     │
+│     Orchestrator's ENV_STATE, NOT these example values!                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
 [ENV_STATE]
-ACTIVATE_CMD: source ~/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev
-PYTHON_PATH: /home/user/miniconda3/envs/ml-dev/bin/python
-ENV_TYPE: conda
-ENV_NAME: ml-dev
+ACTIVATE_CMD: {ACTUAL_ACTIVATE_CMD_FROM_ORCHESTRATOR}
+PYTHON_PATH: {ACTUAL_PYTHON_PATH_FROM_ORCHESTRATOR}
+ENV_TYPE: {ACTUAL_ENV_TYPE}
+ENV_NAME: {ACTUAL_ENV_NAME}
 [/ENV_STATE]
 ```
 
@@ -93,8 +98,7 @@ ENV_NAME: ml-dev
 # Activate environment using ACTIVATE_CMD then test
 {ACTIVATE_CMD} && python -m pytest tests/ -v
 
-# Example:
-source ~/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev && python -m pytest tests/ -v
+# ⚠️ Use the ACTUAL ACTIVATE_CMD from Orchestrator, not this example!
 ```
 
 **⚠️ All test commands must be executed with ACTIVATE_CMD!**

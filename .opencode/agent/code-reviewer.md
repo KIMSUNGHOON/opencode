@@ -84,16 +84,22 @@ Changed files:
 Use file paths passed by Orchestrator as-is:
 
 ```
-# Path example passed by Orchestrator:
-PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Paths below are PLACEHOLDERS! Use ACTUAL paths from       │
+│     Orchestrator, NOT these example paths!                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+# Use ACTUAL paths from Orchestrator prompt:
+PROJECT_ROOT: {ACTUAL_PROJECT_ROOT_FROM_ORCHESTRATOR}
 Changed files:
-- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+- {ACTUAL_FILE_PATH_1_FROM_ORCHESTRATOR}
+- {ACTUAL_FILE_PATH_2_FROM_ORCHESTRATOR}
 ```
 
 **Do not convert to relative paths:**
 ```
 ❌ Wrong: Read("src/core/module.py")
-✅ Correct: Read("/home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py")
+✅ Correct: Read("{ACTUAL_ABSOLUTE_PATH_FROM_ORCHESTRATOR}")
 ```
 
 ### ENOENT Error Handling
@@ -284,37 +290,36 @@ File: {filename}
 ### STEP 3: Report Generation
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Report template below shows FORMAT ONLY!                   │
+│     Replace ALL values with ACTUAL review results!                      │
+│     Use ACTUAL file paths from Orchestrator, NOT "example_file.py"!     │
+└─────────────────────────────────────────────────────────────────────────┘
+
 ══════════════════════════════════════════════════════════════
                     Code Review Report
 ══════════════════════════════════════════════════════════════
 
 📊 Summary
 ┌──────────────┬──────────────┐
-│ Files        │ 3            │
-│ Issues       │ 7            │
-│ Critical     │ 1            │
-│ High         │ 2            │
-│ Medium       │ 3            │
-│ Low          │ 1            │
+│ Files        │ {ACTUAL_COUNT}│
+│ Issues       │ {ACTUAL_COUNT}│
+│ Critical     │ {ACTUAL_COUNT}│
+│ High         │ {ACTUAL_COUNT}│
+│ Medium       │ {ACTUAL_COUNT}│
+│ Low          │ {ACTUAL_COUNT}│
 └──────────────┴──────────────┘
 
 🔴 Critical Issues
 
-[C001] SQL Injection Vulnerability
+[C001] {ACTUAL_ISSUE_TITLE}
 ┌─────────────────────────────────────────────────────────────┐
-│ File: {absolute_path}/example_file.py:45   ← Actual analyzed file path │
-│ Code: query = f"SELECT * FROM users WHERE id = {user_id}"   │
+│ File: {ACTUAL_FILE_PATH}:{LINE}   ← Use ACTUAL analyzed path │
+│ Code: {ACTUAL_PROBLEMATIC_CODE}                              │
 │                                                             │
-│ Problem: User input directly inserted into SQL query        │
-│ Solution: Use parameterized query                           │
-│                                                             │
-│ Fix suggestion:                                             │
-│ query = "SELECT * FROM users WHERE id = ?"                  │
-│ cursor.execute(query, (user_id,))                           │
+│ Problem: {ACTUAL_PROBLEM_DESCRIPTION}                       │
+│ Solution: {ACTUAL_SOLUTION}                                 │
 └─────────────────────────────────────────────────────────────┘
-
-⚠️ The file paths in the example above are templates.
-Use actual file paths passed by Orchestrator.
 
 🟠 High Issues
 ...

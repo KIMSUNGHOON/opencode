@@ -93,7 +93,7 @@ Before executing STEP 1, collect the following information:
 ```bash
 # 1. Current working directory (absolute path)
 pwd
-# e.g., /home/sean5192.kim/ai_codes/torch_aim
+# Use the ACTUAL result from pwd command!
 
 # 2. Git root directory (if Git project)
 git rev-parse --show-toplevel 2>/dev/null || pwd
@@ -148,16 +148,21 @@ ENV_STATE = {
 **Include absolute paths in prompt for all Agent calls:**
 
 ```
-PROJECT_ROOT: /home/sean5192.kim/ai_codes/torch_aim
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Use ACTUAL paths detected from pwd/git commands!           │
+│     Do NOT copy example paths from this document!                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+PROJECT_ROOT: {ACTUAL_PATH_FROM_PWD_OR_GIT}
 Changed files (absolute paths):
-- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
-- /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/utils/helper.py
+- {ACTUAL_FILE_PATH_1}
+- {ACTUAL_FILE_PATH_2}
 ```
 
 **Do NOT use relative paths:**
 ```
 ❌ Wrong: src/core/module.py
-✅ Correct: /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src/core/module.py
+✅ Correct: {PROJECT_ROOT}/{detected_structure}/{file_path}
 ```
 
 ---
@@ -304,9 +309,13 @@ ELSE:
 
 **Store results (passed to all Agents):**
 ```
-PROJECT_ROOT = /home/sean5192.kim/ai_codes/torch_aim
-PROJECT_NAME = torch_aim
-SRC_DIR = /home/sean5192.kim/ai_codes/torch_aim/torch_aim/src  # Nested structure detected
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 Use ACTUAL detected paths, NOT these example values!                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+PROJECT_ROOT = {ACTUAL_PATH_FROM_PWD}
+PROJECT_NAME = {ACTUAL_PROJECT_NAME_FROM_DIRECTORY}
+SRC_DIR = {ACTUAL_SRC_PATH_DETECTED}
 ```
 
 → On completion, go to STEP 1
@@ -337,21 +346,26 @@ IF Task result contains "ENV_SETUP_RESULT: SUCCESS":
 
 **ENV_STATE parsing example:**
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 Parse ACTUAL values from env-setup result!                          │
+│     Values below show FORMAT ONLY - use what user actually selected!    │
+└─────────────────────────────────────────────────────────────────────────┘
+
 Extract from env-setup result:
 
 [ENV_STATE_BEGIN]
-SHELL_TYPE: zsh
-ENV_TYPE: conda
-ENV_NAME: ml-dev
-ENV_PATH: /home/user/miniconda3/envs/ml-dev
-ACTIVATE_CMD: source /home/user/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev
-PYTHON_PATH: /home/user/miniconda3/envs/ml-dev/bin/python
-PYTHON_VERSION: 3.11.5
-CUDA_VERSION: 11.8
+SHELL_TYPE: {ACTUAL_SHELL_USER_SELECTED}
+ENV_TYPE: {ACTUAL_ENV_TYPE_USER_SELECTED}
+ENV_NAME: {ACTUAL_ENV_NAME_USER_SELECTED}
+ENV_PATH: {ACTUAL_ENV_PATH}
+ACTIVATE_CMD: {ACTUAL_ACTIVATE_CMD}
+PYTHON_PATH: {ACTUAL_PYTHON_PATH}
+PYTHON_VERSION: {ACTUAL_PYTHON_VERSION}
+CUDA_VERSION: {ACTUAL_CUDA_VERSION_OR_NONE}
 [ENV_STATE_END]
 
-→ Store these values in ENV_STATE variable
-→ Pass to build-tester, function-tester when calling
+→ Store these ACTUAL values in ENV_STATE variable
+→ Pass ACTUAL values to build-tester, function-tester when calling
 ```
 
 → After user input completion, go to STEP 2

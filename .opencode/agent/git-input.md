@@ -189,6 +189,11 @@ Exclude:
 ### STEP 4: Output Result
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 WARNING: Use ACTUAL file paths from `git diff` output!              │
+│     Do NOT use "file1.py", "file2.py" - these are PLACEHOLDERS!         │
+└─────────────────────────────────────────────────────────────────────────┘
+
 ══════════════════════════════════════════════════════════════
                     Git Input Report
 ══════════════════════════════════════════════════════════════
@@ -196,14 +201,12 @@ Exclude:
 📥 Input Mode: {mode}
 📝 Git Command: {command}
 
-📁 Changed Files ({count} files)
+📁 Changed Files ({ACTUAL_COUNT} files)
 ┌─────────────────────────────────────────────────────────────┐
-│ {absolute_path}/file1.py           ← Show actual git diff results │
-│ {absolute_path}/file2.py                                     │
-│ {absolute_path}/test_file.py                                 │
+│ {ACTUAL_FILE_PATH_1_FROM_GIT_DIFF}                          │
+│ {ACTUAL_FILE_PATH_2_FROM_GIT_DIFF}                          │
+│ ...                                                         │
 └─────────────────────────────────────────────────────────────┘
-
-⚠️ Above paths are templates. Use actual file paths from git diff results.
 
 ➡️ Next Step: Pre-Checker (Phase 1)
 
