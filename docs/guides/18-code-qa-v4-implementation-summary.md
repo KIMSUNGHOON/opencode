@@ -1,0 +1,344 @@
+# Code QA v4 Implementation Summary
+
+This document summarizes all implementation work completed for the Code QA v4 workflow system.
+
+---
+
+## 1. Overview
+
+### 1.1 Project Goals
+
+1. **Edge Case Handling**: Implement robust handling for all identified edge cases in the workflow
+2. **English Translation**: Translate all orchestrator and sub-agent prompts to English
+3. **Qwen3-Next Compatibility**: Ensure prompts are optimized for Qwen3-Next series models
+4. **Local Infrastructure**: Design for token-cost-agnostic local LLM serving
+
+### 1.2 Workflow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Code QA v4 Workflow                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  /code-qa command                                                       │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
+│  │  STEP 1-2   │───▶│  STEP 3-6   │───▶│  STEP 7-8   │                 │
+│  │  Git Input  │    │ Code Review │    │ Build/Test  │                 │
+│  └─────────────┘    └─────────────┘    └─────────────┘                 │
+│                                              │                          │
+│       ┌──────────────────────────────────────┘                          │
+│       ▼                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
+│  │  STEP 9     │───▶│  STEP 10-11 │───▶│  STEP 12    │                 │
+│  │ Git Commit  │    │  Git Push   │    │   Summary   │                 │
+│  └─────────────┘    └─────────────┘    └─────────────┘                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Implemented Edge Cases
+
+### 2.1 Critical Priority (Resolved)
+
+| Issue | Description | Solution | Result Token |
+|-------|-------------|----------|--------------|
+| No changed files | Empty git diff | Graceful workflow exit | `GIT_INPUT_RESULT: NO_CHANGES` |
+| Deleted files | Cannot read deleted files | Exclude from analysis, track separately | `DELETED_FILES: file1, file2` |
+
+### 2.2 High Priority (Resolved)
+
+| Issue | Description | Solution | Result Token |
+|-------|-------------|----------|--------------|
+| Large file count | 100+ changed files | Warning + binary filtering | Warning message |
+| File status tracking | A/M/D/R differentiation | `git diff --name-status` | `FILE_LIST` with status |
+
+### 2.3 Medium Priority (Resolved)
+
+| Issue | Description | Solution | Result Token |
+|-------|-------------|----------|--------------|
+| Detached HEAD | No branch for commit | User choice: create branch / QA-only / exit | `GIT_INPUT_RESULT: DETACHED_HEAD` |
+| Merge conflict | Cannot commit | Block workflow, provide guidance | `GIT_INPUT_RESULT: MERGE_CONFLICT` |
+| Rebase in progress | Cannot commit | Block workflow, provide guidance | `GIT_INPUT_RESULT: REBASE_IN_PROGRESS` |
+| Dependency errors | Build fails due to missing deps | Detect pattern, suggest install command | `BUILD_RESULT: FAIL_DEPS` |
+
+### 2.4 Low Priority (Deferred)
+
+| Issue | Reason for Deferral |
+|-------|---------------------|
+| Dirty working tree | Low frequency, existing handling sufficient |
+| Shallow clone | Edge case, can use `--unshallow` if needed |
+| Runtime not installed | Out of scope (system setup issue) |
+| No network | Low cost-benefit ratio |
+
+---
+
+## 3. Agent Implementation Details
+
+### 3.1 Agent List and Status
+
+| Agent | File | Language | Model | Purpose |
+|-------|------|----------|-------|---------|
+| code-qa | `.opencode/command/code-qa.md` | English | - | Orchestrator |
+| git-input | `.opencode/agent/git-input.md` | English | qwen/qwen3-next-80b-a3b-thinking | Git diff collection |
+| file-input | `.opencode/agent/file-input.md` | English | qwen/qwen3-next-80b-a3b-thinking | Direct file input |
+| env-setup | `.opencode/agent/env-setup.md` | English | qwen/qwen3-next-80b-a3b-thinking | Environment setup |
+| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen/qwen3-next-80b-a3b-thinking | Pre-review checks |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Code review |
+| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Auto-fix issues |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/qwen3-next-80b-a3b-thinking | Quality verification |
+| build-tester | `.opencode/agent/build-tester.md` | English | qwen/qwen3-next-80b-a3b-thinking | Build and test |
+| function-tester | `.opencode/agent/function-tester.md` | English | qwen/qwen3-next-80b-a3b-thinking | Function testing |
+| git-committer | `.opencode/agent/git-committer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Git commit |
+| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen/qwen3-next-80b-a3b-thinking | Git push |
+| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/qwen3-next-80b-a3b-thinking | Final summary |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen/qwen3-next-80b-a3b-thinking | Workspace analysis |
+
+### 3.2 Result Token Patterns
+
+All agents use consistent result token patterns for deterministic parsing:
+
+```
+# Git Input Results
+GIT_INPUT_RESULT: SUCCESS
+GIT_INPUT_RESULT: NO_CHANGES
+GIT_INPUT_RESULT: DELETED_ONLY
+GIT_INPUT_RESULT: NO_CODE_FILES
+GIT_INPUT_RESULT: NO_GIT_REPO
+GIT_INPUT_RESULT: DETACHED_HEAD
+GIT_INPUT_RESULT: MERGE_CONFLICT
+GIT_INPUT_RESULT: REBASE_IN_PROGRESS
+GIT_INPUT_RESULT: ABORTED
+
+# Build Results
+BUILD_RESULT: SUCCESS
+BUILD_RESULT: FAIL
+BUILD_RESULT: FAIL_DEPS
+BUILD_RESULT: SKIP
+
+# Code Review Results
+CODE_REVIEW_RESULT: PASS
+CODE_REVIEW_RESULT: ISSUES_FOUND
+CODE_REVIEW_RESULT: CRITICAL_ISSUES
+
+# Workspace Analysis Results
+WORKSPACE_ANALYSIS_RESULT: COMPLETE
+WORKSPACE_ANALYSIS_RESULT: FAILED
+WORKSPACE_ANALYSIS_RESULT: TIMEOUT
+WORKSPACE_ANALYSIS_RESULT: EMPTY
+```
+
+---
+
+## 4. Qwen3-Next Compatibility
+
+### 4.1 Design Patterns for LLM Compatibility
+
+| Pattern | Implementation | Benefit |
+|---------|---------------|---------|
+| Visual structure | Box-drawing chars (┌─┬─┐) | Clear organization |
+| Result tokens | `CATEGORY: VALUE` format | Deterministic parsing |
+| Step numbering | STEP 1, STEP 2, etc. | Sequential execution |
+| Pseudo-code flow | IF/THEN/ELSE conditions | Explicit branching |
+| Forbidden markers | ❌ with visual emphasis | Critical rule highlighting |
+| Required markers | ✅ with visual emphasis | Mandatory output marking |
+| No-placeholder rule | Global enforcement | Hallucination prevention |
+
+### 4.2 Model Considerations
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Qwen3-Next Model Characteristics                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Thinking Model:                                                        │
+│    - Self-reasoning capability                                          │
+│    - Good for complex tasks (code-reviewer, code-fixer)                │
+│                                                                         │
+│  Instruct Model (Future):                                               │
+│    - Direct instruction following                                       │
+│    - Good for simple tasks (git-input, git-committer)                  │
+│                                                                         │
+│  Local Inference:                                                       │
+│    - Token cost: Not relevant (local serving)                          │
+│    - Latency: Proportional to context length                           │
+│    - Quality/Consistency: Primary concern                               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Future Optimization Plan
+
+When `Qwen3-Next-80B-A3B-Instruct` endpoint becomes available:
+
+1. **Model Assignment by Task Complexity**
+   - Thinking model: Complex reasoning tasks
+   - Instruct model: Simple execution tasks
+
+2. **Agent Rebalancing**
+   - Test each agent with both models
+   - Measure accuracy and latency
+   - Assign optimal model per agent
+
+3. **Workflow Optimization**
+   - Parallel execution where possible
+   - Caching for repeated operations
+
+---
+
+## 5. Workflow Scenarios
+
+### 5.1 Scenario Matrix: Cache State × Options
+
+| Scenario | Cache State | Option | Expected Behavior |
+|----------|------------|--------|-------------------|
+| S1 | Valid cache | (default) | Use cache |
+| S2 | Valid cache | --skip-cache | Ignore cache |
+| S3 | Valid cache | --with-analysis | Use cache (no re-analysis) |
+| S4 | Stale cache | (default) | Warning + proceed without cache |
+| S5 | Stale cache | --with-analysis | Run re-analysis |
+| S6 | No cache | (default) | Warning + proceed without cache |
+| S7 | No cache | --with-analysis | Run analysis |
+| S8 | No cache | --skip-cache | Ignore cache (no analysis) |
+
+### 5.2 Scenario Matrix: Input Mode × Cache
+
+| Scenario | Input Mode | Cache State | Expected Behavior |
+|----------|-----------|-------------|-------------------|
+| I1 | --working | Cache exists | Cache context + git diff |
+| I2 | --working | No cache | git diff only |
+| I3 | --staged | Cache exists | Cache context + staged |
+| I4 | --last | Cache exists | Cache context + last commit |
+| I5 | --branch | Cache exists | Cache context + branch diff |
+| I6 | --files | Cache exists | Cache context + specified files |
+| I7 | --files | No cache | Specified files only |
+
+---
+
+## 6. File Changes Summary
+
+### 6.1 Modified Files
+
+| File | Changes |
+|------|---------|
+| `.opencode/command/code-qa.md` | Full English translation, edge case handling |
+| `.opencode/agent/git-input.md` | English translation, new result tokens |
+| `.opencode/agent/build-tester.md` | English translation, FAIL_DEPS handling |
+| `.opencode/agent/workspace-analyzer.md` | Full English translation |
+| `docs/guides/16-workflow-case-review.md` | English rewrite, all issues marked resolved |
+
+### 6.2 Commits
+
+| Commit | Message |
+|--------|---------|
+| `bdfd9fca5` | feat: implement edge case handling and translate agents to English |
+| `225760dd7` | docs: translate remaining Korean text in workspace-analyzer to English |
+
+---
+
+## 7. Testing Checklist
+
+### 7.1 Happy Path Tests
+
+```bash
+# T1: Default Git mode
+/code-qa
+
+# T2: Staged changes only
+git add src/app.py
+/code-qa --staged
+
+# T3: Direct file specification
+/code-qa --files src/
+
+# T4: With cache
+/analyze
+/code-qa
+
+# T5: Cache + analysis at once
+/code-qa --with-analysis
+```
+
+### 7.2 Edge Case Tests
+
+```bash
+# T6: No changes
+git status  # clean
+/code-qa    # → "No changed files" message
+
+# T7: Only deleted files
+git rm old_file.py
+/code-qa --staged  # → Deleted file handling
+
+# T8: Large file count (100+ files)
+/code-qa  # → Warning and filtering
+
+# T9: Non-Git directory
+cd /tmp/non-git-project
+/code-qa  # → NO_GIT_REPO handling
+
+# T10: Detached HEAD
+git checkout HEAD~1
+/code-qa  # → DETACHED_HEAD handling
+
+# T11: Merge conflict
+git merge feature --no-commit  # create conflict
+/code-qa  # → MERGE_CONFLICT handling
+
+# T12: Rebase in progress
+git rebase main  # create rebase state
+/code-qa  # → REBASE_IN_PROGRESS handling
+
+# T13: Dependencies not installed
+rm -rf node_modules
+/code-qa  # → FAIL_DEPS handling
+```
+
+---
+
+## 8. Architecture Decisions
+
+### 8.1 Why Result Tokens?
+
+Result tokens provide:
+- **Deterministic parsing**: No ambiguity in state detection
+- **Error resilience**: Clear success/failure indication
+- **Debugging**: Easy to trace workflow state
+- **Model independence**: Works across different LLM backends
+
+### 8.2 Why English?
+
+- Primary training language for most LLMs
+- Better tokenization efficiency
+- Wider community accessibility
+- Consistent terminology across codebase
+
+### 8.3 Why Visual Formatting?
+
+- Aids model comprehension of structure
+- Reduces ambiguity in complex instructions
+- Provides clear section boundaries
+- Compatible with markdown rendering
+
+---
+
+## 9. Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| `13-code-qa-v4-complete-diagram.en.md` | Full workflow diagram |
+| `14-code-qa-v4-quick-start.en.md` | Quick start guide |
+| `15-workspace-analysis-workflow.md` | Workspace analysis details |
+| `16-workflow-case-review.md` | Case review and edge cases |
+| `17-long-term-indexing-roadmap.md` | Future indexing plans |
+
+---
+
+## Change History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2025-02-04 | Initial implementation summary |
