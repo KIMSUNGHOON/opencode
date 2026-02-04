@@ -74,57 +74,50 @@
 
 | Phase | Agent | 모델 | 역할 | 실행 환경 |
 |-------|-------|------|------|-----------|
-| **-1** | `@env-setup` | Qwen3-Coder | Shell/conda/venv 환경 감지 | 호스트 |
-| **0** | `@git-input` | Qwen3-Coder | Git diff 추출, 변경 파일 목록 | 호스트 |
-| **1** | `@pre-checker` | Qwen3-Coder | 자동 수정 (lint --fix, format) | 호스트 |
-| **2** | `@code-reviewer` | **GPT-OSS-120B** | 심층 코드 분석, 이슈 발견 | 호스트 |
-| **3** | `@code-fixer` | Qwen3-Coder | 발견된 이슈 수정 (SWE-Bench SOTA) | 호스트 |
-| **4** | `@quality-checker` | Qwen3-Coder | 품질 점수 검사 (≥70%) | 호스트 |
-| **5** | `@build-tester` | Qwen3-Coder | 빌드 테스트 (GPU) | **Sandbox** |
-| **6** | `@function-tester` | Qwen3-Coder | 기능 테스트 (GPU) | **Sandbox** |
-| **7** | `@git-committer` | Qwen3-Coder | Commit 또는 Amend | 호스트 |
-| **8** | `@summary-reporter` | **GPT-OSS-120B** | Markdown 결과 리포트 (CoT) | 호스트 |
-| **9** | `@git-pusher` | Qwen3-Coder | Push & PR 생성 | 호스트 |
+| **-1** | `@env-setup` | Qwen3-Next-Thinking | Shell/conda/venv 환경 감지 | 호스트 |
+| **0** | `@git-input` | Qwen3-Next-Thinking | Git diff 추출, 변경 파일 목록 | 호스트 |
+| **1** | `@pre-checker` | Qwen3-Next-Thinking | 자동 수정 (lint --fix, format) | 호스트 |
+| **2** | `@code-reviewer` | Qwen3-Next-Thinking | 심층 코드 분석, 이슈 발견 (CoT) | 호스트 |
+| **3** | `@code-fixer` | Qwen3-Next-Thinking | 발견된 이슈 수정 | 호스트 |
+| **4** | `@quality-checker` | Qwen3-Next-Thinking | 품질 점수 검사 (≥70%) | 호스트 |
+| **5** | `@build-tester` | Qwen3-Next-Thinking | 빌드 테스트 (GPU) | **Sandbox** |
+| **6** | `@function-tester` | Qwen3-Next-Thinking | 기능 테스트 (GPU) | **Sandbox** |
+| **7** | `@git-committer` | Qwen3-Next-Thinking | Commit 또는 Amend | 호스트 |
+| **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown 결과 리포트 (CoT) | 호스트 |
+| **9** | `@git-pusher` | Qwen3-Next-Thinking | Push & PR 생성 | 호스트 |
 
-### 2.1 모델 배분 다이어그램
+### 2.1 단일 모델 전략
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              모델 배분 전략                                               │
+│                              단일 모델 전략                                               │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  Qwen3-Coder-30B (9개 Agent - 82%)                                              │   │
-│  │  ─────────────────────────────────                                              │   │
-│  │  • SWE-Bench 오픈소스 SOTA                                                       │   │
-│  │  • Agent RL 학습 (멀티턴, 도구 사용)                                              │   │
-│  │  • Tool/Function Calling 특화                                                   │   │
-│  │  • 3.3B 활성 파라미터 → 빠르고 효율적                                            │   │
+│  │  Qwen3-Next-80B-A3B-Thinking-FP8 (모든 Agent - 100%)                            │   │
+│  │  ──────────────────────────────────────────────────                             │   │
+│  │  • Thinking Mode + Tool Calling 모두 지원                                        │   │
+│  │  • 256K Context Window                                                          │   │
+│  │  • 16K Output Limit                                                             │   │
+│  │  • FP8 양자화로 ~76GB VRAM                                                       │   │
 │  │                                                                                  │   │
-│  │  적용: env-setup, git-input, pre-checker, code-fixer, quality-checker,          │   │
-│  │        build-tester, function-tester, git-committer, git-pusher                 │   │
-│  └─────────────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  GPT-OSS-120B (2개 Agent - 18%)                                                 │   │
-│  │  ─────────────────────────────                                                  │   │
-│  │  • Full Chain-of-Thought 지원                                                   │   │
-│  │  • Reasoning effort 조절 가능                                                   │   │
-│  │  • 복잡한 분석/종합 판단에 적합                                                  │   │
-│  │  • 5.1B 활성 파라미터                                                           │   │
+│  │  장점:                                                                           │   │
+│  │  • 모델 전환 없음 → 일관된 성능, 낮은 지연시간                                    │   │
+│  │  • 단순한 인프라 → 하나의 모델 서버만 필요                                        │   │
+│  │  • Reasoning + Tool Calling 통합                                                │   │
 │  │                                                                                  │   │
-│  │  적용: code-reviewer (깊은 분석), summary-reporter (결과 종합)                   │   │
+│  │  적용: 오케스트레이터 + 모든 11개 Agent                                           │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
 │  ═══════════════════════════════════════════════════════════════════════════════════   │
 │                                                                                          │
 │   Phase -1  Phase 0   Phase 1   Phase 2   Phase 3   Phase 4   Phase 5-6   Phase 7-9   │
 │   ┌─────┐  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌───────┐   ┌───────┐   │
-│   │Qwen3│  │Qwen3│   │Qwen3│   │ GPT │   │Qwen3│   │Qwen3│   │ Qwen3 │   │Qwen3+ │   │
-│   │     │→ │     │ → │     │ → │ OSS │ → │     │ → │     │ → │       │ → │  GPT  │   │
+│   │Qwen3│  │Qwen3│   │Qwen3│   │Qwen3│   │Qwen3│   │Qwen3│   │ Qwen3 │   │ Qwen3 │   │
+│   │Next │→ │Next │ → │Next │ → │Next │ → │Next │ → │Next │ → │ Next  │ → │ Next  │   │
 │   └─────┘  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘   └───────┘   └───────┘   │
 │    env      git       pre      review     fix      quality   build/test  commit/     │
-│   setup    input     check      (CoT)    (SOTA)    check      (agent)    summary     │
+│   setup    input     check      (CoT)    (tool)    check      (agent)    summary     │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -454,10 +447,10 @@ project-root/
 │ @quality-checker  │  ✅   │  ❌   │ ❌             │ lint, tsc,     │ ❌                    │
 │                   │       │       │                │ format         │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
-│ @build-tester     │  ✅   │  ❌   │ ❌             │ build,         │ ❌                    │
+│ @build-tester     │  ✅   │  ❌   │ ❌             │ build,         │ ✅ 환경 확인 필수     │
 │                   │       │       │                │ docker run     │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
-│ @function-tester  │  ✅   │  ❌   │ diff           │ test,          │ ❌                    │
+│ @function-tester  │  ✅   │  ❌   │ diff           │ test,          │ ✅ 테스트 실행 확인   │
 │                   │       │       │                │ docker run     │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
 │ @git-committer    │  ✅   │  ❌   │ add, commit,   │ ❌             │ ❌                    │

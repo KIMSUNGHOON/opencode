@@ -99,22 +99,42 @@ Task tool을 호출할 때 필요한 파라미터:
 
 ---
 
-## 상태 변수 초기화
+## 워크플로우 상태 관리
 
-워크플로우 시작 시 다음 변수를 초기화하세요:
+### 결과 추적 방법
+
+각 Agent의 결과에서 다음 토큰을 추출하여 기억하세요:
+
 ```
-retry_count = 0
-quality_score = 0
-changed_files = []      # git-input에서 받은 파일 목록
-review_issues = []      # code-reviewer에서 발견한 이슈
+# 핵심 상태 변수
+retry_count = 0              # 회귀 횟수 (최대 3)
+quality_score = 0            # 품질 점수
 
-# 사용자 입력 관련 상태
-env_setup_confirmed = false   # env-setup 완료 여부
-build_env_confirmed = false   # build-tester 환경 확인 여부
-test_confirmed = false        # function-tester 테스트 확인 여부
+# Agent 결과 저장 (토큰 추출)
+env_result = ""              # ENV_SETUP_RESULT: SUCCESS 이후 내용
+changed_files = []           # FILE_LIST: 이후 파일 목록
+review_issues = []           # ISSUE_LIST: 이후 이슈 목록
+fix_result = ""              # FIX_RESULT: 이후 내용
+build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
+test_result = ""             # TEST_RESULT: SUCCESS/FAIL/SKIPPED
+commit_result = ""           # COMMIT_RESULT: SUCCESS 이후 내용
 ```
 
-**중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
+### 결과 토큰 파싱 규칙
+
+각 Agent 결과에서 다음 패턴을 찾아 저장:
+
+| Agent | 추출할 토큰 | 저장 위치 |
+|-------|------------|----------|
+| env-setup | `ENV_SETUP_RESULT:` 이후 전체 | `env_result` |
+| git-input | `FILE_LIST:` 이후 쉼표 구분 파일 | `changed_files` |
+| code-reviewer | `ISSUE_LIST:` 이후 줄바꿈 구분 | `review_issues` |
+| quality-checker | `QUALITY_SCORE: XX/100` 의 숫자 | `quality_score` |
+| build-tester | `BUILD_RESULT:` 이후 | `build_result` |
+| function-tester | `TEST_RESULT:` 이후 | `test_result` |
+| git-committer | `COMMIT_RESULT:` 이후 전체 | `commit_result` |
+
+**중요: 각 Step 완료 후 결과 토큰을 추출하여 기억하고, 다음 Step에 전달하세요.**
 
 ## 사용자 입력이 필요한 Agent들
 
@@ -177,10 +197,12 @@ Task 도구 호출:
 ### STEP 4: Code Review
 Task 도구 호출:
 - subagent_type: "code-reviewer"
-- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
+- prompt: "다음 파일들의 코드를 분석하고 이슈를 찾으세요: {changed_files}. Read tool을 사용하여 각 파일 내용을 읽고 분석하세요. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
 - description: "코드 리뷰"
 
-**결과 저장:** Task 결과에서 발견된 이슈 목록을 `review_issues`에 저장
+**Agent 동작:** code-reviewer가 Read tool로 파일 내용을 직접 읽고 분석합니다.
+
+**결과 저장:** Task 결과에서 `ISSUE_LIST:` 이후의 이슈 목록을 `review_issues`에 저장
 
 → 완료 시 STEP 5로
 
@@ -275,32 +297,39 @@ Task 도구 호출:
 → 완료 시 STEP 10으로
 
 ### STEP 10: Summary Report
+**오케스트레이터 사전 작업:**
+1. 지금까지 저장한 모든 결과 변수를 prompt에 포함
+2. 실제 값으로 placeholder를 치환
+
 Task 도구 호출:
 - subagent_type: "summary-reporter"
 - prompt: |
     다음 QA 결과를 분석하고 종합 리포트를 생성하세요.
+    필요 시 git log, git diff 명령으로 추가 정보를 확인할 수 있습니다.
 
     === 환경 정보 ===
-    {env_setup_result}
+    {env_result 변수의 실제 내용}
 
-    === 변경 파일 ({changed_files 개수}개) ===
-    {changed_files 목록}
+    === 변경 파일 ===
+    {changed_files 변수의 실제 파일 목록}
 
     === 코드 리뷰 결과 ===
-    {review_issues}
+    {review_issues 변수의 실제 이슈 목록}
 
     === 품질 점수 ===
     {quality_score}/100
 
     === 빌드 결과 ===
-    {build_result}
+    {build_result 변수의 실제 내용}
 
     === 테스트 결과 ===
-    {test_result}
+    {test_result 변수의 실제 내용}
 
     === 커밋 정보 ===
-    {commit_info}
+    {commit_result 변수의 실제 내용}
 - description: "결과 리포트"
+
+**Agent 동작:** summary-reporter가 전달받은 데이터로 리포트 생성. 부족한 정보는 Bash tool로 git log 등을 확인.
 
 → 완료 시 STEP 11로
 
