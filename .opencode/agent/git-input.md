@@ -257,15 +257,54 @@ After initial commit is created:
 git ls-files
 ```
 
-→ Use this list as `changed_files` and proceed to STEP 1
+**⚠️ CRITICAL: Return SUCCESS with FILE_LIST after init completes!**
 
-**If user enters file paths:**
-→ Use those paths as `changed_files` and proceed to STEP 4
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  After git init + add + commit completes, you MUST return:              │
+│                                                                          │
+│  GIT_INPUT_RESULT: SUCCESS                                               │
+│  FILES_FOUND: {count}                                                    │
+│  FILE_LIST: {file1}, {file2}, ...                                        │
+│                                                                          │
+│  This tells the Orchestrator to CONTINUE in Git mode!                   │
+│  Without this, it will switch to non-Git mode incorrectly!              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Output after successful git init flow:**
+```
+═══════════════════════════════════════════════════════════════
+✅ Git Repository Initialized Successfully
+═══════════════════════════════════════════════════════════════
+
+Initial commit created with {count} files.
+
+📁 Files in repository:
+{list from git ls-files}
+
+➡️ Proceeding to Code QA workflow...
+
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: SUCCESS
+FILES_FOUND: {count}
+FILE_LIST: {file1}, {file2}, {file3}, ...
+═══════════════════════════════════════════════════════════════
+```
+
+→ Orchestrator receives SUCCESS and continues in Git mode with the file list
+
+**If user enters file paths (instead of git init):**
+→ Use those paths as `changed_files`
+→ Return `GIT_INPUT_RESULT: SUCCESS` with FILE_LIST
+→ Orchestrator continues (may switch to file-input mode if needed)
 
 **If user selects "exit":**
 ```
+═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: ABORTED
 MESSAGE: User exited QA.
+═══════════════════════════════════════════════════════════════
 ```
 
 ### STEP 1: Parse Input Mode

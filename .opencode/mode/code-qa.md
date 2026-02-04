@@ -438,18 +438,47 @@ Task tool call:
 - description: "Git input parsing"
 
 **⚠️ No Git repository handling:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  IMPORTANT: git-input handles the ENTIRE init flow internally!          │
+│                                                                          │
+│  When user selects "git init":                                          │
+│    1. git-input runs: git init → git add → git commit                   │
+│    2. git-input returns: GIT_INPUT_RESULT: SUCCESS + FILE_LIST          │
+│    3. Orchestrator receives SUCCESS and continues in Git mode           │
+│                                                                          │
+│  DO NOT switch to non-Git mode after git init!                          │
+│  The SUCCESS result means Git mode should continue!                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ```
 IF Task result contains "GIT_INPUT_RESULT: NO_GIT_REPO":
-    → Wait for user response
-    → If user inputs "git init" or "initialize": call git-input again
-    → If user inputs file path: change use_git_mode = false, call file-input
-    → If user inputs "exit" or "quit": terminate workflow
+    → Wait for user response (WAITING_FOR: USER_CHOICE)
+    → If user inputs "git init" or "initialize":
+        → Call git-input again with prompt: "User selected git init. Perform full initialization: git init → add → commit, then return SUCCESS with FILE_LIST."
+        → git-input will perform init and return SUCCESS
+        → On SUCCESS: continue to STEP 3 in Git mode (DO NOT switch to non-Git!)
+    → If user inputs file path:
+        → change use_git_mode = false
+        → call file-input with the paths
+    → If user inputs "exit" or "quit":
+        → terminate workflow
+
+IF Task result contains "GIT_INPUT_RESULT: WAITING_INPUT" AND "WAITING_FOR: INIT_CONFIRMATION":
+    → User is confirming initial commit
+    → Wait for user response (commit/y, .gitignore, abort)
+    → Call git-input again with user's choice
+    → After SUCCESS: continue to STEP 3 in Git mode
 
 IF Task result contains "GIT_INPUT_RESULT: ABORTED":
     → Terminate workflow
 
 IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
-    → Proceed to STEP 3
+    → Extract FILE_LIST from result
+    → Store in changed_files variable
+    → Proceed to STEP 3 (stay in Git mode!)
 ```
 
 #### Option B: Direct File Mode (use_git_mode == false, --files option)
