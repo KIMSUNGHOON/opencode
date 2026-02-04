@@ -71,12 +71,12 @@ ls -la {PROJECT_ROOT}/{path_to_check}
 Always verify path exists before reading files:
 
 ```bash
-# Wrong (X)
-cat src/core/module.py
+# Wrong (X) - Don't use invented relative paths!
+cat {invented_relative_path}
 
-# Correct (O)
-# 1. First verify path exists (use ACTUAL PROJECT_ROOT!)
-ls {PROJECT_ROOT}/{relative_path} 2>/dev/null
+# Correct (O) - Use ACTUAL paths from QA results!
+# 1. First verify path exists
+ls {ACTUAL_FILE_PATH_FROM_QA_RESULTS} 2>/dev/null
 # 2. Read if exists
 ```
 
