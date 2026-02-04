@@ -356,6 +356,32 @@ Task 도구 호출:
 
 ## 설정
 
+**설정 파일 위치:** `.opencode/config/workflow-settings.yaml`
+
+모든 설정 값은 위 파일에서 관리됩니다. 주요 설정:
+
+```yaml
+# 핵심 설정 요약 (workflow-settings.yaml 참조)
+timeout:
+  agent:
+    code-reviewer: 300000   # 5분
+    build-tester: 600000    # 10분
+    function-tester: 600000 # 10분
+  workflow: 3600000         # 1시간
+
+retry:
+  task:
+    max_attempts: 3
+    delay_ms: 2000
+  regression:
+    max_attempts: 3
+
+quality:
+  threshold: 70
+```
+
+**설정 파일이 없는 경우 기본값:**
+
 ```
 MAX_RETRY = 3
 QUALITY_THRESHOLD = 70
@@ -438,22 +464,140 @@ IF task_retry_count >= max_task_retry:
     → 워크플로우 중단, 사용자에게 알림
 ```
 
+### 에러 코드 정의
+
+| 코드 | 에러 유형 | 설명 |
+|------|----------|------|
+| E001 | TIMEOUT | Task 응답 시간 초과 |
+| E002 | NETWORK | 네트워크 연결 실패 |
+| E003 | OOM | 메모리 부족 (Context 초과) |
+| E004 | PARSE | 결과 토큰 파싱 실패 |
+| E005 | TOOL_DENIED | Tool 권한 거부 |
+| E006 | INVALID_INPUT | 잘못된 사용자 입력 |
+| E007 | GIT_ERROR | Git 명령 실패 |
+| E008 | BUILD_ERROR | 빌드 실패 |
+| E009 | TEST_ERROR | 테스트 실패 |
+| E010 | AGENT_ERROR | Agent 내부 오류 |
+
 ### 에러 유형별 처리
 
-| 에러 유형 | 처리 방법 |
-|----------|----------|
-| pending/timeout | 재시도 (최대 3회) |
-| 응답 끊김 | 재시도 (최대 3회) |
-| OOM | Context 길이 줄여서 재시도 |
-| 네트워크 에러 | 재시도 (최대 3회) |
+| 에러 유형 | 처리 방법 | 재시도 |
+|----------|----------|:------:|
+| TIMEOUT | 재시도 후 Context 축소 | ✅ 3회 |
+| NETWORK | 지수 백오프 재시도 | ✅ 3회 |
+| OOM | Context 50% 축소 후 재시도 | ✅ 1회 |
+| PARSE | 동일 Agent 재호출 | ✅ 2회 |
+| TOOL_DENIED | 사용자에게 권한 확인 요청 | ❌ |
+| INVALID_INPUT | 재입력 요청 | ✅ 무제한 |
+| GIT_ERROR | 에러 메시지 분석 후 안내 | ❌ |
+| BUILD_ERROR | code-fixer로 회귀 | ✅ 3회 |
+| TEST_ERROR | code-fixer로 회귀 | ✅ 3회 |
+| AGENT_ERROR | 재시도 후 워크플로우 중단 | ✅ 2회 |
+
+### Agent별 에러 처리
+
+#### env-setup 에러
+```
+IF 에러 유형 == INVALID_INPUT:
+    → 재입력 요청 (WAITING_INPUT + _RETRY)
+    → 최대 3회 후 FAIL 반환
+ELSE IF 에러 유형 == TOOL_DENIED:
+    → "환경 확인 권한이 필요합니다" 메시지 출력
+    → 워크플로우 중단
+```
+
+#### git-input 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "not a git repository":
+        → "Git 저장소가 아닙니다. git init을 실행하세요."
+    ELSE IF "no changes":
+        → GIT_INPUT_RESULT: NO_FILES 반환
+        → 워크플로우 정상 종료
+```
+
+#### code-reviewer 에러
+```
+IF 에러 유형 == PARSE (ISSUE_LIST 없음):
+    → 재호출 (최대 2회)
+    → 실패 시 빈 이슈 목록으로 진행
+IF 에러 유형 == TOOL_DENIED:
+    → "파일 읽기 권한이 필요합니다" 메시지 출력
+```
+
+#### quality-checker 에러
+```
+IF 에러 유형 == PARSE (QUALITY_SCORE 없음):
+    → 재호출하여 점수 재계산 요청
+    → 2회 실패 시 기본값 50점 사용
+IF 에러 유형 == TOOL_DENIED:
+    → 사용 가능한 도구만으로 점수 계산
+```
+
+#### build-tester / function-tester 에러
+```
+IF 에러 유형 == BUILD_ERROR OR TEST_ERROR:
+    IF retry_count < 3:
+        → code-fixer로 회귀
+    ELSE:
+        → 워크플로우 중단
+        → 수동 수정 요청
+IF 에러 유형 == INVALID_INPUT:
+    → 재입력 요청 (y/n/재설정)
+```
+
+#### git-committer 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "nothing to commit":
+        → COMMIT_RESULT: NO_CHANGES 반환
+    ELSE IF "conflict":
+        → "충돌이 발생했습니다. 수동으로 해결하세요."
+        → 워크플로우 중단
+```
+
+#### git-pusher 에러
+```
+IF 에러 유형 == GIT_ERROR:
+    IF "rejected" OR "non-fast-forward":
+        → "원격과 충돌이 있습니다. git pull 후 다시 시도하세요."
+    ELSE IF "permission denied":
+        → "Push 권한이 없습니다. 저장소 권한을 확인하세요."
+IF 에러 유형 == TOOL_DENIED:
+    → 사용자 확인 후 재시도
+```
 
 ### 실패 로그 출력
 
 Task 실패 시 다음 형식으로 로그 출력:
 
 ```
+═══════════════════════════════════════════════════════════════
 ⚠️ Task 실패: {agent_name}
-- 시도: {retry_count}/3
-- 에러: {error_message}
-- 다음 동작: {retry/abort}
+═══════════════════════════════════════════════════════════════
+에러 코드: {error_code}
+에러 유형: {error_type}
+시도 횟수: {retry_count}/{max_retry}
+에러 메시지: {error_message}
+
+복구 동작: {recovery_action}
+═══════════════════════════════════════════════════════════════
+```
+
+### 복구 불가 시 최종 처리
+
+```
+═══════════════════════════════════════════════════════════════
+❌ 워크플로우 중단
+═══════════════════════════════════════════════════════════════
+실패 단계: {step_name} (Phase {phase_number})
+에러 코드: {error_code}
+에러 메시지: {error_message}
+
+수동 조치 필요:
+1. {action_1}
+2. {action_2}
+
+워크플로우를 다시 시작하려면 /code-qa를 실행하세요.
+═══════════════════════════════════════════════════════════════
 ```
