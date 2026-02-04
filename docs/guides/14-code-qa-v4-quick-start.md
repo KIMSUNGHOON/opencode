@@ -12,6 +12,9 @@
 6. [사용 방법](#6-사용-방법)
 7. [제거](#7-제거)
 8. [문제 해결](#8-문제-해결)
+   - [8.9 Agent 대화 멈춤 (Conversational Stoppage)](#89-agent-대화-멈춤-conversational-stoppage)
+   - [8.10 Code-reviewer가 관련 없는 파일 분석](#810-code-reviewer가-관련-없는-파일-분석)
+   - [8.11 플레이스홀더가 치환되지 않음](#811-플레이스홀더가-치환되지-않음)
 9. [부록 A: Agent Tool 권한 매트릭스](#부록-a-agent-tool-권한-매트릭스)
 10. [부록 B: 결과 토큰 및 상태 관리](#부록-b-결과-토큰-및-상태-관리)
 11. [부록 C: 파일 체크리스트](#부록-c-파일-체크리스트)
@@ -716,6 +719,99 @@ glab config set host your-gitlab.example.com
 glab auth login --hostname your-gitlab.example.com
 ```
 
+### 8.9 Agent 대화 멈춤 (Conversational Stoppage)
+
+Agent가 아래와 같은 메시지를 출력하고 멈추는 경우:
+
+```
+"The environment setup process is continuing. Please wait..."
+"Checking the code for issues..."
+"I will now analyze the files..."
+```
+
+**원인**: Agent가 도구를 호출하지 않고 대화형 텍스트만 출력했습니다.
+
+**해결**:
+1. 해당 Agent의 `.md` 파일에 **Anti-Stoppage Rule**이 있는지 확인
+2. 없다면 아래 규칙 추가:
+
+```markdown
+## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│              🚨🚨🚨 ABSOLUTELY FORBIDDEN BEHAVIORS 🚨🚨🚨                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ❌ NEVER output "please wait", "analyzing", "checking" and STOP        │
+│  ❌ NEVER describe what you will do without actually doing it           │
+│  ❌ NEVER output conversational messages without tool calls             │
+│                                                                          │
+│  Your response MUST contain:                                             │
+│    - Actual tool calls (Bash, Read, etc.)                               │
+│    - OR result tokens (SUCCESS/FAIL/WAITING_INPUT)                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.10 Code-reviewer가 관련 없는 파일 분석
+
+Code-reviewer가 `main.py`, `model.py` 등 변경되지 않은 파일을 읽으려 하는 경우:
+
+**원인**:
+1. code-reviewer에 Glob/Grep/Bash 권한이 있어 파일을 직접 탐지함
+2. 오케스트레이터가 `{changed_files}` 플레이스홀더를 그대로 전달함
+
+**해결**:
+1. code-reviewer.md에서 **Glob, Grep, Bash 권한 제거**:
+```yaml
+tools:
+  "*": false
+  "Read": true   # Read만 허용
+# Glob, Grep, Bash 비활성화
+permission:
+  read: allow
+  edit: deny
+  glob: deny
+  grep: deny
+  bash: deny
+```
+
+2. 오케스트레이터(mode/code-qa.md)에서 **동적 프롬프트 구성**:
+```
+❌ WRONG - 플레이스홀더 전달:
+   prompt: "Changed files: {changed_files}"
+
+✅ CORRECT - 실제 값 전달:
+   prompt: "Changed files: /project/src/app.py, /project/src/utils.py"
+```
+
+### 8.11 플레이스홀더가 치환되지 않음
+
+오케스트레이터가 `{changed_files}`, `{review_issues}`, `{ENV_STATE.ACTIVATE_CMD}` 등 플레이스홀더를 그대로 Agent에게 전달하는 경우:
+
+**원인**: Qwen 모델은 플레이스홀더를 자동 치환하지 않습니다.
+
+**해결**: 오케스트레이터(mode/code-qa.md)에서 **모든 프롬프트는 실제 값으로 구성**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│          🚫 NO PLACEHOLDERS IN PROMPTS - BUILD WITH ACTUAL VALUES!      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ❌ WRONG - Using placeholders:                                          │
+│     prompt: "Fix these issues: {review_issues}"                         │
+│     prompt: "Activate with: {ENV_STATE.ACTIVATE_CMD}"                   │
+│                                                                          │
+│  ✅ CORRECT - Using actual values collected from previous steps:         │
+│     prompt: "Fix these issues: [C001] /path/file.py:45 - SQL injection" │
+│     prompt: "Activate with: conda activate ml-dev"                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+오케스트레이터는 각 STEP에서 수집한 상태 변수를 명시적으로 관리해야 합니다:
+- `PROJECT_ROOT`: 프로젝트 경로
+- `ENV_STATE.SHELL_TYPE`: Shell 종류
+- `ENV_STATE.ACTIVATE_CMD`: 환경 활성화 명령
+- `changed_files`: 변경 파일 목록
+- `review_issues`: 리뷰 이슈 목록
+
 ---
 
 ## 부록 A: Agent Tool 권한 매트릭스
@@ -727,7 +823,7 @@ glab auth login --hostname your-gitlab.example.com
 | env-setup | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 환경 감지 |
 | git-input | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | Git 파싱 |
 | pre-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | Lint/Format |
-| code-reviewer | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 코드 분석 |
+| **code-reviewer** | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | 코드 분석 |
 | code-fixer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 코드 수정 |
 | quality-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 품질 검사 |
 | build-tester | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | 빌드 테스트 |
@@ -738,8 +834,10 @@ glab auth login --hostname your-gitlab.example.com
 
 **주요 권한 설명:**
 - **code-fixer**: 유일하게 Edit/Write 권한을 가짐 (코드 수정 필요)
-- **code-reviewer, summary-reporter**: Bash/Read 권한으로 파일 내용 분석 가능
+- **code-reviewer**: Read 권한만 보유 (파일 검색/탐지 불가, 오케스트레이터가 전달한 파일만 분석)
 - **모든 Agent**: 위험한 명령 (rm -rf, git push --force 등) 차단됨
+
+> ⚠️ **중요**: code-reviewer는 Glob, Grep, Bash 권한이 없습니다. 오케스트레이터가 "Changed files:" 섹션에 명시한 파일만 Read할 수 있습니다. 이는 모델이 관련 없는 파일을 임의로 탐지/분석하는 것을 방지합니다.
 
 ---
 

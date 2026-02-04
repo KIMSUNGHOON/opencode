@@ -77,7 +77,7 @@
 | **-1** | `@env-setup` | Qwen3-Next-Thinking | Shell/conda/venv 환경 감지 | 호스트 |
 | **0** | `@git-input` | Qwen3-Next-Thinking | Git diff 추출, 변경 파일 목록 | 호스트 |
 | **1** | `@pre-checker` | Qwen3-Next-Thinking | 자동 수정 (lint --fix, format) | 호스트 |
-| **2** | `@code-reviewer` | Qwen3-Next-Thinking | 심층 코드 분석, 이슈 발견 (CoT) | 호스트 |
+| **2** | `@code-reviewer` | Qwen3-Next-Thinking | 심층 코드 분석 (Read만, CoT) | 호스트 |
 | **3** | `@code-fixer` | Qwen3-Next-Thinking | 발견된 이슈 수정 | 호스트 |
 | **4** | `@quality-checker` | Qwen3-Next-Thinking | 품질 점수 검사 (≥70%) | 호스트 |
 | **5** | `@build-tester` | Qwen3-Next-Thinking | 빌드 테스트 (GPU) | **Sandbox** |
@@ -85,6 +85,8 @@
 | **7** | `@git-committer` | Qwen3-Next-Thinking | Commit 또는 Amend | 호스트 |
 | **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown 결과 리포트 (CoT) | 호스트 |
 | **9** | `@git-pusher` | Qwen3-Next-Thinking | Push & PR 생성 | 호스트 |
+
+> ⚠️ **Note**: code-reviewer는 Read 권한만 보유 (Glob/Grep/Bash 비활성화). 오케스트레이터가 전달한 파일만 분석 가능.
 
 ### 2.1 단일 모델 전략
 
@@ -440,7 +442,8 @@ project-root/
 │ @pre-checker      │  ✅   │  ❌   │ diff           │ lint --fix,    │ ❌                    │
 │                   │       │       │                │ format         │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
-│ @code-reviewer    │  ✅   │  ❌   │ diff, log      │ ❌             │ ❌                    │
+│ @code-reviewer    │  ✅   │  ❌   │ ❌ (Read만!)   │ ❌             │ ❌                    │
+│ ⚠️ Read 권한만    │       │       │                │                │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
 │ @code-fixer       │  ✅   │  ✅   │ diff, status   │ ❌             │ ❌                    │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
@@ -461,6 +464,9 @@ project-root/
 │ @git-pusher       │  ✅   │  ❌   │ push (ask),    │ ❌             │ ✅ Push/PR 필수       │
 │                   │       │       │ branch, remote │                │                       │
 └───────────────────┴───────┴───────┴────────────────┴────────────────┴───────────────────────┘
+
+⚠️ **중요**: @code-reviewer는 Read 권한만 가집니다 (Glob/Grep/Bash 권한 없음).
+오케스트레이터가 "Changed files:" 섹션에서 명시적으로 전달한 파일만 Read할 수 있습니다.
 ```
 
 ---

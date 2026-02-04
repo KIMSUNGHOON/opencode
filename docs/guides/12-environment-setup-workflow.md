@@ -455,7 +455,7 @@ project-root/
 | 항목 | 값 | 설명 |
 |------|-----|------|
 | **mode** | `subagent` | 다른 Agent에서 호출 |
-| **model** | `qwen/qwen3-coder-30b` | Tool calling 특화 모델 |
+| **model** | `qwen/qwen3-next-80b-a3b-thinking` | Thinking + Tool calling 모델 |
 | **color** | `#95A5A6` | UI 표시 색상 |
 
 ### 7.3 권한 매트릭스
@@ -478,7 +478,7 @@ project-root/
 ---
 description: 개발 환경 감지 및 설정 전문가
 mode: subagent
-model: qwen/qwen3-coder-30b
+model: qwen/qwen3-next-80b-a3b-thinking
 color: "#95A5A6"
 tools:
   "*": false
@@ -526,6 +526,20 @@ permission:
 
 당신은 개발 환경 감지 및 설정 전문가입니다.
 Code QA 워크플로우 시작 전에 올바른 실행 환경을 확인하고 설정합니다.
+
+## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│              🚨🚨🚨 ABSOLUTELY FORBIDDEN BEHAVIORS 🚨🚨🚨                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ❌ NEVER output "please wait", "continuing", "checking" and STOP       │
+│  ❌ NEVER describe what you will do without actually doing it           │
+│  ❌ NEVER output conversational messages without tool calls             │
+│                                                                          │
+│  Your response MUST contain:                                             │
+│    - Actual tool calls (Bash, Read, etc.)                               │
+│    - OR result tokens (SUCCESS/FAIL/WAITING_INPUT)                      │
+└─────────────────────────────────────────────────────────────────────────┘
 
 ## 역할
 
@@ -639,7 +653,7 @@ project-root/
 ```markdown
 ---
 description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
-model: opencode/gpt-oss-120b
+model: qwen/qwen3-next-80b-a3b-thinking
 ---
 
 # Code QA Workflow v4
@@ -752,54 +766,52 @@ Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
 
 | Phase | Agent | 역할 | 모델 | 실행 환경 |
 |-------|-------|------|------|-----------|
-| -1 | `@env-setup` | 환경 설정 | Qwen3-Coder | 호스트 |
-| 0 | `@git-input` | Git diff 추출 | Qwen3-Coder | 호스트 |
-| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | Qwen3-Coder | 호스트 |
-| 2 | `@code-reviewer` | 심층 코드 분석 | **GPT-OSS-120B** | 호스트 |
-| 3 | `@code-fixer` | 이슈 수정 | Qwen3-Coder | 호스트 |
-| 4 | `@quality-checker` | 품질 검사 (≥70%) | Qwen3-Coder | 호스트 |
-| 5 | `@build-tester` | 빌드 테스트 | Qwen3-Coder | **Sandbox (기본)** |
-| 6 | `@function-tester` | 기능 테스트 | Qwen3-Coder | **Sandbox (기본)** |
-| 7 | `@git-committer` | 커밋/amend | Qwen3-Coder | 호스트 |
-| 8 | `@summary-reporter` | 결과 리포트 | **GPT-OSS-120B** | 호스트 |
-| 9 | `@git-pusher` | Push & PR (사용자 확인) | Qwen3-Coder | 호스트 |
+| -1 | `@env-setup` | 환경 설정 | Qwen3-Next-Thinking | 호스트 |
+| 0 | `@git-input` | Git diff 추출 | Qwen3-Next-Thinking | 호스트 |
+| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | Qwen3-Next-Thinking | 호스트 |
+| 2 | `@code-reviewer` | 심층 코드 분석 (Read만 가능) | Qwen3-Next-Thinking | 호스트 |
+| 3 | `@code-fixer` | 이슈 수정 | Qwen3-Next-Thinking | 호스트 |
+| 4 | `@quality-checker` | 품질 검사 (≥70%) | Qwen3-Next-Thinking | 호스트 |
+| 5 | `@build-tester` | 빌드 테스트 | Qwen3-Next-Thinking | **Sandbox (기본)** |
+| 6 | `@function-tester` | 기능 테스트 | Qwen3-Next-Thinking | **Sandbox (기본)** |
+| 7 | `@git-committer` | 커밋/amend | Qwen3-Next-Thinking | 호스트 |
+| 8 | `@summary-reporter` | 결과 리포트 | Qwen3-Next-Thinking | 호스트 |
+| 9 | `@git-pusher` | Push & PR (사용자 확인) | Qwen3-Next-Thinking | 호스트 |
 
-### 8.6 모델 배분 전략
+> ⚠️ **Note**: code-reviewer는 Read 권한만 가집니다. 오케스트레이터가 전달한 파일만 분석할 수 있습니다.
+
+### 8.6 단일 모델 전략
 
 #### 모델 특성
 
 | 모델 | 총 파라미터 | 활성 파라미터 | 특화 영역 |
 |------|------------|--------------|-----------|
-| **GPT-OSS-120B** | 117B | 5.1B/token | Reasoning, Chain-of-Thought |
-| **Qwen3-Coder-30B** | 30B | 3.3B/token | Agentic Coding, Tool Calling |
+| **Qwen3-Next-80B-A3B-Thinking-FP8** | 80B | ~3B/token (A3B) | Thinking + Tool Calling |
 
-#### 배분 근거
+#### 전략 설명
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              모델 배분 근거                                               │
+│                              단일 모델 전략                                               │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
-│  Qwen3-Coder-30B (9개 Agent - 82%)                                                      │
-│  ─────────────────────────────────                                                      │
-│  • SWE-Bench 오픈소스 SOTA - 실제 코드 수정에 최적화                                      │
-│  • Agent RL 학습 - 멀티턴 상호작용, 도구 사용, 피드백 기반                                │
-│  • Tool/Function Calling 특화                                                           │
-│  • 256K 컨텍스트 (1M 확장 가능)                                                          │
-│  • 3.3B 활성 파라미터 → 빠르고 효율적                                                    │
+│  Qwen3-Next-80B-A3B-Thinking-FP8 (모든 Agent - 100%)                                    │
+│  ────────────────────────────────────────────────────                                   │
+│  • Thinking Mode + Tool Calling 모두 지원                                                │
+│  • 256K Context Window                                                                  │
+│  • 16K Output Limit                                                                     │
+│  • FP8 양자화로 ~76GB VRAM                                                               │
 │                                                                                          │
-│  GPT-OSS-120B (2개 Agent - 18%)                                                         │
-│  ─────────────────────────────                                                          │
-│  • Full Chain-of-Thought 지원                                                           │
-│  • Reasoning effort 조절 가능 (low/medium/high)                                         │
-│  • 복잡한 분석 및 종합 판단에 적합                                                        │
-│  • Competition Coding, MMLU에서 강력한 성능                                              │
+│  장점:                                                                                   │
+│  • 모델 전환 없음 → 일관된 성능, 낮은 지연시간                                            │
+│  • 단순한 인프라 → 하나의 모델 서버만 필요                                                │
+│  • Reasoning + Tool Calling 통합                                                        │
 │                                                                                          │
 │  ═══════════════════════════════════════════════════════════════════════════════════    │
 │                                                                                          │
-│  @code-reviewer → GPT-OSS-120B (CoT로 깊은 코드 분석)                                   │
-│  @code-fixer    → Qwen3-Coder   (SWE-Bench SOTA, Agent RL)                             │
-│  @summary-reporter → GPT-OSS-120B (CoT로 결과 종합)                                     │
+│  @code-reviewer → Qwen3-Next-Thinking (CoT로 깊은 코드 분석, Read 권한만)               │
+│  @code-fixer    → Qwen3-Next-Thinking (코드 수정, Edit/Write 권한)                      │
+│  @summary-reporter → Qwen3-Next-Thinking (CoT로 결과 종합)                              │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
