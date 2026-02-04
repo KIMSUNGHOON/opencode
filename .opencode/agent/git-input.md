@@ -349,23 +349,56 @@ Extract options from $ARGUMENTS:
 - Check for `--staged`, `--last`, `--branch`, `--range`
 - If none, use default `--working`
 
-### STEP 2: Extract Changed Files
+### STEP 2: Extract Changed Files with Status
+
+**중요: 파일 상태(Added/Modified/Deleted)를 함께 추출해야 합니다!**
 
 ```bash
-# Default (working)
-git diff --name-only
+# Default (working) - 상태 포함
+git diff --name-status
 
-# staged
-git diff --staged --name-only
+# staged - 상태 포함
+git diff --staged --name-status
 
-# last
-git diff HEAD~1 --name-only
+# last - 상태 포함
+git diff HEAD~1 --name-status
 
-# branch (compared to main)
-git diff main...HEAD --name-only
+# branch (compared to main) - 상태 포함
+git diff main...HEAD --name-status
 
-# range
-git diff <commit_a>..<commit_b> --name-only
+# range - 상태 포함
+git diff <commit_a>..<commit_b> --name-status
+```
+
+**출력 형식:**
+```
+M    src/modified_file.py      # Modified
+A    src/new_file.py          # Added
+D    src/deleted_file.py      # Deleted
+R100 old_name.py new_name.py  # Renamed (with similarity %)
+```
+
+**파일 상태 처리:**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  파일 상태별 처리 방법                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  A (Added):     분석 대상 ✅                                             │
+│  M (Modified):  분석 대상 ✅                                             │
+│  D (Deleted):   분석 제외 ❌ (파일이 없으므로 읽을 수 없음)              │
+│  R (Renamed):   새 경로로 분석 ✅ (old_name 제외, new_name 포함)         │
+│  C (Copied):    분석 대상 ✅                                             │
+│  T (Type changed): 분석 대상 ✅                                          │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**삭제된 파일이 있을 때:**
+```
+IF 삭제된 파일(D) 존재:
+    → FILE_LIST에서 제외
+    → 결과에 DELETED_FILES 섹션 추가
 ```
 
 ### STEP 3: File Filtering
@@ -449,17 +482,38 @@ Exclude:
 ```
 ═══════════════════════════════════════════════════════════════
 GIT_INPUT_RESULT: SUCCESS
-FILES_FOUND: {file count}
+FILES_FOUND: {분석 대상 파일 수}
 FILE_LIST: {file1}, {file2}, {file3}, ...
+DELETED_FILES: {삭제된 파일들 - 있는 경우만}
+RENAMED_FILES: {old→new 형식 - 있는 경우만}
 ═══════════════════════════════════════════════════════════════
 ```
 
-**When no files found:**
+**When no files changed (clean working directory):**
 ```
 ═══════════════════════════════════════════════════════════════
-GIT_INPUT_RESULT: NO_FILES
+GIT_INPUT_RESULT: NO_CHANGES
 FILES_FOUND: 0
-MESSAGE: No changed code files. Exiting QA.
+MESSAGE: 변경된 파일이 없습니다. 워크플로우를 종료합니다.
+═══════════════════════════════════════════════════════════════
+```
+
+**When only deleted files (nothing to analyze):**
+```
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: DELETED_ONLY
+FILES_FOUND: 0
+DELETED_FILES: {삭제된 파일들}
+MESSAGE: 삭제된 파일만 있습니다. 분석할 파일이 없습니다.
+═══════════════════════════════════════════════════════════════
+```
+
+**When no code files (only config/docs changed):**
+```
+═══════════════════════════════════════════════════════════════
+GIT_INPUT_RESULT: NO_CODE_FILES
+FILES_FOUND: 0
+MESSAGE: 변경된 코드 파일이 없습니다. (설정/문서 파일만 변경됨)
 ═══════════════════════════════════════════════════════════════
 ```
 

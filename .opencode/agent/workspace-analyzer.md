@@ -302,7 +302,19 @@ Generate the following JSON structure for the cache file:
     "is_repo": true,
     "remote_url": "git@github.com:user/repo.git",
     "current_branch": "main"
-  }
+  },
+
+  "analysis_meta": {
+    "truncated": false,
+    "partial_analysis": false,
+    "file_limit_reached": false,
+    "max_files_analyzed": 10000,
+    "analysis_duration_ms": 1234,
+    "errors": [],
+    "warnings": []
+  },
+
+  "subprojects": []
 }
 ```
 
@@ -348,6 +360,32 @@ ERROR: {error_description}
 ═══════════════════════════════════════════════════════════════
 ```
 
+**When analysis times out or is truncated (large project):**
+```
+═══════════════════════════════════════════════════════════════
+WORKSPACE_ANALYSIS_RESULT: TIMEOUT
+WARNING: 프로젝트가 너무 커서 부분 분석만 완료되었습니다.
+         분석된 파일: {analyzed_count} / 전체: {total_count}
+═══════════════════════════════════════════════════════════════
+
+📊 Partial Analysis Summary
+...
+
+CACHE_DATA:
+```json
+{partial_cache_json_with_truncated_true}
+```
+═══════════════════════════════════════════════════════════════
+```
+
+**When project is empty:**
+```
+═══════════════════════════════════════════════════════════════
+WORKSPACE_ANALYSIS_RESULT: EMPTY
+WARNING: 소스 파일이 없는 빈 프로젝트입니다.
+═══════════════════════════════════════════════════════════════
+```
+
 ## Important Notes
 
 1. **Read-Only**: Do NOT modify any files
@@ -355,6 +393,84 @@ ERROR: {error_description}
 3. **Performance**: Use Glob patterns efficiently, avoid scanning large directories
 4. **Error Handling**: Report errors but continue with partial analysis
 5. **Required Token**: Must include `WORKSPACE_ANALYSIS_RESULT:` token
+
+## Large Project Handling (10,000+ files)
+
+**파일 수 제한:**
+```
+IF total_files > 10,000:
+    1. 전체 파일 목록 대신 디렉토리 구조만 기록
+    2. 주요 디렉토리(src/, lib/, tests/)만 상세 분석
+    3. files.by_type에는 상위 100개 파일만 포함
+    4. 캐시에 "truncated": true 플래그 추가
+    5. 경고 메시지 출력
+```
+
+**타임아웃 처리:**
+```
+IF 분석 시간 > 60초:
+    → 현재까지 수집된 데이터로 캐시 생성
+    → WORKSPACE_ANALYSIS_RESULT: TIMEOUT 출력
+    → "partial_analysis": true 플래그 추가
+```
+
+## Edge Case Handling
+
+### 빈 프로젝트
+```
+IF 소스 파일이 0개:
+    → project.type = "empty"
+    → 경고: "소스 파일이 없습니다"
+    → 최소 캐시 생성 (디렉토리 구조만)
+```
+
+### 알 수 없는 프로젝트 타입
+```
+IF manifest 파일이 없음 (package.json, go.mod 등):
+    → project.type = "unknown"
+    → 파일 확장자 기반으로 languages 추론
+    → build_system.type = "unknown"
+```
+
+### 모노레포 (Monorepo)
+```
+IF 루트에 여러 package.json 또는 여러 go.mod 존재:
+    → project.type = "monorepo"
+    → 각 서브프로젝트를 "subprojects" 배열에 기록
+    → 루트 레벨 분석만 수행 (서브프로젝트 상세 분석 안 함)
+```
+
+### 심볼릭 링크
+```
+IF 심볼릭 링크 발견:
+    → 링크 자체만 기록, 타겟 따라가지 않음
+    → 무한 루프 방지
+```
+
+### Git Submodules
+```
+IF .gitmodules 파일 존재:
+    → submodules 목록 기록
+    → 서브모듈 내부는 분석하지 않음
+```
+
+### 권한 오류
+```
+IF 파일/디렉토리 읽기 권한 없음:
+    → 해당 경로 스킵
+    → errors 배열에 기록
+    → 분석 계속 진행
+```
+
+### 바이너리 파일
+```
+확장자 기반 바이너리 파일 제외:
+- .exe, .dll, .so, .dylib
+- .zip, .tar, .gz, .rar
+- .png, .jpg, .gif, .ico, .svg
+- .pdf, .doc, .docx
+- .woff, .woff2, .ttf, .eot
+```
 
 ## Excluded Directories
 

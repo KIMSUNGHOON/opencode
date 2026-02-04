@@ -16,6 +16,11 @@
    - [8.9 Agent 대화 멈춤 (Conversational Stoppage)](#89-agent-대화-멈춤-conversational-stoppage)
    - [8.10 Code-reviewer가 관련 없는 파일 분석](#810-code-reviewer가-관련-없는-파일-분석)
    - [8.11 플레이스홀더가 치환되지 않음](#811-플레이스홀더가-치환되지-않음)
+   - [8.12 변경된 파일 없음 (NO_CHANGES)](#812-변경된-파일-없음-no_changes)
+   - [8.13 삭제된 파일만 있음 (DELETED_ONLY)](#813-삭제된-파일만-있음-deleted_only)
+   - [8.14 대규모 프로젝트 타임아웃 (TIMEOUT)](#814-대규모-프로젝트-타임아웃-timeout)
+   - [8.15 빈 프로젝트 (EMPTY)](#815-빈-프로젝트-empty)
+   - [8.16 대량 파일 변경 경고](#816-대량-파일-변경-경고)
 9. [부록 A: Agent Tool 권한 매트릭스](#부록-a-agent-tool-권한-매트릭스)
 10. [부록 B: 결과 토큰 및 상태 관리](#부록-b-결과-토큰-및-상태-관리)
 11. [부록 C: 파일 체크리스트](#부록-c-파일-체크리스트)
@@ -464,21 +469,37 @@ opencode
 `/analyze`로 생성된 캐시는 `/code-qa`에서 자동으로 사용됩니다:
 
 ```bash
-# 방법 1: 사전 분석 후 QA (권장)
+# 방법 1: 빠른 QA (캐시 없이도 동작)
+/code-qa
+
+# 방법 2: 사전 분석 후 QA (권장 - 프로젝트 컨텍스트 제공)
 /analyze
 /code-qa
 
-# 방법 2: code-qa가 캐시 없으면 자동 분석
-/code-qa
+# 방법 3: 분석+QA 한 번에 (캐시 없으면 자동 분석)
+/code-qa --with-analysis
 
-# 캐시 무시하고 QA 실행
+# 캐시 완전 무시
 /code-qa --skip-cache
 ```
+
+**캐시 옵션 설명:**
+
+| 옵션 | 캐시 있을 때 | 캐시 없을 때 |
+|------|------------|------------|
+| (기본값) | 캐시 사용 | 캐시 없이 진행 (경고만) |
+| --with-analysis | 캐시 사용 | 자동 분석 실행 |
+| --skip-cache | 캐시 무시 | 캐시 무시 |
 
 **캐시 사용 이점:**
 - code-reviewer에게 정확한 프로젝트 컨텍스트 제공
 - 파일 할루시네이션 방지 (존재하지 않는 파일 추측 방지)
 - 반복 실행 시 분석 시간 절약
+
+**대규모 프로젝트 (10,000+ 파일) 주의사항:**
+- 분석에 시간이 오래 걸릴 수 있음
+- 파일 수 제한으로 부분 분석될 수 있음 (TIMEOUT)
+- 주요 디렉토리만 상세 분석됨
 
 ### 6.6 사용자 확인 단계
 
@@ -868,6 +889,82 @@ permission:
 - `changed_files`: 변경 파일 목록
 - `review_issues`: 리뷰 이슈 목록
 
+### 8.12 변경된 파일 없음 (NO_CHANGES)
+
+```
+GIT_INPUT_RESULT: NO_CHANGES
+MESSAGE: 변경된 파일이 없습니다.
+```
+
+**원인**: Git working directory가 clean 상태입니다.
+
+**해결**:
+- 파일을 수정한 후 다시 실행
+- `--staged` 옵션 사용 시 `git add` 먼저 실행
+- `--last` 옵션으로 마지막 커밋 검사
+
+### 8.13 삭제된 파일만 있음 (DELETED_ONLY)
+
+```
+GIT_INPUT_RESULT: DELETED_ONLY
+DELETED_FILES: old_file.py, unused_module.py
+```
+
+**원인**: 변경 사항이 파일 삭제뿐입니다.
+
+**해결**: 삭제된 파일은 분석할 수 없으므로:
+- 워크플로우가 자동으로 Git Commit 단계로 건너뜁니다
+- 다른 파일도 수정했다면 해당 파일이 분석됩니다
+
+### 8.14 대규모 프로젝트 타임아웃 (TIMEOUT)
+
+```
+WORKSPACE_ANALYSIS_RESULT: TIMEOUT
+WARNING: 프로젝트가 너무 커서 부분 분석만 완료되었습니다.
+```
+
+**원인**: 10,000개 이상의 파일로 인해 분석 시간 초과
+
+**해결**:
+```bash
+# 분석 없이 QA 실행 (빠름)
+/code-qa --skip-cache
+
+# 또는 특정 디렉토리만 분석
+/code-qa --files src/
+```
+
+### 8.15 빈 프로젝트 (EMPTY)
+
+```
+WORKSPACE_ANALYSIS_RESULT: EMPTY
+WARNING: 소스 파일이 없는 빈 프로젝트입니다.
+```
+
+**원인**: 프로젝트에 소스 코드 파일이 없습니다.
+
+**해결**:
+- 소스 파일 추가 후 다시 실행
+- 파일 확장자가 지원되는지 확인 (.py, .js, .ts, .go, .rs 등)
+
+### 8.16 대량 파일 변경 경고
+
+```
+⚠️ 변경 파일이 150개입니다. 분석에 시간이 오래 걸릴 수 있습니다.
+```
+
+**해결**:
+```bash
+# staged 파일만 검사
+/code-qa --staged
+
+# 특정 디렉토리만 검사
+/code-qa --files src/core/
+
+# 마지막 커밋만 검사
+/code-qa --last
+```
+
 ---
 
 ## 부록 A: Agent Tool 권한 매트릭스
@@ -906,9 +1003,11 @@ permission:
 
 | Agent | 출력 토큰 | 예시 |
 |-------|----------|------|
-| workspace-analyzer | `WORKSPACE_ANALYSIS_RESULT: COMPLETE/FAILED` | `WORKSPACE_ANALYSIS_RESULT: COMPLETE` |
+| workspace-analyzer | `WORKSPACE_ANALYSIS_RESULT: COMPLETE/TIMEOUT/EMPTY/FAILED` | `WORKSPACE_ANALYSIS_RESULT: COMPLETE` |
 | env-setup | `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `ENV_SETUP_RESULT: SUCCESS` |
+| git-input | `GIT_INPUT_RESULT: SUCCESS/NO_CHANGES/DELETED_ONLY/NO_CODE_FILES/NO_GIT_REPO` | `GIT_INPUT_RESULT: SUCCESS` |
 | git-input | `FILE_LIST: {파일목록}` | `FILE_LIST: src/app.py, src/utils.py` |
+| git-input | `DELETED_FILES: {삭제된 파일}` (옵션) | `DELETED_FILES: old.py` |
 | pre-checker | `PRE_CHECK_RESULT: SUCCESS/PARTIAL` | `PRE_CHECK_RESULT: SUCCESS` |
 | code-reviewer | `ISSUE_LIST: {이슈목록}` | `ISSUE_LIST: [H001] Null ref...` |
 | code-fixer | `FIX_RESULT: SUCCESS/PARTIAL` | `FIX_RESULT: SUCCESS` |
@@ -926,8 +1025,18 @@ permission:
 retry_count = 0              # 회귀 횟수 (최대 3)
 quality_score = 0            # 품질 점수
 
+# 캐시 관련
+workspace_cache = null       # 워크스페이스 캐시 데이터
+use_cache = true             # --skip-cache면 false
+auto_analyze = false         # --with-analysis면 true
+
+# 모드 관련
+use_git_mode = true          # --files 사용 시 false
+
+# 상태 변수
 env_result = ""              # 환경 설정 결과
-changed_files = []           # 변경 파일 목록
+changed_files = []           # 변경 파일 목록 (삭제된 파일 제외)
+deleted_files = []           # 삭제된 파일 목록 (분석 제외)
 review_issues = []           # 리뷰 이슈 목록
 fix_result = ""              # 수정 결과
 build_result = ""            # 빌드 결과

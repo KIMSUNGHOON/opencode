@@ -84,9 +84,10 @@ env_setup_confirmed = false   # env-setup 완료 여부
 build_env_confirmed = false   # build-tester 환경 확인 여부
 test_confirmed = false        # function-tester 테스트 확인 여부
 
-# 워크스페이스 캐시 (NEW)
+# 워크스페이스 캐시
 workspace_cache = null        # 캐시 데이터 (있으면 사용)
 use_cache = true              # --skip-cache면 false
+auto_analyze = false          # --with-analysis면 true (캐시 없을 때 자동 분석)
 ```
 
 **중요: 각 Step의 결과를 변수에 저장하고, 다음 Step에 전달하세요.**
@@ -102,6 +103,11 @@ IF $ARGUMENTS에 "--skip-cache" 포함:
     use_cache = false
 ELSE:
     use_cache = true
+
+IF $ARGUMENTS에 "--with-analysis" 포함:
+    auto_analyze = true
+ELSE:
+    auto_analyze = false
 ```
 
 ## 사용자 입력이 필요한 Agent들
@@ -150,17 +156,30 @@ IF 파일이 존재하고 읽기 성공:
     IF 캐시 유효:
         workspace_cache = {읽은 JSON 데이터}
         → STEP 1로 진행 (캐시 사용)
-    ELSE:
-        → workspace-analyzer 호출하여 재분석
+    ELSE (캐시 오래됨):
+        IF auto_analyze == true (--with-analysis):
+            → workspace-analyzer 호출하여 재분석
+        ELSE:
+            → 경고 출력: "⚠️ 캐시가 오래되었습니다. 최신 분석을 원하면 /analyze를 먼저 실행하세요."
+            → workspace_cache = null
+            → STEP 1로 진행 (캐시 없이)
 
 ELSE IF 파일이 없음:
-    → workspace-analyzer 호출하여 분석
+    IF auto_analyze == true (--with-analysis):
+        → workspace-analyzer 호출하여 분석
+    ELSE:
+        → 경고 출력: "ℹ️ 워크스페이스 캐시가 없습니다. 프로젝트 컨텍스트 없이 진행합니다. 분석을 원하면 /analyze를 먼저 실행하세요."
+        → workspace_cache = null
+        → STEP 1로 진행 (캐시 없이)
 ```
 
-**자동 분석 (캐시 없거나 오래됨):**
+**자동 분석 (--with-analysis 옵션 사용 시에만):**
+
+⚠️ **중요**: auto_analyze == true일 때만 workspace-analyzer를 호출합니다.
+
 Task 도구 호출:
 - subagent_type: "workspace-analyzer"
-- prompt: "현재 워크스페이스를 분석하세요. 프로젝트 타입, 파일 구조, 의존성, 빌드 시스템을 분석하고 CACHE_DATA: 이후에 JSON으로 결과를 출력하세요."
+- prompt: "현재 워크스페이스를 분석하세요. 프로젝트 타입, 파일 구조, 의존성, 빌드 시스템을 분석하고 CACHE_DATA: 이후에 JSON으로 결과를 출력하세요. 파일 수가 10,000개를 초과하면 주요 디렉토리만 분석하세요."
 - description: "워크스페이스 분석"
 
 ```
@@ -170,9 +189,20 @@ IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: COMPLETE" 포함:
     3. .opencode/workspace-cache/analysis.json에 저장
     → STEP 1로 진행
 
+IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: TIMEOUT" 포함:
+    → 경고 출력: "⚠️ 프로젝트가 너무 커서 부분 분석만 완료되었습니다."
+    → CACHE_DATA가 있으면 추출하여 workspace_cache에 저장 (부분 데이터)
+    → STEP 1로 진행 (부분 캐시 사용)
+
+IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: EMPTY" 포함:
+    → 경고 출력: "ℹ️ 빈 프로젝트입니다. 소스 파일이 없습니다."
+    → workspace_cache = null
+    → STEP 1로 진행
+
 IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: FAILED" 포함:
-    → workspace_cache = null (캐시 없이 진행)
-    → STEP 1로 진행 (경고 메시지 출력)
+    → 경고 출력: "⚠️ 워크스페이스 분석 실패. 캐시 없이 진행합니다."
+    → workspace_cache = null
+    → STEP 1로 진행
 ```
 
 → 완료 시 STEP 1로
@@ -205,8 +235,25 @@ Task 도구 호출:
 - prompt: "입력 옵션 $ARGUMENTS 를 파싱하고 변경 파일 목록을 추출하세요"
 - description: "Git 입력 파싱"
 
-**⚠️ Git 저장소 없음 처리:**
+**⚠️ Git 결과 처리:**
 ```
+IF Task 결과에 "GIT_INPUT_RESULT: SUCCESS" 포함:
+    → changed_files에 FILE_LIST 저장
+    → DELETED_FILES가 있으면 로그 출력 (분석 제외됨)
+    → STEP 2.5 (파일 검증)으로 진행
+
+IF Task 결과에 "GIT_INPUT_RESULT: NO_CHANGES" 포함:
+    → 메시지 출력: "ℹ️ 변경된 파일이 없습니다."
+    → 워크플로우 종료 (성공, QA 불필요)
+
+IF Task 결과에 "GIT_INPUT_RESULT: DELETED_ONLY" 포함:
+    → 메시지 출력: "ℹ️ 삭제된 파일만 있습니다. 분석할 파일이 없습니다."
+    → STEP 9 (Git Commit)로 건너뛰기
+
+IF Task 결과에 "GIT_INPUT_RESULT: NO_CODE_FILES" 포함:
+    → 메시지 출력: "ℹ️ 변경된 코드 파일이 없습니다."
+    → 워크플로우 종료 (성공, QA 불필요)
+
 IF Task 결과에 "GIT_INPUT_RESULT: NO_GIT_REPO" 포함:
     → 사용자 응답을 기다립니다
     → 사용자가 "git init" 또는 "초기화" 입력 시: git-input 다시 호출
@@ -215,9 +262,6 @@ IF Task 결과에 "GIT_INPUT_RESULT: NO_GIT_REPO" 포함:
 
 IF Task 결과에 "GIT_INPUT_RESULT: ABORTED" 포함:
     → 워크플로우 종료
-
-IF Task 결과에 "GIT_INPUT_RESULT: SUCCESS" 포함:
-    → STEP 3으로 진행
 ```
 
 #### 옵션 B: 파일 직접 지정 모드 (use_git_mode == false, --files 옵션)
@@ -235,6 +279,39 @@ IF Task 결과에 "FILE_INPUT_RESULT: NO_FILES" 또는 "FILE_INPUT_RESULT: INVAL
 ```
 
 **결과 저장:** Task 결과에서 파일 목록을 추출하여 `changed_files`에 저장
+
+**⚠️ 파일 목록 검증 (STEP 2.5):**
+```
+# 변경 파일 없음 체크
+IF changed_files.length == 0:
+    → 메시지 출력: "ℹ️ 변경된 파일이 없습니다. 워크플로우를 종료합니다."
+    → 워크플로우 종료 (성공, QA 불필요)
+
+# 삭제된 파일 필터링
+IF changed_files에 삭제된 파일(D) 포함:
+    → 삭제된 파일은 분석 대상에서 제외
+    → 메시지 출력: "ℹ️ 삭제된 파일 {N}개는 분석에서 제외됩니다."
+    → changed_files에서 삭제된 파일 제거
+
+# 분석 대상 파일 없음 (모두 삭제됨)
+IF 필터링 후 changed_files.length == 0:
+    → 메시지 출력: "ℹ️ 분석할 파일이 없습니다. (삭제된 파일만 있음)"
+    → STEP 9 (Git Commit)로 건너뛰기
+
+# 대량 파일 경고
+IF changed_files.length > 100:
+    → 경고 출력: "⚠️ 변경 파일이 {N}개입니다. 분석에 시간이 오래 걸릴 수 있습니다."
+    → 소스 파일만 필터링 권장 (테스트, 설정 파일 제외 가능)
+
+# 바이너리 파일 필터링
+바이너리 확장자 파일 자동 제외:
+- .exe, .dll, .so, .dylib, .bin
+- .zip, .tar, .gz, .rar, .7z
+- .png, .jpg, .jpeg, .gif, .ico, .svg, .webp
+- .pdf, .doc, .docx, .xls, .xlsx
+- .woff, .woff2, .ttf, .eot
+- .mp3, .mp4, .wav, .avi
+```
 
 → 완료 시 STEP 3으로
 
@@ -487,5 +564,18 @@ IF Task 결과에 "PUSH_RESULT: FAIL" 포함:
 - --no-sandbox: 호스트에서 직접 실행
 
 ### 캐시 옵션
-- (기본값): 워크스페이스 캐시 사용 (있으면)
-- --skip-cache: 캐시 무시하고 진행 (캐시 확인/분석 단계 건너뜀)
+- (기본값): 캐시 있으면 사용, 없으면 캐시 없이 진행 (자동 분석 안 함)
+- --with-analysis: 캐시 없거나 오래되면 자동으로 workspace-analyzer 실행
+- --skip-cache: 캐시 완전 무시 (확인도 안 함)
+
+**권장 사용 패턴:**
+```bash
+# 빠른 QA (캐시 없이도 OK)
+/code-qa
+
+# 프로젝트 컨텍스트가 필요한 경우
+/analyze && /code-qa
+
+# 한 번에 분석+QA
+/code-qa --with-analysis
+```
