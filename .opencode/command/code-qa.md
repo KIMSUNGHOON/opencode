@@ -120,7 +120,7 @@ The following Agents must receive user input before proceeding:
 
 | Agent | Required Input | Wait State |
 |-------|----------------|------------|
-| env-setup | Shell selection (1-3), Environment type (1-4) | `WAITING_INPUT` |
+| env-setup | Confirm current env (Y/n/list) or select from list | `WAITING_INPUT` |
 | git-input | When no Git repo: init/specify files/exit | `NO_GIT_REPO` |
 | git-input | When Detached HEAD: create branch/continue/exit | `DETACHED_HEAD` |
 | build-tester | Environment confirmation ("confirm/y" or "reset/n") | `WAITING_INPUT` |
@@ -215,7 +215,7 @@ IF Task result contains "WORKSPACE_ANALYSIS_RESULT: FAILED":
 ### STEP 1: Environment Setup (User Input Required)
 Task tool call:
 - subagent_type: "env-setup"
-- prompt: "Check Shell, environment, Python/CUDA versions. Must ask user to select Shell type (zsh/bash/sh) and virtual environment type (conda/uv/venv)."
+- prompt: "Detect current environment (shell, conda/venv, runtimes). If active environment exists, ask single Y/n confirmation. If no active environment, show env list for selection."
 - description: "Environment setup check"
 
 **⚠️ User input wait handling:**
