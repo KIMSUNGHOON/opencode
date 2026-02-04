@@ -619,14 +619,59 @@ IF use_git_mode == false:
     → Terminate workflow (complete with Summary Report)
 ```
 
+**⚠️ IMPORTANT: Check for unpushed commits before ending!**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Even if NO CODE CHANGES were made in this QA run,                      │
+│  there might be UNPUSHED COMMITS from previous work!                    │
+│                                                                          │
+│  ALWAYS check: git log @{u}.. --oneline 2>/dev/null                     │
+│                                                                          │
+│  If unpushed commits exist → ASK user about Push/PR                     │
+│  If no unpushed commits → End workflow                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Orchestrator pre-check before calling git-pusher:**
+```bash
+# Check for unpushed commits
+git log @{u}.. --oneline 2>/dev/null
+
+# If output is empty → no unpushed commits → can skip STEP 11
+# If output has commits → must ask user about Push/PR
+```
+
 **Git Mode:**
 Task tool call:
 - subagent_type: "git-pusher"
-- prompt: "Detect remote repository platform (GitHub/GitLab) and ask user for Push confirmation. After Push, also ask about PR (GitHub) or MR (GitLab) creation."
+- prompt: |
+    First check if there are unpushed commits:
+    ```
+    git log @{u}.. --oneline 2>/dev/null
+    ```
+
+    If unpushed commits exist:
+    → Show the list of unpushed commits
+    → Ask user: "Do you want to push these commits? (y/n)"
+    → If yes, also ask about PR/MR creation
+
+    If no unpushed commits:
+    → Output "PUSH_RESULT: NO_UNPUSHED_COMMITS" and end
+
+    Detect remote repository platform (GitHub/GitLab) and ask user for Push confirmation.
+    After Push, also ask about PR (GitHub) or MR (GitLab) creation.
 - description: "Push and PR/MR"
 
-**⚠️ Authentication error handling:**
+**⚠️ Result handling:**
 ```
+IF Task result contains "PUSH_RESULT: NO_UNPUSHED_COMMITS":
+    → Output "No unpushed commits found. Workflow complete."
+    → Terminate workflow (nothing to push)
+
+IF Task result contains "PUSH_RESULT: WAITING_INPUT":
+    → Wait for user to respond (y/n for push, then y/n for PR/MR)
+    → Call git-pusher again with user's response
+
 IF Task result contains "PUSH_RESULT: AUTH_ERROR":
     → Guide user on auth error type (SSH/HTTPS/GPG/CLI) and solution
     → If user inputs "retry": call git-pusher again
@@ -636,7 +681,7 @@ IF Task result contains "PUSH_RESULT: SUCCESS":
     → Terminate workflow (success)
 
 IF Task result contains "PUSH_RESULT: SKIPPED":
-    → Terminate workflow (Push skipped)
+    → Terminate workflow (Push skipped by user)
 
 IF Task result contains "PUSH_RESULT: FAIL":
     → Output error message and terminate workflow
