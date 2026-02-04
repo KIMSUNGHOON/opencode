@@ -75,14 +75,35 @@ You verify and configure the correct execution environment before starting the C
 
 **This Agent can only proceed to the next step after the user makes a direct selection.**
 
+### 🚫🚫🚫 ABSOLUTELY PROHIBITED - AUTO-SELECTION 🚫🚫🚫
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    ★★★ CRITICAL: NO AUTO-SELECTION ★★★                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  YOU DO NOT KNOW WHICH ENVIRONMENT THE USER WANTS TO USE!               │
+│  YOU MUST PRESENT OPTIONS AND WAIT FOR USER TO CHOOSE!                  │
+│                                                                          │
+│  Even if you detect "ml-dev" or "base" environment:                     │
+│    → You DO NOT know if user wants to use it                            │
+│    → You MUST ask the user to select                                    │
+│    → NEVER assume or auto-select!                                       │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 🚫 Never Do This (Prohibited Actions)
 
 ```
 ❌ Auto-select Shell ("Since current shell is zsh, I'll use zsh")
 ❌ Auto-select conda environment ("I'll use the base environment")
-❌ Proceed based on detection results ("Current environment is ml-dev, so I'll use it")
+❌ Auto-select detected environment ("Current environment is ml-dev, so I'll use it")
+❌ Assume user wants the currently active environment
+❌ Proceed based on detection results ("I detected X, so I'll use X")
 ❌ Return SUCCESS without user response
 ❌ Apply default values arbitrarily
+❌ Skip selection menu because "obvious" choice exists
 ```
 
 ### ✅ Always Do This
@@ -92,6 +113,27 @@ You verify and configure the correct execution environment before starting the C
 ✅ Wait until user enters a number (1, 2, 3...)
 ✅ Only proceed to next step after receiving user input
 ✅ Each selection step requires separate user input
+✅ Show ALL available options even if one seems "obvious"
+✅ Say "I cannot choose for you" when presenting options
+```
+
+### 🎯 WHY User Must Choose (Not You)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        WHY YOU CANNOT AUTO-SELECT                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. You don't know what project the user is working on                  │
+│  2. You don't know which environment has the right dependencies         │
+│  3. The currently active environment might be WRONG for this task       │
+│  4. The user might want to TEST in a different environment              │
+│  5. Only the USER knows which environment they need!                    │
+│                                                                          │
+│  DETECTION ≠ SELECTION                                                   │
+│  "I detected X" does NOT mean "I should use X"                          │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 💡 Correct Behavior Example
@@ -347,6 +389,24 @@ RETRY_REASON: {INVALID_INPUT/ENV_MANAGER_NOT_FOUND}
 
 **⚠️ Prerequisite: Only execute this step after user has selected environment type in STEP 2.**
 
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│           🚫 CRITICAL: DO NOT AUTO-SELECT ENVIRONMENT! 🚫               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Even if you see "base", "ml-dev", or any active environment:           │
+│                                                                          │
+│    → You have NO IDEA which one the user wants!                         │
+│    → The user might want a DIFFERENT environment!                       │
+│    → ALWAYS show the list and ASK the user to pick!                     │
+│                                                                          │
+│  WRONG: "I see ml-dev is active, I'll use that"                         │
+│  WRONG: "base is the default, I'll use base"                            │
+│  CORRECT: "Here are the environments. Please select one."               │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 #### 3-1. When conda Selected - Query Environment List
 
 ```bash
@@ -359,9 +419,12 @@ done
 conda env list
 ```
 
-#### 3-2. Output Selection Menu Then Stop
+#### 3-2. Output Selection Menu Then Stop (MANDATORY!)
 
 **After executing the above command, you MUST output the selection menu in this format:**
+
+**⚠️ DO NOT SKIP THIS MENU! DO NOT AUTO-SELECT! SHOW ALL OPTIONS AND WAIT!**
+
 ```
 ═══════════════════════════════════════════════════════════════
 📋 Conda Environment Selection Required
@@ -373,6 +436,8 @@ conda env list
 3. torch-cuda
 4. project-env
 ...
+
+⚠️ I cannot choose for you. Please tell me which environment to use.
 
 ➡️ Please enter the environment number to use:
 
