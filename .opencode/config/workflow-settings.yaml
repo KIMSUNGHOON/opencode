@@ -68,7 +68,7 @@ model:
   thinking: "qwen/qwen3-next-80b-a3b-thinking"
 
   # 코드 모델 (Coder) - Fixer, Tester, Git, Utility agents
-  coder: "qwen-coder/qwen3-coder-next-80b-a3b"
+  coder: "qwen-coder/Qwen3-Coder-Next-FP8"
 
   # Fallback 모델 (한쪽 서버 장애 시)
   fallback: "qwen/qwen3-next-80b-a3b-thinking"

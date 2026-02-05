@@ -1229,16 +1229,16 @@ This workflow uses two specialized models on separate GPU nodes:
 | **code-reviewer** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (CoT analysis) |
 | **quality-checker** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (score evaluation) |
 | **summary-reporter** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (report generation) |
-| **code-fixer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (SWE-Bench) |
-| **pre-checker** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (lint/format) |
-| **build-tester** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (build exec) |
-| **function-tester** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (test exec) |
-| **env-setup** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (env detect) |
-| **git-input** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git parse) |
-| **workspace-analyzer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (file scan) |
-| **git-committer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git commit) |
-| **git-pusher** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git push) |
-| **file-input** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (file parse) |
+| **code-fixer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (SWE-Bench) |
+| **pre-checker** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (lint/format) |
+| **build-tester** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (build exec) |
+| **function-tester** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (test exec) |
+| **env-setup** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (env detect) |
+| **git-input** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git parse) |
+| **workspace-analyzer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (file scan) |
+| **git-committer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git commit) |
+| **git-pusher** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git push) |
+| **file-input** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (file parse) |
 
 ### Dual Model Assignment Rationale
 
@@ -1307,10 +1307,10 @@ Node 2 (Coder Model):
 Total: 4x H100 NVL 96GB
 ```
 
-### Deployment Commands (SGLang)
+### Deployment Commands
 
 ```bash
-# Node 1: Thinking Model (port 8000)
+# Node 1: Thinking Model (SGLang, port 8000)
 python3 -m sglang.launch_server \
   --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
   --tp 2 \
@@ -1319,14 +1319,13 @@ python3 -m sglang.launch_server \
   --host 0.0.0.0 \
   --mem-fraction-static 0.85
 
-# Node 2: Coder Model (port 8001)
-python3 -m sglang.launch_server \
-  --model Qwen/Qwen3-Coder-Next-FP8 \
-  --tp 2 \
-  --context-length 262144 \
+# Node 2: Coder Model (vLLM, port 8001)
+vllm serve Qwen/Qwen3-Coder-Next-FP8 \
+  --served-model-name Qwen3-Coder-Next-FP8 \
+  --tensor-parallel-size 2 \
+  --max-model-len 262144 \
   --port 8001 \
-  --host 0.0.0.0 \
-  --mem-fraction-static 0.85
+  --host 0.0.0.0
 ```
 
 ---
