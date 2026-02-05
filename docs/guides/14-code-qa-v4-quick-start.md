@@ -1,106 +1,95 @@
 # Code QA v4 Quick Start Guide
 
-이 문서는 Code QA v4 워크플로우의 설치, 설정, 사용 방법을 제공합니다.
+This document provides installation, configuration, and usage instructions for the Code QA v4 workflow.
 
-## 목차
+## Table of Contents
 
-1. [개요](#1-개요)
-2. [사전 요구사항](#2-사전-요구사항)
-3. [설치](#3-설치)
-4. [설정 파일 구조](#4-설정-파일-구조)
-5. [글로벌 설정](#5-글로벌-설정)
-6. [사용 방법](#6-사용-방법)
-   - [6.5 워크스페이스 분석 (/analyze)](#65-워크스페이스-분석-analyze)
-7. [제거](#7-제거)
-8. [문제 해결](#8-문제-해결)
-   - [8.9 Agent 대화 멈춤 (Conversational Stoppage)](#89-agent-대화-멈춤-conversational-stoppage)
-   - [8.10 Code-reviewer가 관련 없는 파일 분석](#810-code-reviewer가-관련-없는-파일-분석)
-   - [8.11 플레이스홀더가 치환되지 않음](#811-플레이스홀더가-치환되지-않음)
-   - [8.12 변경된 파일 없음 (NO_CHANGES)](#812-변경된-파일-없음-no_changes)
-   - [8.13 삭제된 파일만 있음 (DELETED_ONLY)](#813-삭제된-파일만-있음-deleted_only)
-   - [8.14 대규모 프로젝트 타임아웃 (TIMEOUT)](#814-대규모-프로젝트-타임아웃-timeout)
-   - [8.15 빈 프로젝트 (EMPTY)](#815-빈-프로젝트-empty)
-   - [8.16 대량 파일 변경 경고](#816-대량-파일-변경-경고)
-9. [부록 A: Agent Tool 권한 매트릭스](#부록-a-agent-tool-권한-매트릭스)
-10. [부록 B: 결과 토큰 및 상태 관리](#부록-b-결과-토큰-및-상태-관리)
-11. [부록 C: 파일 체크리스트](#부록-c-파일-체크리스트)
+1. [Overview](#1-overview)
+2. [Prerequisites](#2-prerequisites)
+3. [Installation](#3-installation)
+4. [Configuration File Structure](#4-configuration-file-structure)
+5. [Global Configuration](#5-global-configuration)
+6. [Usage](#6-usage)
+7. [Uninstallation](#7-uninstallation)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Appendix A: Agent Tool Permission Matrix](#appendix-a-agent-tool-permission-matrix)
+10. [Appendix B: Result Tokens and State Management](#appendix-b-result-tokens-and-state-management)
+11. [Appendix C: File Checklist](#appendix-c-file-checklist)
 
 ---
 
-## 1. 개요
+## 1. Overview
 
-### 1.1 Code QA v4란?
+### 1.1 What is Code QA v4?
 
-Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워크플로우입니다.
+Code QA v4 is an automated code quality workflow with 13 specialized agents orchestrated by a central coordinator.
 
-### 1.2 주요 특징
+### 1.2 Key Features
 
-- **듀얼 모델 전략**:
+- **Dual Model Strategy**:
   - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
   - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
-- **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
-- **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
-- **회귀 루프**: 품질 기준 미달 시 자동 재시도 (최대 3회)
-- **구조화된 상태 관리**: 결과 토큰 파싱을 통한 Agent간 데이터 전달
-- **GitLab-CE 지원**: GitHub 및 GitLab 모두 지원 (gh/glab CLI)
-- **인증 오류 처리**: SSH/HTTPS/GPG/CLI 인증 문제 감지 및 안내
+- **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
+- **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
+- **Regression Loop**: Automatic retry on quality threshold failure (max 3 times)
+- **Structured State Management**: Inter-agent data passing via result token parsing
+- **GitLab-CE Support**: Both GitHub and GitLab supported (gh/glab CLI)
+- **Authentication Error Handling**: SSH/HTTPS/GPG/CLI auth issue detection and guidance
 
-### 1.3 모델 스펙
+### 1.3 Model Specifications
 
-| 항목 | Thinking Model | Coder Model |
+| Item | Thinking Model | Coder Model |
 |------|---------------|-------------|
-| **모델** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
-| **서빙 엔진** | SGLang | vLLM |
-| **포트** | 8000 | 8001 |
+| **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
+| **Serving Engine** | SGLang (port 8000) | vLLM (port 8001) |
 | **Context Window** | 256K | 256K |
 | **Output Limit** | 16K | 16K |
-| **Reasoning** | ✅ (thinking mode) | ❌ |
-| **Tool Calling** | ✅ | ✅ |
-| **VRAM 요구량** | ~76GB (FP8) | ~40GB (FP8) |
-| **권장 GPU** | 2x H100 NVL 96GB | 1x H100 NVL 96GB |
-| **담당 Agent** | Orchestrator, code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
+| **Reasoning** | Yes (thinking mode) | No |
+| **Tool Calling** | Yes | Yes |
+| **Agents** | Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
-### 1.4 공식 샘플링 파라미터
+### 1.4 Official Sampling Parameters
 
 ```
-Temperature: 0.6
-TopP: 0.95
-TopK: 20
-MinP: 0
+Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8):
+  Temperature: 0.6, TopP: 0.95, TopK: 20, MinP: 0
+
+Coder Model (Qwen3-Coder-Next-FP8):
+  Temperature: 1.0, TopP: 0.95, TopK: 40
 ```
 
 ---
 
-## 2. 사전 요구사항
+## 2. Prerequisites
 
-### 2.1 하드웨어
+### 2.1 Hardware
 
-- GPU: 3x H100 NVL 96GB (또는 동급) — Thinking 2x + Coder 1x
-- VRAM: 최소 240GB (두 모델 + KV cache)
+- GPU: 2x H100 NVL 96GB (or equivalent)
+- VRAM: Minimum 160GB (model + KV cache)
 
-### 2.2 소프트웨어
+### 2.2 Software
 
 ```bash
 # Python 3.10+
 python --version
 
-# SGLang 설치 (Thinking Model 서빙)
+# SGLang installation (for Thinking Model)
 pip install sglang[all]
 
-# vLLM 설치 (Coder Model 서빙)
+# vLLM installation (for Coder Model)
 pip install vllm
 
-# Docker (Sandbox 사용 시)
+# Docker (for Sandbox)
 docker --version
-nvidia-docker --version  # GPU 사용 시
+nvidia-docker --version  # For GPU usage
 ```
 
-### 2.3 모델 서버 실행
+### 2.3 Model Server Launch
 
-**Thinking Model — SGLang (포트 8000):**
+**Thinking Model — SGLang (port 8000):**
 
 ```bash
-# SGLang으로 Qwen3-Next-80B-A3B-Thinking-FP8 서빙
+# Serve Qwen3-Next-80B-A3B-Thinking-FP8 with SGLang
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
     --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
@@ -110,7 +99,7 @@ python -m sglang.launch_server \
     --host 0.0.0.0
 ```
 
-**NEXTN Speculative Decoding 사용 시 (~30% 성능 향상):**
+**With NEXTN Speculative Decoding (~30% performance boost):**
 ```bash
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
@@ -123,10 +112,10 @@ python -m sglang.launch_server \
     --host 0.0.0.0
 ```
 
-**Coder Model — vLLM (포트 8001):**
+**Coder Model — vLLM (port 8001):**
 
 ```bash
-# vLLM으로 Qwen3-Coder-Next-FP8 서빙
+# Serve Qwen3-Coder-Next-FP8 with vLLM
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-Coder-Next-FP8 \
     --served-model-name Qwen3-Coder-Next-FP8 \
@@ -138,24 +127,24 @@ python -m vllm.entrypoints.openai.api_server \
 
 ---
 
-## 3. 설치
+## 3. Installation
 
-### 3.1 글로벌 설정 디렉토리 생성
+### 3.1 Create Global Config Directory
 
 ```bash
 mkdir -p ~/.config/opencode/.opencode/{agent,command,mode}
 ```
 
-### 3.2 글로벌 설정 파일 복사
+### 3.2 Copy Global Config Files
 
-**방법 1: 저장소에서 복사 (권장)**
+**Method 1: Copy from Repository (Recommended)**
 
 ```bash
-# opencode 저장소 clone
+# Clone opencode repository
 git clone https://github.com/your-org/opencode.git /tmp/opencode-setup
 
-# 글로벌 설정 파일 복사
-cp /tmp/opencode-setup/.opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md \
+# Copy global config files
+cp /tmp/opencode-setup/.opencode/agent/{env-setup,workspace-analyzer,git-input,file-input,pre-checker,code-reviewer,code-fixer,quality-checker,build-tester,function-tester,git-committer,summary-reporter,git-pusher}.md \
    ~/.config/opencode/.opencode/agent/
 
 cp /tmp/opencode-setup/.opencode/command/code-qa.md \
@@ -164,83 +153,85 @@ cp /tmp/opencode-setup/.opencode/command/code-qa.md \
 cp /tmp/opencode-setup/.opencode/mode/code-qa.md \
    ~/.config/opencode/.opencode/mode/
 
-# 정리
+# Cleanup
 rm -rf /tmp/opencode-setup
 ```
 
-**방법 2: 수동 생성**
+**Method 2: Manual Creation**
 
-아래 섹션 5의 설정 파일을 직접 생성합니다.
+Create the config files manually as described in Section 5.
 
-### 3.3 환경 변수 설정
+### 3.3 Set Environment Variables
 
 ```bash
-# ~/.bashrc 또는 ~/.zshrc에 추가
-export QWEN_THINKING_URL="http://localhost:8000/v1"   # Thinking Model (SGLang)
-export QWEN_CODER_URL="http://localhost:8001/v1"      # Coder Model (vLLM)
+# Add to ~/.bashrc or ~/.zshrc
+export QWEN_BASE_URL="http://localhost:8000/v1"
+export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ```
 
 ---
 
-## 4. 설정 파일 구조
+## 4. Configuration File Structure
 
-### 4.1 글로벌 설정 (모든 프로젝트 공통)
+### 4.1 Global Config (Shared Across All Projects)
 
 ```
 ~/.config/opencode/
-├── opencode.json                    # Provider, Model, Agent 샘플링 파라미터
+├── opencode.json                    # Provider, Model, Agent sampling params
 └── .opencode/
-    ├── agent/                       # Code QA Agents (11개)
-    │   ├── env-setup.md             # Phase -1: 환경 설정 (사용자 입력 필수)
-    │   ├── git-input.md             # Phase 0: Git 변경 파일 추출
-    │   ├── pre-checker.md           # Phase 1: Lint/Format 자동 수정
-    │   ├── code-reviewer.md         # Phase 2: 코드 심층 분석
-    │   ├── code-fixer.md            # Phase 3: 이슈 수정
-    │   ├── quality-checker.md       # Phase 4: 품질 점수 검사
-    │   ├── build-tester.md          # Phase 5: 빌드 테스트 (사용자 확인 필수)
-    │   ├── function-tester.md       # Phase 6: 기능 테스트 (사용자 확인 필수)
-    │   ├── git-committer.md         # Phase 7: Git 커밋
-    │   ├── summary-reporter.md      # Phase 8: 결과 종합 리포트
-    │   └── git-pusher.md            # Phase 9: Push 및 PR
+    ├── agent/                       # Code QA Agents (13)
+    │   ├── env-setup.md             # STEP 1: Environment setup (user input required)
+    │   ├── workspace-analyzer.md    # STEP 0B: Workspace analysis (cache)
+    │   ├── git-input.md             # STEP 2: Git changed file extraction
+    │   ├── file-input.md            # STEP 0C: File input parser (non-Git)
+    │   ├── pre-checker.md           # STEP 3: Lint/Format auto-fix
+    │   ├── code-reviewer.md         # STEP 4: Deep code analysis
+    │   ├── code-fixer.md            # STEP 5: Issue fixing
+    │   ├── quality-checker.md       # STEP 6: Quality score check
+    │   ├── build-tester.md          # STEP 7: Build test (user confirm required)
+    │   ├── function-tester.md       # STEP 8: Function test (user confirm required)
+    │   ├── git-committer.md         # STEP 9: Git commit
+    │   ├── summary-reporter.md      # STEP 10: Summary report
+    │   └── git-pusher.md            # STEP 11: Push and PR
     ├── command/
-    │   └── code-qa.md               # /code-qa 커맨드
+    │   └── code-qa.md               # /code-qa command
     └── mode/
-        └── code-qa.md               # Code QA 오케스트레이터 모드
+        └── code-qa.md               # Code QA orchestrator mode
 
 ```
 
-### 4.2 프로젝트별 설정 (오버라이드용)
+### 4.2 Project-Specific Config (Override)
 
 ```
 your-project/
 ├── .opencode/
-│   ├── opencode.jsonc               # 프로젝트별 오버라이드 (선택)
-│   ├── env-config.yaml              # 환경 설정 (선택)
-│   ├── agent/                       # 프로젝트 전용 agent만
+│   ├── opencode.jsonc               # Project override (optional)
+│   ├── env-config.yaml              # Environment config (optional)
+│   ├── agent/                       # Project-specific agents only
 │   │   └── custom-agent.md
 │   └── docker/
-│       └── Dockerfile.sandbox       # Sandbox 이미지 (선택)
+│       └── Dockerfile.sandbox       # Sandbox image (optional)
 └── ...
 ```
 
-### 4.3 설정 우선순위
+### 4.3 Configuration Priority
 
 ```
-1. 환경 변수 (OPENCODE_*)           ← 최우선
-2. CLI 플래그
-3. 프로젝트 루트 opencode.json
-4. 프로젝트 .opencode/opencode.jsonc
-5. 글로벌 ~/.config/opencode/opencode.json
-6. 기본값                           ← 최하위
+1. Environment variables (OPENCODE_*)    ← Highest
+2. CLI flags
+3. Project root opencode.json
+4. Project .opencode/opencode.jsonc
+5. Global ~/.config/opencode/opencode.json
+6. Defaults                              ← Lowest
 ```
 
 ---
 
-## 5. 글로벌 설정
+## 5. Global Configuration
 
-### 5.1 글로벌 설정 파일 (`~/.config/opencode/opencode.json`)
+### 5.1 Global Config File (`~/.config/opencode/opencode.json`)
 
-아래 내용을 복사하여 사용하세요:
+Copy and use the following content:
 
 ```json
 {
@@ -294,17 +285,21 @@ your-project/
     }
   },
   "agent": {
+    // Thinking Model agents (temp=0.6, top_k=20)
     "code-reviewer": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "code-fixer": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "env-setup": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "build-tester": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "function-tester": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "pre-checker": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
     "quality-checker": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "git-input": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "git-committer": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "git-pusher": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "summary-reporter": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 }
+    "summary-reporter": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
+    // Coder Model agents (temp=1.0, top_k=40)
+    "env-setup": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "workspace-analyzer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "git-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "file-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "pre-checker": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "code-fixer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "build-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "function-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "git-committer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
+    "git-pusher": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 }
   },
   "experimental": {
     "chatMaxRetries": 5
@@ -312,758 +307,314 @@ your-project/
 }
 ```
 
-### 5.2 프로젝트별 설정 (`.opencode/opencode.jsonc`)
-
-글로벌 설정을 상속하므로 오버라이드할 항목만 정의:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json"
-  // 필요 시 프로젝트별 오버라이드 추가
-  // Provider, Agent 설정은 글로벌에서 상속됨
-}
-```
-
-### 5.3 환경 설정 파일 (`.opencode/env-config.yaml`, 선택)
-
-```yaml
-shell:
-  type: "zsh"
-  rc_file: "~/.zshrc"
-
-environment:
-  name: "my-project-env"
-  type: "conda"
-
-requirements:
-  python: ">=3.10"
-  cuda: ">=11.8"
-
-sandbox:
-  enabled: true
-  dockerfile: ".opencode/docker/Dockerfile.sandbox"
-  image_name: "qa-sandbox"
-  gpu: true
-```
-
 ---
 
-## 6. 사용 방법
+## 6. Usage
 
-### 6.1 설치 확인
+### 6.1 Verify Installation
 
 ```bash
-# opencode 실행
+# Run opencode
 opencode
 
-# 모델 연결 확인
-> 안녕하세요. 현재 사용 중인 모델은 무엇인가요?
+# Check model connection
+> Hello. What model are you currently using?
 ```
 
-### 6.2 Mode로 사용하기
+### 6.2 Using as Mode
 
-모드 선택기에서 "code-qa"를 선택합니다:
+Select "code-qa" in the mode selector:
 
 ```
-# Ctrl+X → m (또는 설정된 키바인드)
-> code-qa (Code QA 워크플로우)
+# Ctrl+X -> m (or configured keybind)
+> code-qa (Code QA Workflow)
 ```
 
-### 6.3 전체 워크플로우 (/code-qa)
+### 6.3 Full Workflow (/code-qa)
 
 ```bash
 # ═══════════════════════════════════════════════════════════════
-# /code-qa - 전체 Code QA 워크플로우 (11단계)
+# /code-qa - Full Code QA Workflow (13 agents)
 # ═══════════════════════════════════════════════════════════════
 
-# ── Git 모드 (기본값) ──────────────────────────────────────────
-/code-qa                        # Working directory 변경 검사
-/code-qa --staged               # Staged 변경만 검사
-/code-qa --last                 # 마지막 커밋 검사
-/code-qa --branch               # 브랜치 전체 검사 (main 대비)
-/code-qa --range a1b2c3..d4e5f6 # 특정 커밋 범위 검사
+# ── Git Mode (default) ──────────────────────────────────────────
+/code-qa                        # Check working directory changes
+/code-qa --staged               # Check staged changes only
+/code-qa --last                 # Check last commit
+/code-qa --branch               # Check entire branch (vs main)
+/code-qa --range a1b2c3..d4e5f6 # Check specific commit range
 
-# ── 파일 직접 지정 모드 (Non-Git) ──────────────────────────────
-/code-qa --files src/main.py              # 단일 파일
-/code-qa --files src/*.py                 # 와일드카드
-/code-qa --files src/,lib/                # 여러 디렉토리
-/code-qa --files "src/**/*.py"            # 재귀 패턴
+# ── File Direct Mode (Non-Git) ──────────────────────────────────
+/code-qa --files src/main.py              # Single file
+/code-qa --files src/*.py                 # Wildcard
+/code-qa --files src/,lib/                # Multiple directories
+/code-qa --files "src/**/*.py"            # Recursive pattern
 
-# ── 실행 환경 옵션 ─────────────────────────────────────────────
-/code-qa --no-sandbox           # Docker 없이 호스트에서 직접 실행
+# ── Execution Environment Options ───────────────────────────────
+/code-qa --no-sandbox           # Run directly on host without Docker
 
-# ── 조합 예시 ──────────────────────────────────────────────────
-/code-qa --staged --no-sandbox            # Staged + 호스트
-/code-qa --files src/ --no-sandbox        # 파일 지정 + 호스트
-/code-qa --last --no-sandbox              # 마지막 커밋 + 호스트
+# ── Combined Examples ───────────────────────────────────────────
+/code-qa --staged --no-sandbox            # Staged + Host
+/code-qa --files src/ --no-sandbox        # File mode + Host
+/code-qa --last --no-sandbox              # Last commit + Host
 ```
 
-**Git 모드 vs 파일 모드:**
+**Git Mode vs File Mode:**
 
-| 모드 | 입력 소스 | Git 단계 | 사용 시나리오 |
-|------|----------|----------|--------------|
-| **Git 모드** | git diff | 포함 | Git 저장소 프로젝트 |
-| **파일 모드** | --files | 제외 | Non-Git 프로젝트, 특정 파일만 검사 |
+| Mode | Input Source | Git Steps | Use Case |
+|------|-------------|-----------|----------|
+| **Git Mode** | git diff | Included | Git repository projects |
+| **File Mode** | --files | Excluded | Non-Git projects, specific file checks |
 
-### 6.4 독립 실행 커맨드
+### 6.4 Standalone Commands
 
-각 sub-agent를 독립적으로 실행할 수 있습니다:
+Each sub-agent can be executed independently:
 
 ```bash
-# ═══════════════════════════════════════════════════════════════
-# 독립 실행 커맨드 - Sub-Agent 개별 사용
-# ═══════════════════════════════════════════════════════════════
+# ── /env - Environment Setup ────────────────────────────────────
+/env                            # Interactive environment setup
+/env --shell zsh --env conda    # Pre-specify Shell/environment
+/env --info                     # Check current environment info only
+/env --reset                    # Reset environment settings
 
-# ── /env - 환경 설정 ───────────────────────────────────────────
-/env                            # 대화형 환경 설정
-/env --shell zsh --env conda    # Shell/환경 미리 지정
-/env --info                     # 현재 환경 정보만 확인
-/env --reset                    # 환경 설정 초기화
+# ── /lint - Lint/Format Auto-fix ────────────────────────────────
+/lint                           # Entire current directory
+/lint src/main.py               # Specific file
+/lint src/                      # Specific directory
+/lint src/*.py                  # Wildcard
+/lint --check                   # Check only without fixing
+/lint --no-sandbox              # Run on host
 
-# ── /lint - Lint/Format 자동 수정 ──────────────────────────────
-/lint                           # 현재 디렉토리 전체
-/lint src/main.py               # 특정 파일
-/lint src/                      # 특정 디렉토리
-/lint src/*.py                  # 와일드카드
-/lint --check                   # 수정 없이 검사만
-/lint --no-sandbox              # 호스트에서 실행
+# ── /review - Code Review ───────────────────────────────────────
+/review                         # Review working directory changes
+/review --staged                # Review staged changes only
+/review --last                  # Review last commit
+/review src/main.py             # Review specific file
+/review --security              # Focus on security issues only
+/review --verbose               # Detailed analysis
 
-# ── /review - 코드 리뷰 ────────────────────────────────────────
-/review                         # Working directory 변경 리뷰
-/review --staged                # Staged 변경만 리뷰
-/review --last                  # 마지막 커밋 리뷰
-/review src/main.py             # 특정 파일 리뷰
-/review --security              # 보안 이슈만 집중
-/review --verbose               # 상세 분석
+# ── /fix - Code Issue Fixing ────────────────────────────────────
+/fix "src/main.py:45 - SQL injection"  # Fix specific issue
+/fix src/main.py                # Fix all issues in file
+/fix --from-review              # Fix based on /review results
+/fix --type security src/       # Fix specific type only
+/fix --dry-run                  # Preview only
 
-# ── /fix - 코드 이슈 수정 ──────────────────────────────────────
-/fix "src/main.py:45 - SQL injection"  # 특정 이슈 수정
-/fix src/main.py                # 파일의 모든 이슈 수정
-/fix --from-review              # /review 결과 기반 수정
-/fix --type security src/       # 특정 타입만 수정
-/fix --dry-run                  # 미리보기만
+# ── /quality - Quality Check ────────────────────────────────────
+/quality                        # Check current directory
+/quality src/                   # Check specific directory
+/quality --threshold 80         # Change pass threshold
+/quality --verbose              # Detailed results
+/quality --json                 # JSON output
+/quality --no-sandbox           # Run on host
 
-# ── /quality - 품질 검사 ───────────────────────────────────────
-/quality                        # 현재 디렉토리 검사
-/quality src/                   # 특정 디렉토리 검사
-/quality --threshold 80         # 통과 기준 변경
-/quality --verbose              # 상세 결과
-/quality --json                 # JSON 출력
-/quality --no-sandbox           # 호스트에서 실행
+# ── /build - Build Test ─────────────────────────────────────────
+/build                          # Build in Docker Sandbox
+/build --no-sandbox             # Build on host
+/build --skip-confirm           # Skip environment confirmation
+/build --cmd "pip install -e ." # Custom build command
+/build --verbose                # Detailed logs
 
-# ── /build - 빌드 테스트 ───────────────────────────────────────
-/build                          # Docker Sandbox에서 빌드
-/build --no-sandbox             # 호스트에서 빌드
-/build --skip-confirm           # 환경 확인 건너뛰기
-/build --cmd "pip install -e ." # 커스텀 빌드 명령
-/build --verbose                # 상세 로그
-
-# ── /test - 기능 테스트 ────────────────────────────────────────
-/test                           # 모든 테스트 탐지/실행
-/test tests/test_main.py        # 특정 테스트 파일
-/test tests/::test_function     # 특정 테스트 함수
-/test --lang python             # 특정 언어만
-/test --coverage                # 커버리지 포함
-/test --no-sandbox              # 호스트에서 실행
-/test --fail-fast               # 첫 실패시 중단
+# ── /test - Function Test ───────────────────────────────────────
+/test                           # Detect and run all tests
+/test tests/test_main.py        # Specific test file
+/test tests/::test_function     # Specific test function
+/test --lang python             # Specific language only
+/test --coverage                # Include coverage
+/test --no-sandbox              # Run on host
+/test --fail-fast               # Stop on first failure
 ```
 
-**독립 커맨드 사용 시나리오:**
+### 6.5 User Confirmation Steps
 
-| 커맨드 | 사용 시나리오 |
-|--------|--------------|
-| `/lint` | 빠른 포맷팅/린트 수정 |
-| `/review` | 코드 리뷰만 필요할 때 |
-| `/fix` | 특정 이슈만 수정 |
-| `/quality` | 품질 점수 확인만 |
-| `/build` | 빌드 테스트만 |
-| `/test` | 테스트만 실행 |
-| `/env` | 환경 설정만 |
-| `/analyze` | 워크스페이스 분석만 |
+The following agents require user input:
 
-### 6.5 워크스페이스 분석 (/analyze)
-
-프로젝트 구조, 의존성, 빌드 시스템을 사전에 분석하고 캐시에 저장합니다.
-
-```bash
-# ═══════════════════════════════════════════════════════════════
-# /analyze - 워크스페이스 분석 및 캐시 생성
-# ═══════════════════════════════════════════════════════════════
-
-# 기본 분석 (캐시가 없거나 24시간 경과 시 실행)
-/analyze
-
-# 강제 재분석 (캐시 무시)
-/analyze --force
-```
-
-**분석 항목:**
-
-| 항목 | 설명 |
-|------|------|
-| 프로젝트 타입 | TypeScript, Python, Go, Rust 등 |
-| 파일 구조 | 디렉토리 구조, 파일 목록 |
-| 의존성 | package.json, requirements.txt 등에서 추출 |
-| 빌드 시스템 | npm, cargo, go, make 등 |
-| 환경 정보 | 런타임 버전, Docker 설정 |
-| Git 정보 | remote URL, 현재 브랜치 |
-
-**캐시 파일 위치:**
-```
-.opencode/workspace-cache/
-└── analysis.json       # 메인 분석 결과
-```
-
-**Code-QA와 통합:**
-
-`/analyze`로 생성된 캐시는 `/code-qa`에서 자동으로 사용됩니다:
-
-```bash
-# 방법 1: 빠른 QA (캐시 없이도 동작)
-/code-qa
-
-# 방법 2: 사전 분석 후 QA (권장 - 프로젝트 컨텍스트 제공)
-/analyze
-/code-qa
-
-# 방법 3: 분석+QA 한 번에 (캐시 없으면 자동 분석)
-/code-qa --with-analysis
-
-# 캐시 완전 무시
-/code-qa --skip-cache
-```
-
-**캐시 옵션 설명:**
-
-| 옵션 | 캐시 있을 때 | 캐시 없을 때 |
-|------|------------|------------|
-| (기본값) | 캐시 사용 | 캐시 없이 진행 (경고만) |
-| --with-analysis | 캐시 사용 | 자동 분석 실행 |
-| --skip-cache | 캐시 무시 | 캐시 무시 |
-
-**캐시 사용 이점:**
-- code-reviewer에게 정확한 프로젝트 컨텍스트 제공
-- 파일 할루시네이션 방지 (존재하지 않는 파일 추측 방지)
-- 반복 실행 시 분석 시간 절약
-
-**대규모 프로젝트 (10,000+ 파일) 주의사항:**
-- 분석에 시간이 오래 걸릴 수 있음
-- 파일 수 제한으로 부분 분석될 수 있음 (TIMEOUT)
-- 주요 디렉토리만 상세 분석됨
-
-### 6.6 사용자 확인 단계
-
-다음 Agent들에서 사용자 입력을 요구합니다:
-
-| Agent | 필요한 입력 | 설명 |
-|-------|------------|------|
-| **env-setup** | Shell 선택 (1-3), 환경 타입 선택 (1-4) | 어떤 Shell과 가상환경을 사용할지 선택 |
-| **git-input** | "초기화/git init", 파일 경로, 또는 "종료/exit" | Git 저장소가 아닌 경우 처리 방법 선택 |
-| **file-input** | (자동) | --files 옵션 사용 시 파일 탐색 |
-| **build-tester** | "확인/y" 또는 "재설정/n" | 환경 설정이 올바른지 확인 후 빌드 진행 |
-| **function-tester** | "실행/y", 특정 언어, 또는 "스킵/n" | 모든 언어 테스트 한 번에 표시 후 실행 여부 결정 |
-| **git-committer** | "확인/y", 새 메시지, 또는 "취소/n" | 커밋 정보 확인 후 커밋 실행 여부 결정 (Git 모드만) |
-| **git-pusher** | "확인/y", "재시도", 또는 "스킵/n" | Push 여부 및 인증 오류 처리 (Git 모드만) |
-
-**Git 모드 vs 파일 모드에서 실행되는 Agent:**
-
-| Agent | Git 모드 | 파일 모드 (--files) |
-|-------|---------|-------------------|
-| env-setup | ✅ | ✅ |
-| git-input | ✅ | ❌ |
-| file-input | ❌ | ✅ |
-| pre-checker | ✅ | ✅ |
-| code-reviewer | ✅ | ✅ |
-| code-fixer | ✅ | ✅ |
-| quality-checker | ✅ | ✅ |
-| build-tester | ✅ | ✅ |
-| function-tester | ✅ | ✅ |
-| git-committer | ✅ | ❌ |
-| summary-reporter | ✅ | ✅ |
-| git-pusher | ✅ | ❌ |
-
-### 6.7 워크플로우 진행 과정
-
-**Git 모드 워크플로우 (기본):**
-```
-Phase -1: Environment Setup (사용자 입력 필수)
-    │
-    ↓
-Phase 0: Git Input ────────────────┐
-    │                               │ (Git 저장소 아님)
-    │                               ↓
-    │                          사용자 선택
-    │                          - 초기화 → 계속
-    │                          - 파일 지정 → 파일 모드로 전환
-    │                          - 종료 → 워크플로우 종료
-    ↓
-Phase 1: Pre-Check (Lint/Format)
-    ↓
-Phase 2: Code Review
-    ↓
-Phase 3: Code Fix
-    ↓
-Phase 4: Quality Check ──────────────┐
-    │                                │
-    ↓ (>=70점)                       │ (<70점)
-    │                                │
-Phase 5: Build Test (사용자 확인)   │
-    │                                │
-    ↓ (성공)                         │
-    │                                │
-Phase 6: Function Test (사용자 확인)│
-    │    └─ 모든 언어 한 번에 표시   │
-    │    └─ 한 번만 확인 요청        │
-    │                                │
-    └──→ 실패 시 ───────────────────┘
-                        ↓
-                   Code Fixer로 회귀
-                   (최대 3회)
-    ↓
-Phase 7: Git Commit (사용자 확인 필수)
-    │    └─ 커밋 정보 미리보기
-    │    └─ 메시지 수정 가능
-    ↓
-Phase 8: Summary Report
-    ↓
-Phase 9: Push & PR/MR (사용자 확인)
-    │    └─ GitHub: gh pr create
-    │    └─ GitLab: glab mr create
-    │    └─ 인증 오류 시: 해결 안내
-    ↓
-워크플로우 완료
-```
-
-**파일 모드 워크플로우 (--files 옵션):**
-```
-Phase -1: Environment Setup (사용자 입력 필수)
-    ↓
-Phase 0: File Input (--files 경로 파싱)
-    ↓
-Phase 1: Pre-Check (Lint/Format)
-    ↓
-Phase 2: Code Review
-    ↓
-Phase 3: Code Fix
-    ↓
-Phase 4: Quality Check ──────────────┐
-    │                                │
-    ↓ (>=70점)                       │ (<70점)
-    │                                │
-Phase 5: Build Test (사용자 확인)   │
-    │                                │
-    ↓ (성공)                         │
-    │                                │
-Phase 6: Function Test (사용자 확인)│
-    │                                │
-    └──→ 실패 시 ───────────────────┘
-                        ↓
-                   Code Fixer로 회귀
-                   (최대 3회)
-    ↓
-Phase 8: Summary Report  ← Git 단계 건너뜀
-    ↓
-워크플로우 완료 (Commit/Push 없음)
-```
+| Agent | Required Input | Description |
+|-------|---------------|-------------|
+| **env-setup** | Shell selection (1-3), Environment type (1-4) | Select which Shell and virtual environment to use |
+| **git-input** | "init/git init", file path, or "exit" | Choose how to handle non-Git repositories |
+| **file-input** | (automatic) | File discovery when using --files option |
+| **build-tester** | "y/confirm" or "n/reset" | Confirm environment settings before build |
+| **function-tester** | "y/run", specific language, or "n/skip" | Show all language tests at once, decide execution |
+| **git-committer** | "y/confirm", new message, or "n/cancel" | Confirm commit info before execution (Git mode only) |
+| **git-pusher** | "y/confirm", "retry", or "n/skip" | Push confirmation and auth error handling (Git mode only) |
 
 ---
 
-## 7. 제거
+## 7. Uninstallation
 
-### 7.1 글로벌 설정 제거
+### 7.1 Remove Global Config
 
 ```bash
-# 글로벌 Code QA Agent 제거 (12개)
-rm -rf ~/.config/opencode/.opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,file-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
+# Remove global Code QA Agents (13)
+rm -rf ~/.config/opencode/.opencode/agent/{env-setup,workspace-analyzer,git-input,file-input,pre-checker,code-reviewer,code-fixer,quality-checker,build-tester,function-tester,git-committer,summary-reporter,git-pusher}.md
 
-# 글로벌 Code QA Command 제거 (8개)
+# Remove global Code QA Commands (8)
 rm -rf ~/.config/opencode/.opencode/command/{code-qa,env,lint,review,fix,quality,build,test}.md
 
-# 글로벌 Code QA Mode 제거
+# Remove global Code QA Mode
 rm -rf ~/.config/opencode/.opencode/mode/code-qa.md
-
-# 글로벌 설정 파일에서 Code QA agent 설정 제거 (수동)
-vim ~/.config/opencode/opencode.json
-# → "agent" 섹션에서 Code QA 관련 항목 삭제
 ```
 
-### 7.2 전체 글로벌 설정 제거
+### 7.2 Remove All Global Config
 
 ```bash
-# 모든 글로벌 설정 제거 (주의!)
+# Remove all global config (caution!)
 rm -rf ~/.config/opencode/
 ```
 
-### 7.3 프로젝트별 설정 제거
-
-```bash
-# 프로젝트의 Code QA Agent 제거 (있는 경우)
-rm -rf .opencode/agent/{env-setup,build-tester,function-tester,code-reviewer,code-fixer,git-input,file-input,git-committer,git-pusher,pre-checker,quality-checker,summary-reporter}.md
-
-# 프로젝트의 Code QA Command 제거 (있는 경우)
-rm -rf .opencode/command/{code-qa,env,lint,review,fix,quality,build,test}.md
-
-# 프로젝트의 Code QA Mode 제거 (있는 경우)
-rm -rf .opencode/mode/code-qa.md
-
-# 기타 설정 파일 제거
-rm -rf .opencode/env-config.yaml
-rm -rf .opencode/docker/
-```
-
 ---
 
-## 8. 문제 해결
+## 8. Troubleshooting
 
-### 8.1 설정 오류: "Unrecognized key"
+### 8.1 Config Error: "Unrecognized key"
 
 ```
 Error: Configuration is invalid
 Unrecognized key: "agents"
 ```
 
-**원인**: `agents` (복수형) 대신 `agent` (단수형)을 사용해야 합니다.
+**Cause**: Use `agent` (singular) instead of `agents` (plural).
 
-**해결**:
+**Solution**:
 ```bash
 sed -i 's/"agents":/"agent":/' ~/.config/opencode/opencode.json
 ```
 
-### 8.2 모델 연결 실패
+### 8.2 Model Connection Failed
 
 ```
 Error: Failed to connect to model server
 ```
 
-**해결**:
+**Solution**:
 ```bash
-# Thinking Model 서버 상태 확인 (SGLang, port 8000)
+# Check Thinking Model server status (SGLang, port 8000)
 curl http://localhost:8000/v1/models
 
-# Coder Model 서버 상태 확인 (vLLM, port 8001)
+# Check Coder Model server status (vLLM, port 8001)
 curl http://localhost:8001/v1/models
 
-# 환경 변수 확인
-echo $QWEN_THINKING_URL
-echo $QWEN_CODER_URL
+# Check environment variables
+echo $QWEN_BASE_URL
+echo $QWEN_CODER_BASE_URL
 ```
 
-### 8.3 Docker Sandbox 실패
+### 8.3 Docker Sandbox Failed
 
 ```
 Error: Docker image not found
 ```
 
-**해결**:
+**Solution**:
 ```bash
-# Dockerfile 확인
+# Check Dockerfile
 ls .opencode/docker/Dockerfile.sandbox
 
-# 이미지 빌드
+# Build image
 docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
 ```
 
-### 8.4 Agent를 찾을 수 없음
+### 8.4 Agent Not Found
 
 ```
 Error: Agent 'env-setup' not found
 ```
 
-**원인**: 글로벌 또는 프로젝트 설정에 Agent 파일이 없습니다.
+**Cause**: Agent file missing from global or project config.
 
-**해결**:
+**Solution**:
 ```bash
-# 글로벌 Agent 확인
+# Check global agents
 ls ~/.config/opencode/.opencode/agent/
 
-# 프로젝트 Agent 확인
+# Check project agents
 ls .opencode/agent/
 ```
 
-### 8.5 WAITING_INPUT 상태에서 멈춤
+### 8.5 Stuck in WAITING_INPUT State
 
-env-setup, git-input, build-tester, function-tester, git-committer에서 사용자 입력을 기다리는 상태입니다.
+env-setup, git-input, build-tester, function-tester, git-committer are waiting for user input.
 
-**해결**: 요청된 입력을 제공하세요:
-- Shell 선택: `1`, `2`, 또는 `3`
-- 환경 타입: `1`, `2`, `3`, 또는 `4`
-- 확인: `y` 또는 `확인`
-- 스킵: `n` 또는 `스킵`
-- Git 초기화: `git init` 또는 `초기화`
-- 커밋 메시지 수정: 새 메시지 직접 입력
+**Solution**: Provide the requested input:
+- Shell selection: `1`, `2`, or `3`
+- Environment type: `1`, `2`, `3`, or `4`
+- Confirm: `y` or `confirm`
+- Skip: `n` or `skip`
+- Git init: `git init` or `init`
+- Edit commit message: Enter new message directly
 
-### 8.6 Git 저장소가 아닌 경우 (NO_GIT_REPO)
+### 8.6 Not a Git Repository (NO_GIT_REPO)
 
 ```
 GIT_INPUT_RESULT: NO_GIT_REPO
 ```
 
-**해결**:
-- Git 저장소로 초기화: `git init` 또는 `초기화` 입력
-- 특정 파일만 QA: 파일 경로 입력 (예: `src/main.py`)
-- QA 종료: `종료` 또는 `exit` 입력
+**Solution**:
+- Initialize as Git repo: Enter `git init` or `init`
+- QA specific files only: Enter file path (e.g., `src/main.py`)
+- Exit QA: Enter `exit`
 
-### 8.7 인증 오류 (AUTH_ERROR)
+### 8.7 Authentication Error (AUTH_ERROR)
 
 ```
 PUSH_RESULT: AUTH_ERROR
 AUTH_TYPE: SSH
 ```
 
-**해결**: 인증 유형에 따라 다음 명령 실행
+**Solution**: Run commands based on auth type
 
-| 오류 유형 | 해결 명령 |
-|----------|----------|
-| SSH 키 없음 | `ssh-keygen -t ed25519` |
-| SSH agent 비활성 | `eval "$(ssh-agent -s)"` |
-| SSH 키 미등록 | `ssh-add ~/.ssh/id_ed25519` |
-| GitHub CLI 미인증 | `gh auth login` |
-| GitLab CLI 미인증 | `glab auth login` |
-| GPG 서명 실패 | `gpg --list-secret-keys` |
-
-### 8.8 GitLab-CE Push/MR 실패
-
-```
-Error: glab not found
-```
-
-**해결**:
-```bash
-# GitLab CLI 설치
-# macOS
-brew install glab
-
-# Linux (snap)
-sudo snap install glab
-
-# 또는 pip
-pip install python-gitlab
-
-# 인증
-glab auth login
-```
-
-**GitLab-CE (self-hosted) 설정:**
-```bash
-# GitLab instance 설정
-glab config set host your-gitlab.example.com
-glab auth login --hostname your-gitlab.example.com
-```
-
-### 8.9 Agent 대화 멈춤 (Conversational Stoppage)
-
-Agent가 아래와 같은 메시지를 출력하고 멈추는 경우:
-
-```
-"The environment setup process is continuing. Please wait..."
-"Checking the code for issues..."
-"I will now analyze the files..."
-```
-
-**원인**: Agent가 도구를 호출하지 않고 대화형 텍스트만 출력했습니다.
-
-**해결**:
-1. 해당 Agent의 `.md` 파일에 **Anti-Stoppage Rule**이 있는지 확인
-2. 없다면 아래 규칙 추가:
-
-```markdown
-## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│              🚨🚨🚨 ABSOLUTELY FORBIDDEN BEHAVIORS 🚨🚨🚨                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│  ❌ NEVER output "please wait", "analyzing", "checking" and STOP        │
-│  ❌ NEVER describe what you will do without actually doing it           │
-│  ❌ NEVER output conversational messages without tool calls             │
-│                                                                          │
-│  Your response MUST contain:                                             │
-│    - Actual tool calls (Bash, Read, etc.)                               │
-│    - OR result tokens (SUCCESS/FAIL/WAITING_INPUT)                      │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 8.10 Code-reviewer가 관련 없는 파일 분석
-
-Code-reviewer가 `main.py`, `model.py` 등 변경되지 않은 파일을 읽으려 하는 경우:
-
-**원인**:
-1. code-reviewer에 Glob/Grep/Bash 권한이 있어 파일을 직접 탐지함
-2. 오케스트레이터가 `{changed_files}` 플레이스홀더를 그대로 전달함
-
-**해결**:
-1. code-reviewer.md에서 **Glob, Grep, Bash 권한 제거**:
-```yaml
-tools:
-  "*": false
-  "Read": true   # Read만 허용
-# Glob, Grep, Bash 비활성화
-permission:
-  read: allow
-  edit: deny
-  glob: deny
-  grep: deny
-  bash: deny
-```
-
-2. 오케스트레이터(mode/code-qa.md)에서 **동적 프롬프트 구성**:
-```
-❌ WRONG - 플레이스홀더 전달:
-   prompt: "Changed files: {changed_files}"
-
-✅ CORRECT - 실제 값 전달:
-   prompt: "Changed files: /project/src/app.py, /project/src/utils.py"
-```
-
-### 8.11 플레이스홀더가 치환되지 않음
-
-오케스트레이터가 `{changed_files}`, `{review_issues}`, `{ENV_STATE.ACTIVATE_CMD}` 등 플레이스홀더를 그대로 Agent에게 전달하는 경우:
-
-**원인**: Qwen 모델은 플레이스홀더를 자동 치환하지 않습니다.
-
-**해결**: 오케스트레이터(mode/code-qa.md)에서 **모든 프롬프트는 실제 값으로 구성**:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│          🚫 NO PLACEHOLDERS IN PROMPTS - BUILD WITH ACTUAL VALUES!      │
-├─────────────────────────────────────────────────────────────────────────┤
-│  ❌ WRONG - Using placeholders:                                          │
-│     prompt: "Fix these issues: {review_issues}"                         │
-│     prompt: "Activate with: {ENV_STATE.ACTIVATE_CMD}"                   │
-│                                                                          │
-│  ✅ CORRECT - Using actual values collected from previous steps:         │
-│     prompt: "Fix these issues: [C001] /path/file.py:45 - SQL injection" │
-│     prompt: "Activate with: conda activate ml-dev"                      │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-오케스트레이터는 각 STEP에서 수집한 상태 변수를 명시적으로 관리해야 합니다:
-- `PROJECT_ROOT`: 프로젝트 경로
-- `ENV_STATE.SHELL_TYPE`: Shell 종류
-- `ENV_STATE.ACTIVATE_CMD`: 환경 활성화 명령
-- `changed_files`: 변경 파일 목록
-- `review_issues`: 리뷰 이슈 목록
-
-### 8.12 변경된 파일 없음 (NO_CHANGES)
-
-```
-GIT_INPUT_RESULT: NO_CHANGES
-MESSAGE: 변경된 파일이 없습니다.
-```
-
-**원인**: Git working directory가 clean 상태입니다.
-
-**해결**:
-- 파일을 수정한 후 다시 실행
-- `--staged` 옵션 사용 시 `git add` 먼저 실행
-- `--last` 옵션으로 마지막 커밋 검사
-
-### 8.13 삭제된 파일만 있음 (DELETED_ONLY)
-
-```
-GIT_INPUT_RESULT: DELETED_ONLY
-DELETED_FILES: old_file.py, unused_module.py
-```
-
-**원인**: 변경 사항이 파일 삭제뿐입니다.
-
-**해결**: 삭제된 파일은 분석할 수 없으므로:
-- 워크플로우가 자동으로 Git Commit 단계로 건너뜁니다
-- 다른 파일도 수정했다면 해당 파일이 분석됩니다
-
-### 8.14 대규모 프로젝트 타임아웃 (TIMEOUT)
-
-```
-WORKSPACE_ANALYSIS_RESULT: TIMEOUT
-WARNING: 프로젝트가 너무 커서 부분 분석만 완료되었습니다.
-```
-
-**원인**: 10,000개 이상의 파일로 인해 분석 시간 초과
-
-**해결**:
-```bash
-# 분석 없이 QA 실행 (빠름)
-/code-qa --skip-cache
-
-# 또는 특정 디렉토리만 분석
-/code-qa --files src/
-```
-
-### 8.15 빈 프로젝트 (EMPTY)
-
-```
-WORKSPACE_ANALYSIS_RESULT: EMPTY
-WARNING: 소스 파일이 없는 빈 프로젝트입니다.
-```
-
-**원인**: 프로젝트에 소스 코드 파일이 없습니다.
-
-**해결**:
-- 소스 파일 추가 후 다시 실행
-- 파일 확장자가 지원되는지 확인 (.py, .js, .ts, .go, .rs 등)
-
-### 8.16 대량 파일 변경 경고
-
-```
-⚠️ 변경 파일이 150개입니다. 분석에 시간이 오래 걸릴 수 있습니다.
-```
-
-**해결**:
-```bash
-# staged 파일만 검사
-/code-qa --staged
-
-# 특정 디렉토리만 검사
-/code-qa --files src/core/
-
-# 마지막 커밋만 검사
-/code-qa --last
-```
+| Error Type | Solution Command |
+|-----------|-----------------|
+| No SSH key | `ssh-keygen -t ed25519` |
+| SSH agent inactive | `eval "$(ssh-agent -s)"` |
+| SSH key not added | `ssh-add ~/.ssh/id_ed25519` |
+| GitHub CLI not authenticated | `gh auth login` |
+| GitLab CLI not authenticated | `glab auth login` |
+| GPG signing failed | `gpg --list-secret-keys` |
 
 ---
 
-## 부록 A: Agent Tool 권한 매트릭스
+## Appendix A: Agent Tool Permission Matrix
 
-각 Agent가 사용할 수 있는 Tool 목록입니다:
+List of tools available to each agent:
 
-| Agent | Bash | Read | Edit | Write | Glob | Grep | 주요 역할 |
-|-------|:----:|:----:|:----:|:-----:|:----:|:----:|----------|
-| **workspace-analyzer** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 워크스페이스 분석 |
-| env-setup | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 환경 감지 |
-| git-input | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | Git 파싱 |
-| pre-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | Lint/Format |
-| **code-reviewer** | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | 코드 분석 |
-| code-fixer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 코드 수정 |
-| quality-checker | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 품질 검사 |
-| build-tester | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | 빌드 테스트 |
-| function-tester | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | 기능 테스트 |
-| git-committer | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | Git 커밋 |
-| summary-reporter | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | 리포트 생성 |
-| git-pusher | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | Push/PR |
+| Agent | Bash | Read | Edit | Write | Glob | Grep | Primary Role |
+|-------|:----:|:----:|:----:|:-----:|:----:|:----:|-------------|
+| **workspace-analyzer** | Yes | Yes | No | No | Yes | Yes | Workspace analysis |
+| env-setup | Yes | Yes | No | No | Yes | Yes | Environment detection |
+| git-input | Yes | Yes | No | No | Yes | No | Git parsing |
+| pre-checker | Yes | Yes | No | No | Yes | Yes | Lint/Format |
+| **code-reviewer** | **No** | Yes | No | No | **No** | **No** | Code analysis |
+| code-fixer | Yes | Yes | Yes | Yes | Yes | Yes | Code modification |
+| quality-checker | Yes | Yes | No | No | Yes | Yes | Quality check |
+| build-tester | Yes | Yes | No | No | Yes | No | Build testing |
+| function-tester | Yes | Yes | No | No | Yes | Yes | Function testing |
+| git-committer | Yes | Yes | No | No | No | No | Git commit |
+| summary-reporter | Yes | Yes | No | No | No | No | Report generation |
+| git-pusher | Yes | Yes | No | No | No | No | Push/PR |
 
-**주요 권한 설명:**
-- **code-fixer**: 유일하게 Edit/Write 권한을 가짐 (코드 수정 필요)
-- **code-reviewer**: Read 권한만 보유 (파일 검색/탐지 불가, 오케스트레이터가 전달한 파일만 분석)
-- **모든 Agent**: 위험한 명령 (rm -rf, git push --force 등) 차단됨
-
-> ⚠️ **중요**: code-reviewer는 Glob, Grep, Bash 권한이 없습니다. 오케스트레이터가 "Changed files:" 섹션에 명시한 파일만 Read할 수 있습니다. 이는 모델이 관련 없는 파일을 임의로 탐지/분석하는 것을 방지합니다.
+**Key Permission Notes:**
+- **code-fixer**: Only agent with Edit/Write permissions (code modification required)
+- **code-reviewer**: Read permission only (Glob/Grep/Bash disabled). Can only analyze files explicitly passed by the orchestrator.
+- **All Agents**: Dangerous commands blocked (rm -rf, git push --force, etc.)
 
 ---
 
-## 부록 B: 결과 토큰 및 상태 관리
+## Appendix B: Result Tokens and State Management
 
-### 결과 토큰 형식
+### Result Token Format
 
-각 Agent는 실행 완료 시 다음 형식의 토큰을 출력합니다:
+Each agent outputs tokens in the following format upon completion:
 
-| Agent | 출력 토큰 | 예시 |
-|-------|----------|------|
+| Agent | Output Token | Example |
+|-------|-------------|---------|
 | workspace-analyzer | `WORKSPACE_ANALYSIS_RESULT: COMPLETE/TIMEOUT/EMPTY/FAILED` | `WORKSPACE_ANALYSIS_RESULT: COMPLETE` |
 | env-setup | `ENV_SETUP_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `ENV_SETUP_RESULT: SUCCESS` |
-| git-input | `GIT_INPUT_RESULT: SUCCESS/NO_CHANGES/DELETED_ONLY/NO_CODE_FILES/NO_GIT_REPO` | `GIT_INPUT_RESULT: SUCCESS` |
-| git-input | `FILE_LIST: {파일목록}` | `FILE_LIST: src/app.py, src/utils.py` |
-| git-input | `DELETED_FILES: {삭제된 파일}` (옵션) | `DELETED_FILES: old.py` |
+| git-input | `FILE_LIST: {files}` | `FILE_LIST: src/app.py, src/utils.py` |
+| file-input | `FILE_LIST: {files}` | `FILE_LIST: /home/user/project/src/app.py` |
 | pre-checker | `PRE_CHECK_RESULT: SUCCESS/PARTIAL` | `PRE_CHECK_RESULT: SUCCESS` |
-| code-reviewer | `ISSUE_LIST: {이슈목록}` | `ISSUE_LIST: [H001] Null ref...` |
+| code-reviewer | `ISSUE_LIST: {issues}` | `ISSUE_LIST: [H001] Null ref...` |
 | code-fixer | `FIX_RESULT: SUCCESS/PARTIAL` | `FIX_RESULT: SUCCESS` |
 | quality-checker | `QUALITY_SCORE: XX/100` | `QUALITY_SCORE: 85/100` |
 | build-tester | `BUILD_RESULT: SUCCESS/FAIL/WAITING_INPUT` | `BUILD_RESULT: SUCCESS` |
@@ -1071,108 +622,97 @@ WARNING: 소스 파일이 없는 빈 프로젝트입니다.
 | git-committer | `COMMIT_RESULT: SUCCESS/NO_CHANGES` | `COMMIT_RESULT: SUCCESS` |
 | git-pusher | `PUSH_RESULT: SUCCESS/SKIPPED/FAIL` | `PUSH_RESULT: SUCCESS` |
 
-### 오케스트레이터 상태 변수
+### Orchestrator State Variables
 
-오케스트레이터(mode/code-qa.md)가 추적하는 상태 변수:
+State variables tracked by the orchestrator (mode/code-qa.md):
 
 ```
-retry_count = 0              # 회귀 횟수 (최대 3)
-quality_score = 0            # 품질 점수
+retry_count = 0              # Regression count (max 3)
+quality_score = 0            # Quality score
 
-# 캐시 관련
-workspace_cache = null       # 워크스페이스 캐시 데이터
-use_cache = true             # --skip-cache면 false
-auto_analyze = false         # --with-analysis면 true
-
-# 모드 관련
-use_git_mode = true          # --files 사용 시 false
-
-# 상태 변수
-env_result = ""              # 환경 설정 결과
-changed_files = []           # 변경 파일 목록 (삭제된 파일 제외)
-deleted_files = []           # 삭제된 파일 목록 (분석 제외)
-review_issues = []           # 리뷰 이슈 목록
-fix_result = ""              # 수정 결과
-build_result = ""            # 빌드 결과
-test_result = ""             # 테스트 결과
-commit_result = ""           # 커밋 결과
+env_result = ""              # Environment setup result
+changed_files = []           # Changed file list
+review_issues = []           # Review issue list
+pre_check_result = ""        # Pre-check result (SUCCESS/PARTIAL)
+fix_result = ""              # Fix result
+build_result = ""            # Build result
+test_result = ""             # Test result
+commit_result = ""           # Commit result
+workspace_cache = null       # Workspace analysis cache
 ```
 
-### 회귀 조건
+### Regression Conditions
 
-| 조건 | 동작 |
-|------|------|
-| `QUALITY_SCORE < 70` | STEP 5 (code-fixer)로 회귀 |
-| `BUILD_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
-| `TEST_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
-| `retry_count >= 3` | 워크플로우 중단, 수동 검토 요청 |
+| Condition | Action |
+|-----------|--------|
+| `QUALITY_SCORE < 70` | Regress to STEP 5 (code-fixer) |
+| `BUILD_RESULT: FAIL` | Regress to STEP 5 (code-fixer) |
+| `TEST_RESULT: FAIL` | Regress to STEP 5 (code-fixer) |
+| `retry_count >= 3` | Stop workflow, request manual review |
 
 ---
 
-## 부록 C: 파일 체크리스트
+## Appendix C: File Checklist
 
-### 글로벌 설정 파일 (필수)
+### Global Config Files (Required)
 
 ```
 ~/.config/opencode/
-├── opencode.json                           ✅ Provider, Agent 설정
+├── opencode.json                           Provider, Agent settings
 └── .opencode/
-    ├── agent/                              (13개 Agent)
-    │   ├── workspace-analyzer.md           ✅ 워크스페이스 분석 (NEW)
-    │   ├── env-setup.md                    ✅ 환경 설정
-    │   ├── git-input.md                    ✅ Git 입력 파서
-    │   ├── file-input.md                   ✅ 파일 입력 파서 (Non-Git)
-    │   ├── pre-checker.md                  ✅ Lint/Format
-    │   ├── code-reviewer.md                ✅ 코드 리뷰
-    │   ├── code-fixer.md                   ✅ 코드 수정
-    │   ├── quality-checker.md              ✅ 품질 검사
-    │   ├── build-tester.md                 ✅ 빌드 테스트
-    │   ├── function-tester.md              ✅ 기능 테스트
-    │   ├── git-committer.md                ✅ Git 커밋
-    │   ├── summary-reporter.md             ✅ 결과 리포트
-    │   └── git-pusher.md                   ✅ Push/PR
-    ├── command/                            (9개 Command)
-    │   ├── code-qa.md                      ✅ 전체 워크플로우
-    │   ├── analyze.md                      ✅ /analyze - 워크스페이스 분석 (NEW)
-    │   ├── env.md                          ✅ /env - 환경 설정
-    │   ├── lint.md                         ✅ /lint - Lint/Format
-    │   ├── review.md                       ✅ /review - 코드 리뷰
-    │   ├── fix.md                          ✅ /fix - 코드 수정
-    │   ├── quality.md                      ✅ /quality - 품질 검사
-    │   ├── build.md                        ✅ /build - 빌드 테스트
-    │   └── test.md                         ✅ /test - 기능 테스트
-    ├── mode/
-    │   └── code-qa.md                      ✅ QA 오케스트레이터
-    └── workspace-cache/                    (캐시 디렉토리 - 자동 생성)
-        └── analysis.json                   📦 분석 결과 캐시
+    ├── agent/                              (13 Agents)
+    │   ├── env-setup.md                    Environment setup
+    │   ├── workspace-analyzer.md           Workspace analysis (cache)
+    │   ├── git-input.md                    Git input parser
+    │   ├── file-input.md                   File input parser (Non-Git)
+    │   ├── pre-checker.md                  Lint/Format
+    │   ├── code-reviewer.md                Code review
+    │   ├── code-fixer.md                   Code fixing
+    │   ├── quality-checker.md              Quality check
+    │   ├── build-tester.md                 Build testing
+    │   ├── function-tester.md              Function testing
+    │   ├── git-committer.md                Git commit
+    │   ├── summary-reporter.md             Result report
+    │   └── git-pusher.md                   Push/PR
+    ├── command/                            (8 Commands)
+    │   ├── code-qa.md                      Full workflow
+    │   ├── env.md                          /env - Environment
+    │   ├── lint.md                         /lint - Lint/Format
+    │   ├── review.md                       /review - Code review
+    │   ├── fix.md                          /fix - Code fixing
+    │   ├── quality.md                      /quality - Quality check
+    │   ├── build.md                        /build - Build test
+    │   └── test.md                         /test - Function test
+    └── mode/
+        └── code-qa.md                      QA orchestrator
 ```
 
-### 환경 변수 (필수)
+### Environment Variables (Required)
 
 ```bash
-QWEN_THINKING_URL="http://localhost:8000/v1"   ✅ Thinking Model (SGLang)
-QWEN_CODER_URL="http://localhost:8001/v1"      ✅ Coder Model (vLLM)
+QWEN_BASE_URL="http://localhost:8000/v1"
+QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ```
 
-### 커맨드 요약
+### Command Summary
 
-| 커맨드 | 용도 | Git 필요 |
-|--------|------|---------|
-| `/code-qa` | 전체 워크플로우 | 선택 |
-| `/code-qa --files <경로>` | 전체 워크플로우 (Non-Git) | ❌ |
-| `/analyze` | 워크스페이스 분석 및 캐시 생성 | ❌ |
-| `/env` | 환경 설정만 | ❌ |
-| `/lint` | Lint/Format만 | ❌ |
-| `/review` | 코드 리뷰만 | 선택 |
-| `/fix` | 코드 수정만 | ❌ |
-| `/quality` | 품질 검사만 | ❌ |
-| `/build` | 빌드 테스트만 | ❌ |
-| `/test` | 기능 테스트만 | ❌ |
+| Command | Purpose | Git Required |
+|---------|---------|--------------|
+| `/code-qa` | Full workflow | Optional |
+| `/code-qa --files <path>` | Full workflow (Non-Git) | No |
+| `/env` | Environment setup only | No |
+| `/lint` | Lint/Format only | No |
+| `/review` | Code review only | Optional |
+| `/fix` | Code fixing only | No |
+| `/quality` | Quality check only | No |
+| `/build` | Build test only | No |
+| `/test` | Function test only | No |
 
 ---
 
-## 관련 문서
+## Related Documents
 
-- [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - 환경 설정 상세
-- [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - 전체 워크플로우 다이어그램
-- [15-workspace-analysis-workflow.md](./15-workspace-analysis-workflow.md) - 워크스페이스 분석 워크플로우 설계
+- [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - Environment setup details
+- [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - Full workflow diagram
+- [18-code-qa-v4-implementation-summary.md](./18-code-qa-v4-implementation-summary.md) - Implementation summary
+- [20-dual-model-strategy-report.md](./20-dual-model-strategy-report.md) - Dual model strategy

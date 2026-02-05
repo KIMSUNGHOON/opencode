@@ -24,15 +24,15 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 │       │                                                                 │
 │       ▼                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│  │  STEP 1-2   │───▶│  STEP 3-6   │───▶│  STEP 7-8   │                 │
-│  │  Git Input  │    │ Code Review │    │ Build/Test  │                 │
+│  │  STEP 0-2   │───▶│  STEP 3-6   │───▶│  STEP 7-8   │                 │
+│  │  Env/Input  │    │ Review/Fix  │    │ Build/Test  │                 │
 │  └─────────────┘    └─────────────┘    └─────────────┘                 │
 │                                              │                          │
 │       ┌──────────────────────────────────────┘                          │
 │       ▼                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│  │  STEP 9     │───▶│  STEP 10-11 │───▶│  STEP 12    │                 │
-│  │ Git Commit  │    │  Git Push   │    │   Summary   │                 │
+│  │  STEP 9     │───▶│  STEP 10    │───▶│  STEP 11    │                 │
+│  │ Git Commit  │    │   Summary   │    │  Git Push   │                 │
 │  └─────────────┘    └─────────────┘    └─────────────┘                 │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -102,6 +102,17 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 All agents use consistent result token patterns for deterministic parsing:
 
 ```
+# Environment Setup Results
+ENV_SETUP_RESULT: SUCCESS
+ENV_SETUP_RESULT: FAIL
+ENV_SETUP_RESULT: WAITING_INPUT
+
+# Workspace Analysis Results
+WORKSPACE_ANALYSIS_RESULT: COMPLETE
+WORKSPACE_ANALYSIS_RESULT: FAILED
+WORKSPACE_ANALYSIS_RESULT: TIMEOUT
+WORKSPACE_ANALYSIS_RESULT: EMPTY
+
 # Git Input Results
 GIT_INPUT_RESULT: SUCCESS
 GIT_INPUT_RESULT: NO_CHANGES
@@ -113,22 +124,42 @@ GIT_INPUT_RESULT: MERGE_CONFLICT
 GIT_INPUT_RESULT: REBASE_IN_PROGRESS
 GIT_INPUT_RESULT: ABORTED
 
+# Pre-Check Results
+PRE_CHECK_RESULT: SUCCESS
+PRE_CHECK_RESULT: PARTIAL
+
+# Code Review Results
+REVIEW_RESULT: ISSUES_FOUND
+REVIEW_RESULT: NO_ISSUES
+
+# Fix Results
+FIX_RESULT: SUCCESS
+FIX_RESULT: PARTIAL
+
+# Quality Check Results
+QUALITY_SCORE: XX/100
+
 # Build Results
 BUILD_RESULT: SUCCESS
 BUILD_RESULT: FAIL
 BUILD_RESULT: FAIL_DEPS
 BUILD_RESULT: SKIP
 
-# Code Review Results
-CODE_REVIEW_RESULT: PASS
-CODE_REVIEW_RESULT: ISSUES_FOUND
-CODE_REVIEW_RESULT: CRITICAL_ISSUES
+# Test Results
+TEST_RESULT: SUCCESS
+TEST_RESULT: FAIL
+TEST_RESULT: SKIPPED
+TEST_RESULT: NO_TESTS
 
-# Workspace Analysis Results
-WORKSPACE_ANALYSIS_RESULT: COMPLETE
-WORKSPACE_ANALYSIS_RESULT: FAILED
-WORKSPACE_ANALYSIS_RESULT: TIMEOUT
-WORKSPACE_ANALYSIS_RESULT: EMPTY
+# Commit Results
+COMMIT_RESULT: SUCCESS
+COMMIT_RESULT: NO_CHANGES
+COMMIT_RESULT: SKIPPED
+
+# Push Results
+PUSH_RESULT: SUCCESS
+PUSH_RESULT: SKIPPED
+PUSH_RESULT: FAIL
 ```
 
 ---
@@ -389,11 +420,12 @@ Result tokens provide:
 
 | Document | Description |
 |----------|-------------|
-| `13-code-qa-v4-complete-diagram.en.md` | Full workflow diagram |
-| `14-code-qa-v4-quick-start.en.md` | Quick start guide |
+| `13-code-qa-v4-complete-diagram.md` | Full workflow diagram |
+| `14-code-qa-v4-quick-start.md` | Quick start guide (EN) |
+| `14-code-qa-v4-quick-start.kr.md` | Quick start guide (KR) |
 | `15-workspace-analysis-workflow.md` | Workspace analysis details |
 | `16-workflow-case-review.md` | Case review and edge cases |
-| `17-long-term-indexing-roadmap.md` | Future indexing plans |
+| `20-dual-model-strategy-report.md` | Dual model strategy report |
 
 ---
 
@@ -403,3 +435,4 @@ Result tokens provide:
 |---------|------|---------|
 | 1.0 | 2025-02-04 | Initial implementation summary |
 | 1.1 | 2025-02-04 | env-setup streamlining (4 steps → 1-2 steps) |
+| 1.2 | 2026-02-05 | Complete result token list, fix step diagram, add all 13 agents |
