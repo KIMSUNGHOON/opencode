@@ -224,18 +224,18 @@ Check the options entered by the user:
 ### Input Mode (Mutually Exclusive)
 
 **Git Mode (default):**
-- (default): --working (git diff)
+- (default): --working (git diff - unstaged changes)
 - --staged: staged changes only
-- --last: last commit
-- --branch: entire branch
-- --range <a>..<b>: specific range
+- --last: last commit changes
+- --branch: entire branch diff from base
+- --range <a>..<b>: specific commit range
 
 **Direct File Mode (Non-Git):**
 - --files <path>: specify files/directories directly (Git not required)
   - e.g., `--files src/main.py`
   - e.g., `--files src/*.py`
   - e.g., `--files src/,lib/,tests/`
-  - e.g., `--files "src/**/*.py"`
+  - e.g., `--files torch_aim/csrc` (relative to project root)
 
 **Important:** When using `--files`, skip Git-related steps (git-input, git-committer, git-pusher).
 
@@ -243,9 +243,27 @@ Check the options entered by the user:
 - (default): Use Docker Sandbox
 - --no-sandbox: Run directly on host
 
-### Workflow Mode
-- (default): Full workflow (11 steps)
-- --no-git: Exclude Git steps (env-setup → pre-check → review → fix → quality → build → test → summary)
+### Cache Options
+- (default): Auto-analyze if workspace cache is missing or stale (24h). Cache provides project context to all agents.
+- --skip-cache: Skip cache check AND auto-analysis entirely (fastest startup, no project context)
+
+### Option Compatibility Matrix
+
+```
+┌──────────────┬──────────────┬──────────┬────────────┬────────────────────┐
+│ Option       │ STEP 0       │ STEP 2   │ STEP 9/11  │ Notes              │
+│              │ (Analysis)   │ (Input)  │ (Git ops)  │                    │
+├──────────────┼──────────────┼──────────┼────────────┼────────────────────┤
+│ (default)    │ Auto-analyze │ git-input│ Commit+Push│ Full workflow      │
+│ --staged     │ Auto-analyze │ git-input│ Commit+Push│ Staged only        │
+│ --last       │ Auto-analyze │ git-input│ Amend      │ Amend last commit  │
+│ --branch     │ Auto-analyze │ git-input│ Commit+Push│ Full branch diff   │
+│ --range a..b │ Auto-analyze │ git-input│ Commit+Push│ Specific range     │
+│ --files path │ Auto-analyze │file-input│ SKIP       │ No Git operations  │
+│ --skip-cache │ SKIP         │ (any)    │ (any)      │ No project context │
+│ --no-sandbox │ Auto-analyze │ (any)    │ (any)      │ Run on host        │
+└──────────────┴──────────────┴──────────┴────────────┴────────────────────┘
+```
 
 ---
 
@@ -276,6 +294,10 @@ commit_result = ""           # Content after COMMIT_RESULT: SUCCESS
 env_setup_confirmed = false  # env-setup completion status
 build_env_confirmed = false  # build-tester env confirmation status
 test_confirmed = false       # function-tester test confirmation status
+
+# Workspace cache
+workspace_cache = null       # Cache data (use if available)
+skip_cache = false           # true if --skip-cache (skip cache AND auto-analysis entirely)
 ```
 
 ### Result Token Parsing Rules
@@ -284,6 +306,7 @@ Find and save the following patterns from each Agent's result:
 
 | Agent | Token to Extract | Storage Location |
 |-------|-----------------|------------------|
+| workspace-analyzer | JSON after `CACHE_DATA:` | `workspace_cache` |
 | env-setup | Everything after `ENV_SETUP_RESULT:` | `env_result` |
 | git-input | Comma-separated files after `FILE_LIST:` | `changed_files` |
 | code-reviewer | Newline-separated items after `ISSUE_LIST:` | `review_issues` |
@@ -300,6 +323,11 @@ IF $ARGUMENTS contains "--files":
     use_git_mode = false
 ELSE:
     use_git_mode = true
+
+IF $ARGUMENTS contains "--skip-cache":
+    skip_cache = true
+ELSE:
+    skip_cache = false
 ```
 
 ## Agents Requiring User Input
@@ -327,9 +355,17 @@ The following Agents MUST receive user input before proceeding:
 Use Task tool (function call) to invoke agents at each STEP.
 **When Task completes, check the result and immediately proceed to the next STEP.**
 
-### STEP 0: Project Root Detection (Automatic)
+### STEP 0: Project Root Detection + Workspace Analysis (Automatic)
 
-**⚠️ This step is executed directly by the Orchestrator. No Task call.**
+**This step has TWO phases:**
+1. Phase A: Project Root Detection (Orchestrator runs directly)
+2. Phase B: Workspace Cache & Auto-Analysis
+
+---
+
+#### Phase A: Project Root Detection
+
+**⚠️ This phase is executed directly by the Orchestrator. No Task call.**
 
 ```bash
 # 1. Current directory (absolute path)
@@ -423,6 +459,91 @@ SRC_DIR = {ACTUAL_SRC_PATH_DETECTED}
 PROJECT_TYPE = {DETECTED_PROJECT_TYPE}
 BUILD_CMD = {AUTO_DETECTED_BUILD_COMMAND}
 TEST_CMD = {AUTO_DETECTED_TEST_COMMAND}
+```
+
+---
+
+#### Phase B: Workspace Cache & Auto-Analysis
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Workspace analysis is ALWAYS performed unless explicitly skipped.      │
+│                                                                          │
+│  DEFAULT behavior:                                                       │
+│    Cache exists + fresh (24h) → Use cache                               │
+│    Cache missing or stale    → Auto-run workspace-analyzer              │
+│                                                                          │
+│  --skip-cache: Skip cache check AND auto-analysis entirely             │
+│                (fastest startup, no project context)                     │
+│                                                                          │
+│  This applies to ALL modes: Git mode, --files, --last, --branch, etc.  │
+│  Project context is always useful regardless of input mode.             │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**⚠️ Cache skip conditions:**
+```
+IF skip_cache == true (--skip-cache option):
+    → Skip Phase B entirely
+    → workspace_cache = null
+    → Proceed to STEP 1
+```
+
+**Cache check:**
+Use Read tool to read `.opencode/workspace-cache/analysis.json` file.
+
+```
+IF file exists and read successfully:
+    1. Check analyzed_at timestamp
+    2. Cache is valid if within 24 hours
+
+    IF cache is valid:
+        workspace_cache = {read JSON data}
+        → Output: "✓ Using workspace cache (analyzed: {analyzed_at})"
+        → Proceed to STEP 1 (using cache)
+
+    ELSE (cache is stale):
+        → Output: "Cache expired. Running workspace analysis..."
+        → Run auto-analysis (see below)
+
+ELSE IF file not found:
+    → Output: "No workspace cache. Running workspace analysis..."
+    → Run auto-analysis (see below)
+```
+
+**Auto-analysis (default behavior when cache missing or stale):**
+
+First, create cache directory:
+```bash
+mkdir -p .opencode/workspace-cache
+```
+
+Task tool call:
+- subagent_type: "workspace-analyzer"
+- prompt: "Analyze current workspace. Analyze project type, file structure, dependencies, build system and output results as JSON after CACHE_DATA:. If file count exceeds 10,000, analyze only main directories."
+- description: "Workspace analysis"
+
+```
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: COMPLETE":
+    1. Extract JSON after CACHE_DATA:
+    2. workspace_cache = {extracted JSON}
+    3. Save to .opencode/workspace-cache/analysis.json (using Write tool)
+    → Proceed to STEP 1
+
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: TIMEOUT":
+    → Output warning: "⚠️ Project too large, only partial analysis completed."
+    → Extract CACHE_DATA if available and store in workspace_cache (partial data)
+    → Proceed to STEP 1 (using partial cache)
+
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: EMPTY":
+    → Output info: "ℹ️ Empty project. No source files found."
+    → workspace_cache = null
+    → Proceed to STEP 1
+
+IF Task result contains "WORKSPACE_ANALYSIS_RESULT: FAILED":
+    → Output warning: "⚠️ Workspace analysis failed. Proceeding without cache."
+    → workspace_cache = null
+    → Proceed to STEP 1
 ```
 
 → On completion, go to STEP 1
