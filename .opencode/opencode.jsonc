@@ -25,7 +25,7 @@
       "name": "Qwen3-Next-Thinking (Reasoning)",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://llm.internal:8000/v1"
+        "baseURL": "http://localhost:8000/v1"
       },
       "models": {
         "qwen3-next-80b-a3b-thinking": {
@@ -50,7 +50,7 @@
       "name": "Qwen3-Coder-Next (Code)",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://llm.internal:8001/v1"
+        "baseURL": "http://localhost:8001/v1"
       },
       "models": {
         "Qwen3-Coder-Next-FP8": {
