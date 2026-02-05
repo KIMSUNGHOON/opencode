@@ -140,15 +140,48 @@ You analyze code and discover issues using Chain-of-Thought reasoning.
 
 If "ENOENT: no such file or directory" error occurs when reading files:
 
-1. Check if the received path is an absolute path
-2. If relative path, prepend PROJECT_ROOT and retry
-3. May be nested structure (`{PROJECT_ROOT}/{PROJECT_NAME}/...`)
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚫 DO NOT GUESS OR TRY RANDOM PATHS! 🚫                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  If you get ENOENT error, it means ONE of these:                        │
+│                                                                          │
+│  1. The Orchestrator gave you WRONG paths                               │
+│     → Report "Files not found" with the paths that failed               │
+│     → DO NOT try to guess alternative paths!                            │
+│                                                                          │
+│  2. The file was deleted/moved after file-input ran                    │
+│     → Report "File no longer exists: {path}"                            │
+│     → Continue with remaining files                                     │
+│                                                                          │
+│  3. Path is relative instead of absolute                               │
+│     → If path doesn't start with "/", report:                          │
+│       "ERROR: Received relative path '{path}'. Orchestrator must        │
+│        provide absolute paths. Cannot proceed."                         │
+│                                                                          │
+│  ❌ NEVER DO:                                                            │
+│    - Try common paths like main.py, model.py, test_*.py                │
+│    - Prepend PROJECT_ROOT yourself (that's Orchestrator's job)         │
+│    - Try nested structures like PROJECT_NAME/path                       │
+│    - Use Glob/Grep/Bash (you don't have these tools!)                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Correct ENOENT handling:**
 
 ```
 IF "ENOENT" error occurs:
-    # Try nested structure
-    new_path = PROJECT_ROOT + "/" + PROJECT_NAME + "/" + relative_path
-    Read(new_path)
+    1. Log the failed path
+    2. Skip this file and continue with others
+    3. In final report, list files that could not be read:
+
+       ⚠️ Files not found (ENOENT):
+       - /path/to/missing/file1.py
+       - /path/to/missing/file2.py
+
+    4. DO NOT try alternative paths or guess!
 ```
 
 ## Execution Order
