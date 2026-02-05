@@ -290,11 +290,6 @@ build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
 test_result = ""             # TEST_RESULT: SUCCESS/FAIL/SKIPPED
 commit_result = ""           # Content after COMMIT_RESULT: SUCCESS
 
-# User input related state
-env_setup_confirmed = false  # env-setup completion status
-build_env_confirmed = false  # build-tester env confirmation status
-test_confirmed = false       # function-tester test confirmation status
-
 # Workspace cache
 workspace_cache = null       # Cache data (use if available)
 skip_cache = false           # true if --skip-cache (skip cache AND auto-analysis entirely)
@@ -310,6 +305,7 @@ Find and save the following patterns from each Agent's result:
 | env-setup | Everything after `ENV_SETUP_RESULT:` | `env_result` |
 | git-input | Comma-separated files after `FILE_LIST:` | `changed_files` |
 | code-reviewer | Newline-separated items after `ISSUE_LIST:` | `review_issues` |
+| code-fixer | Everything after `FIX_RESULT:` | `fix_result` |
 | quality-checker | Number from `QUALITY_SCORE: XX/100` | `quality_score` |
 | build-tester | Everything after `BUILD_RESULT:` | `build_result` |
 | function-tester | Everything after `TEST_RESULT:` | `test_result` |
@@ -932,12 +928,28 @@ Task tool call:
     ```
 - description: "Code fix"
 
+**Store result:** Extract content after `FIX_RESULT:` and save to `fix_result`
+
 → On completion, go to STEP 6
 
 ### STEP 6: Quality Check
+
+**⚠️ Build prompt with FIX_RESULT context from STEP 5!**
+
 Task tool call:
 - subagent_type: "quality-checker"
-- prompt: "Run static analysis tools (ruff, mypy, radon, etc.) directly, and calculate quality score based on results. You MUST output score in QUALITY_SCORE: XX/100 format."
+- prompt: **(Build with actual values!)**
+    ```
+    Previous fix results:
+    [actual content of fix_result from STEP 5, e.g., "FIX_RESULT: SUCCESS, ISSUES_FIXED: 3/3"]
+
+    Target files:
+    - [actual absolute paths from changed_files]
+
+    Run static analysis tools (ruff, mypy, radon, etc.) directly on the target files,
+    and calculate quality score based on results.
+    You MUST output score in QUALITY_SCORE: XX/100 format.
+    ```
 - description: "Quality check"
 
 **Required action after Task completion:**
@@ -1092,36 +1104,95 @@ IF Task result contains "COMMIT_RESULT: SKIPPED" or "COMMIT_RESULT: NO_CHANGES":
 → On completion, go to STEP 10
 
 ### STEP 10: Summary Report
-**Orchestrator pre-work:**
-1. Include all result variables saved so far in prompt
-2. Replace placeholders with actual values
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚨 CRITICAL: YOU MUST BUILD THE PROMPT WITH ACTUAL VALUES! 🚨           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  DO NOT pass the template below with {placeholder} strings!             │
+│  You must SUBSTITUTE each {placeholder} with the ACTUAL value you       │
+│  extracted and saved from previous Steps.                               │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**⚠️ Orchestrator MUST construct the prompt like this:**
+
+```python
+# Pseudo-code for how YOU (Orchestrator) must build the prompt:
+
+# 1. Gather all saved state variables
+env_info = env_result         # from STEP 1
+files = changed_files         # from STEP 2
+issues = review_issues        # from STEP 4
+fix_info = fix_result         # from STEP 5
+score = quality_score         # from STEP 6
+build_info = build_result     # from STEP 7
+test_info = test_result       # from STEP 8
+commit_info = commit_result   # from STEP 9
+
+# 2. Build the prompt with ACTUAL values (not placeholders!)
+prompt = f"""
+Analyze the following QA results and generate a comprehensive report.
+
+=== Environment Info ===
+{env_info}
+
+=== Changed Files ===
+{files}
+
+=== Code Review Results ===
+{issues}
+
+=== Fix Results ===
+{fix_info}
+
+=== Quality Score ===
+{score}/100
+
+=== Build Result ===
+{build_info}
+
+=== Test Result ===
+{test_info}
+
+=== Commit Info ===
+{commit_info}
+"""
+```
 
 Task tool call:
 - subagent_type: "summary-reporter"
-- prompt: |
+- prompt: **(YOU MUST BUILD THIS - see above!)**
+    ```
     Analyze the following QA results and generate a comprehensive report.
     You can use git log, git diff commands for additional information if needed.
 
     === Environment Info ===
-    {actual content of env_result variable}
+    [actual content of env_result from STEP 1]
 
     === Changed Files ===
-    {actual file list from changed_files variable}
+    [actual file list from changed_files from STEP 2]
 
     === Code Review Results ===
-    {actual issue list from review_issues variable}
+    [actual issue list from review_issues from STEP 4]
+
+    === Fix Results ===
+    [actual content of fix_result from STEP 5]
 
     === Quality Score ===
-    {quality_score}/100
+    [actual quality_score number from STEP 6]/100
 
     === Build Result ===
-    {actual content of build_result variable}
+    [actual content of build_result from STEP 7]
 
     === Test Result ===
-    {actual content of test_result variable}
+    [actual content of test_result from STEP 8]
 
     === Commit Info ===
-    {actual content of commit_result variable}
+    [actual content of commit_result from STEP 9]
+    ```
 - description: "Result report"
 
 **Agent behavior:** summary-reporter generates report from passed data. Uses Bash tool to check git log etc. for missing info.

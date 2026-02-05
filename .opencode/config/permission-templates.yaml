@@ -326,6 +326,13 @@ agent_permissions:
       - conda_env
       - dangerous_commands_deny
 
+  workspace-analyzer:
+    extends:
+      - base_exploration
+      - env_detection
+      - git_read_only
+      - dangerous_commands_deny
+
   git-input:
     extends:
       - base_exploration
