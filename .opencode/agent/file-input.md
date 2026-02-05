@@ -78,8 +78,80 @@ You generate a list of files to inspect for projects not using Git.
 ## Role
 
 1. **Parse Input** - Parse file/directory paths from $ARGUMENTS
-2. **Search Files** - Search code files in specified paths
-3. **Generate Target List** - Filter code files
+2. **Normalize Paths** - Convert relative paths to absolute paths using PROJECT_ROOT
+3. **Search Files** - Search code files in specified paths
+4. **Generate Target List** - Filter code files
+
+## 🚨 CRITICAL: Path Normalization Rules
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│            ★★★ ALL PATHS MUST BE ABSOLUTE PATHS! ★★★                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  When you receive a path from --files option, you MUST:                 │
+│                                                                          │
+│  1. Check if it's already absolute (starts with /)                     │
+│     → If yes, use it directly                                          │
+│                                                                          │
+│  2. If it's a relative path (e.g., "torch_aim/csrc", "src/"):          │
+│     → PREPEND PROJECT_ROOT to make it absolute                         │
+│     → Example: PROJECT_ROOT=/home/user/project                         │
+│       Input: "src/" → "/home/user/project/src/"                        │
+│                                                                          │
+│  3. If path starts with ~/                                              │
+│     → Expand to home directory                                          │
+│     → Example: "~/code" → "/home/user/code"                            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│            ⚠️ AVOID DUPLICATE PATH STRUCTURES! ⚠️                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  PROBLEM: Nested project structures can cause path duplication          │
+│                                                                          │
+│  Example of WRONG behavior:                                             │
+│    PROJECT_ROOT = /home/user/Workspaces/torch_aim                       │
+│    Input = "torch_aim/csrc"                                             │
+│    WRONG: /home/user/Workspaces/torch_aim/torch_aim/csrc (DUPLICATE!)  │
+│                                                                          │
+│  CORRECT behavior:                                                       │
+│    1. First try: PROJECT_ROOT + input path                              │
+│    2. If that path doesn't exist, try: input path directly             │
+│    3. Verify path exists using ls or Glob before proceeding            │
+│                                                                          │
+│  Verification step (REQUIRED):                                          │
+│    BEFORE searching files, verify the path exists:                      │
+│    - Use: ls -d {absolute_path} 2>/dev/null                            │
+│    - If path doesn't exist, try alternative interpretations            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Path Resolution Priority
+
+When resolving relative paths, try in this order:
+
+1. **PROJECT_ROOT + path** (standard case)
+   ```
+   PROJECT_ROOT=/home/user/project
+   Input: "src/"
+   Try: /home/user/project/src/
+   ```
+
+2. **Current working directory + path** (if PROJECT_ROOT fails)
+   ```
+   pwd: /home/user/Workspaces/torch_aim
+   Input: "torch_aim/csrc"
+   Try: /home/user/Workspaces/torch_aim/torch_aim/csrc
+   ```
+
+3. **Direct path interpretation** (if input looks like project-relative)
+   ```
+   Input: "torch_aim/csrc" in project "torch_aim"
+   If above paths fail, check if input IS the project structure
+   ```
 
 ## Supported Input Formats
 
@@ -220,10 +292,20 @@ Filter code files only:
 **Always output in this format at the end:**
 
 ```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚨 CRITICAL: FILE_LIST MUST contain ABSOLUTE PATHS ONLY!              │
+│                                                                          │
+│  ❌ WRONG: FILE_LIST: src/main.py, lib/utils.py                         │
+│  ✅ CORRECT: FILE_LIST: /home/user/project/src/main.py, /home/user/project/lib/utils.py │
+│                                                                          │
+│  The code-reviewer agent can ONLY read files using absolute paths!     │
+│  Relative paths will cause ENOENT errors!                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
 ═══════════════════════════════════════════════════════════════
 FILE_INPUT_RESULT: SUCCESS
 FILES_FOUND: {file count}
-FILE_LIST: {file1}, {file2}, {file3}, ...
+FILE_LIST: {absolute_path_1}, {absolute_path_2}, {absolute_path_3}, ...
 ═══════════════════════════════════════════════════════════════
 ```
 

@@ -556,6 +556,25 @@ IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
 │  3. Return FILE_INPUT_RESULT with found files                           │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ⚠️ PATH HANDLING: Avoid path duplication in nested projects!           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Example scenario:                                                       │
+│    Workspace: /home/user/Workspaces/torch_aim/                          │
+│    Command: /code-qa --files torch_aim/csrc                             │
+│    PROJECT_ROOT: /home/user/Workspaces/torch_aim                        │
+│                                                                          │
+│  PROBLEM: If you blindly prepend PROJECT_ROOT:                          │
+│    /home/user/Workspaces/torch_aim/torch_aim/csrc  ← DUPLICATE!         │
+│                                                                          │
+│  SOLUTION: Tell file-input to VERIFY path existence before searching:  │
+│    1. First verify if path exists at PROJECT_ROOT/input_path            │
+│    2. If not, try PROJECT_ROOT directly as the base                     │
+│    3. Always return ABSOLUTE paths in FILE_LIST                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **You MUST actually call the Task tool with these parameters:**
@@ -566,14 +585,27 @@ Task tool call:
     Find code files at the following paths: [actual --files value]
 
     PROJECT_ROOT: [actual PROJECT_ROOT from STEP 0]
+    PROJECT_NAME: [actual PROJECT_NAME from STEP 0]
 
-    Use the Glob tool to search for code files in the specified directory.
-    For directories ending with /, search recursively for all code files.
+    ⚠️ IMPORTANT: Path Resolution Rules
+    1. First, verify if the input path exists:
+       - Run: ls -d [PROJECT_ROOT]/[input_path] 2>/dev/null
+       - If exists, use that path
+       - If NOT exists, try: ls -d [input_path] 2>/dev/null (maybe input is already relative to PROJECT_ROOT)
+
+    2. Watch for DUPLICATE path structures:
+       - If PROJECT_NAME appears in both PROJECT_ROOT and input_path, you may have duplication
+       - Example: PROJECT_ROOT=/home/user/torch_aim, input=torch_aim/csrc
+         → Check if /home/user/torch_aim/torch_aim/csrc exists
+         → If not, check if /home/user/torch_aim/csrc exists instead
+
+    3. Use the Glob tool to search for code files in the VERIFIED directory.
+       For directories ending with /, search recursively for all code files.
 
     Example Glob patterns to use:
-    - For "src/": use pattern "src/**/*" then filter by extension
-    - For "csrc/": use pattern "csrc/**/*.{c,h,cpp,hpp,cu,cuh,cc}"
-    - For specific files: use the exact path
+    - For "src/": use pattern "[verified_path]/**/*" then filter by extension
+    - For "csrc/": use pattern "[verified_path]/**/*.{c,h,cpp,hpp,cu,cuh,cc}"
+    - For specific files: use the exact absolute path
 
     Supported code file extensions:
     - C/C++: .c, .h, .cpp, .hpp, .cc, .hh, .cxx, .hxx
@@ -581,7 +613,8 @@ Task tool call:
     - Python: .py, .pyx, .pxd, .pyi
     - And other language extensions...
 
-    Return FILE_INPUT_RESULT with the list of found files.
+    🚨 CRITICAL: FILE_LIST MUST contain ABSOLUTE PATHS ONLY!
+    Return FILE_INPUT_RESULT with the list of found files (all absolute paths).
 - description: "File input parsing"
 
 ```
@@ -700,6 +733,27 @@ Task tool call:
 │                                                                          │
 │  Use the ACTUAL paths you know from STEP 0 (PROJECT_ROOT) and           │
 │  STEP 2 (FILE_LIST). Do not use placeholders or variables!              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚨 CRITICAL: CODE-REVIEWER CAN ONLY READ LISTED FILES! 🚨              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  The code-reviewer agent has NO file discovery capabilities:            │
+│    - No Glob tool (cannot search for files)                             │
+│    - No Grep tool (cannot search content)                               │
+│    - No Bash tool (cannot run ls, find, etc.)                           │
+│                                                                          │
+│  If you provide:                                                         │
+│    - Empty file list → It will report "no files to analyze"            │
+│    - Relative paths → It will get ENOENT errors                        │
+│    - Wrong paths → It will fail to read files                          │
+│                                                                          │
+│  VERIFY before calling code-reviewer:                                   │
+│    1. FILE_LIST from STEP 2 contains actual file paths                 │
+│    2. All paths are ABSOLUTE (start with /)                            │
+│    3. Files actually exist (were found by file-input/git-input)        │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
