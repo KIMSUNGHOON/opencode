@@ -61,15 +61,43 @@ quality:
   default_score: 50
 
 # =============================================================================
-# 모델 설정
+# 모델 설정 (Dual Model Strategy)
 # =============================================================================
 model:
-  # 기본 모델
-  default: "qwen/qwen3-next-80b-a3b-thinking"
+  # 추론 모델 (Thinking) - Orchestrator, Reviewer, QC, Reporter
+  thinking: "qwen/qwen3-next-80b-a3b-thinking"
+
+  # 코드 모델 (Coder) - Fixer, Tester, Git, Utility agents
+  coder: "qwen-coder/qwen3-coder-next-80b-a3b"
+
+  # Fallback 모델 (한쪽 서버 장애 시)
+  fallback: "qwen/qwen3-next-80b-a3b-thinking"
+
+  # Agent별 모델 할당
+  assignment:
+    # Thinking Model (port 8000) - 추론 집약 에이전트
+    thinking_agents:
+      - code-qa          # Orchestrator
+      - code-reviewer    # Phase 2: 심층 코드 분석 (CoT)
+      - quality-checker  # Phase 4: 품질 평가/점수 산정
+      - summary-reporter # Phase 8: 종합 리포트 생성
+
+    # Coder Model (port 8001) - 코드/유틸리티 에이전트
+    coder_agents:
+      - env-setup          # Phase -1: 환경 감지
+      - git-input          # Phase 0: Git 파싱
+      - workspace-analyzer # Phase 0B: 파일 구조 분석
+      - pre-checker        # Phase 1: Lint/Format
+      - code-fixer         # Phase 3: 코드 수정 (SWE-Bench)
+      - build-tester       # Phase 5: 빌드 테스트
+      - function-tester    # Phase 6: 기능 테스트
+      - git-committer      # Phase 7: Git 커밋
+      - git-pusher         # Phase 9: Push/PR
+      - file-input         # 파일 직접 입력
 
   # Context 설정
   context:
-    max_length: 262144      # 최대 Context 길이
+    max_length: 262144      # 최대 Context 길이 (256K)
     reduce_ratio: 0.5       # OOM 시 축소 비율
 
   # 샘플링 파라미터

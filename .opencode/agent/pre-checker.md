@@ -1,7 +1,7 @@
 ---
 description: Code Auto-Cleanup (Lint Fix, Format)
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#9B59B6"
 tools:
   "*": false

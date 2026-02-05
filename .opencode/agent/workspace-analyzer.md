@@ -1,7 +1,7 @@
 ---
 description: Workspace Structure Analyzer (File Discovery & Project Analysis)
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#3498DB"
 tools:
   "*": false

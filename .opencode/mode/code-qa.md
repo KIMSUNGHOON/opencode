@@ -1219,53 +1219,114 @@ TASK_RETRY = 3           # Task call retry count
 TASK_RETRY_DELAY = 2000  # Retry interval (ms)
 ```
 
-### Single Model Strategy
+### Dual Model Strategy
 
-This workflow uses **Qwen3-Next-80B-A3B-Thinking** single model for all roles.
+This workflow uses two specialized models on separate GPU nodes:
 
-| Role | Model | Mode |
-|------|-------|------|
-| **Orchestrator** | qwen3-next-80b-a3b-thinking | Thinking (reasoning) |
-| **All Sub-Agents** | qwen3-next-80b-a3b-thinking | Tool Calling |
+| Role | Model | Endpoint | Mode |
+|------|-------|----------|------|
+| **Orchestrator** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (reasoning) |
+| **code-reviewer** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (CoT analysis) |
+| **quality-checker** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (score evaluation) |
+| **summary-reporter** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (report generation) |
+| **code-fixer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (SWE-Bench) |
+| **pre-checker** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (lint/format) |
+| **build-tester** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (build exec) |
+| **function-tester** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (test exec) |
+| **env-setup** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (env detect) |
+| **git-input** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git parse) |
+| **workspace-analyzer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (file scan) |
+| **git-committer** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git commit) |
+| **git-pusher** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (git push) |
+| **file-input** | qwen3-coder-next-80b-a3b | :8001 | Non-thinking (file parse) |
 
-### Benefits of Single Model
-
-1. **256K Context Window**: Can handle long code files
-2. **Thinking + Tool Calling**: Supports both reasoning and tool invocation
-3. **No model switching**: Consistent performance, low latency
-4. **Simple infrastructure**: Only one model server needed
-
-### Hardware Requirements
+### Dual Model Assignment Rationale
 
 ```
-Recommended: 2x H100 NVL 96GB (Tensor Parallel)
-- Model weights (FP8): ~76GB
-- KV Cache (256K): ~50GB
-- Headroom: ~66GB
+Thinking Model (port 8000) - 4 agents:
+  추론이 핵심인 에이전트. CoT reasoning이 품질에 직접 영향.
+  - Orchestrator: 워크플로우 상태 관리, 조건 분기, 회귀 판단
+  - code-reviewer: 보안 취약점, 논리적 오류 심층 분석
+  - quality-checker: 정적 분석 결과 종합 평가, 점수 산정
+  - summary-reporter: 전체 QA 결과 종합 분석 리포트 생성
 
-Minimum: 1x H100 NVL 96GB
-- Context limited to 128K
+Coder Model (port 8001) - 10 agents:
+  코드 생성/수정 또는 도구 실행이 핵심인 에이전트.
+  Non-thinking 모드로 빠른 응답, SWE-Bench 70.6% 성능 활용.
+  - code-fixer: SWE-Bench 스타일 코드 수정/버그 픽스 (핵심 임팩트)
+  - pre-checker: Lint/Format 도구 실행
+  - build-tester / function-tester: 빌드/테스트 명령 실행
+  - env-setup / git-input / workspace-analyzer: 환경/파일 탐색
+  - git-committer / git-pusher / file-input: Git/파일 유틸리티
 ```
 
-### Deployment Command (SGLang)
+### Context Transfer Between Models
+
+```
+Orchestrator (Thinking) manages all state and constructs prompts:
+
+  Phase 2 (Thinking) → Phase 3 (Coder):
+    code-reviewer outputs ISSUE_LIST
+    → Orchestrator extracts and passes to code-fixer prompt
+
+  Phase 3 (Coder) → Phase 4 (Thinking):
+    code-fixer outputs FIX_RESULT
+    → Orchestrator passes to quality-checker prompt
+
+Context is transferred via structured tokens (Layer 1-2),
+NOT by sharing model sessions. Each agent call is independent.
+```
+
+### Fallback Strategy
+
+```
+IF Coder server (port 8001) is unavailable:
+  → Route all Coder agents to Thinking model (port 8000)
+  → Performance degrades but workflow continues (same as single model)
+
+IF Thinking server (port 8000) is unavailable:
+  → Route Thinking agents to Coder model (port 8001)
+  → Reasoning depth may decrease, but code operations work normally
+```
+
+### Hardware Requirements (Option A: Separate Nodes)
+
+```
+Node 1 (Thinking Model):
+  2x H100 NVL 96GB (Tensor Parallel)
+  - Model weights (FP8): ~76GB
+  - KV Cache (256K): ~50GB
+  - Headroom: ~66GB
+
+Node 2 (Coder Model):
+  2x H100 NVL 96GB (Tensor Parallel)
+  - Model weights (FP8): ~76GB
+  - KV Cache (256K): ~50GB
+  - Headroom: ~66GB
+
+Total: 4x H100 NVL 96GB
+```
+
+### Deployment Commands (SGLang)
 
 ```bash
-# 2x H100 NVL - 256K context
+# Node 1: Thinking Model (port 8000)
 python3 -m sglang.launch_server \
   --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
   --tp 2 \
   --context-length 262144 \
   --port 8000 \
-  --host 0.0.0.0
+  --host 0.0.0.0 \
+  --mem-fraction-static 0.85
 
-# High-performance deployment (NEXTN Speculative Decoding, ~30% improvement)
+# Node 2: Coder Model (port 8001)
 python3 -m sglang.launch_server \
-  --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --model Qwen/Qwen3-Coder-Next-FP8 \
   --tp 2 \
   --context-length 262144 \
-  --speculative-algo NEXTN \
-  --speculative-num-steps 3 \
-  --port 8000
+  --port 8001 \
+  --host 0.0.0.0 \
+  --mem-fraction-static 0.85
 ```
 
 ---

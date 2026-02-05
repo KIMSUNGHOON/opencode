@@ -1,7 +1,7 @@
 ---
 description: Function Test Expert (Docker Sandbox)
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#3498DB"
 tools:
   "*": false

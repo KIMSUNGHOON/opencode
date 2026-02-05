@@ -1,7 +1,7 @@
 ---
 description: Git Push and PR Creation Expert
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#2ECC71"
 tools:
   "*": false

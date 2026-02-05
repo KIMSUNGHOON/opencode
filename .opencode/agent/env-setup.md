@@ -1,7 +1,7 @@
 ---
 description: Development Environment Detection and Setup Expert
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#95A5A6"
 tools:
   "*": false

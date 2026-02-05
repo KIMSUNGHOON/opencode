@@ -1,7 +1,7 @@
 ---
 description: Code Issue Fix Expert (SWE-Bench SOTA)
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/qwen3-coder-next-80b-a3b
 color: "#27AE60"
 tools:
   "*": false

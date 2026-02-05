@@ -1,5 +1,69 @@
 {
-  "$schema": "https://opencode.ai/config.json"
-  // 프로젝트별 오버라이드만 정의
-  // Provider와 Agent 설정은 글로벌(~/.config/opencode/opencode.json)에서 상속
+  "$schema": "https://opencode.ai/config.json",
+
+  // =============================================================================
+  // Dual Model Provider Configuration
+  // =============================================================================
+  // Option A: 별도 GPU 노드 2대 구성
+  //   - Node 1 (port 8000): Qwen3-Next-Thinking     -> 추론 집약 에이전트
+  //   - Node 2 (port 8001): Qwen3-Coder-Next        -> 코드/유틸리티 에이전트
+  //
+  // Model Assignment:
+  //   Thinking (qwen/qwen3-next-80b-a3b-thinking):
+  //     - Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
+  //   Coder (qwen-coder/qwen3-coder-next-80b-a3b):
+  //     - env-setup, git-input, workspace-analyzer, pre-checker, code-fixer,
+  //       build-tester, function-tester, git-committer, git-pusher, file-input
+  // =============================================================================
+
+  "provider": {
+    // -------------------------------------------------------------------------
+    // Provider 1: Thinking Model (추론 집약)
+    // Orchestrator, code-reviewer, quality-checker, summary-reporter
+    // -------------------------------------------------------------------------
+    "qwen": {
+      "name": "Qwen3-Next-Thinking (Reasoning)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://llm.internal:8000/v1"
+      },
+      "models": {
+        "qwen3-next-80b-a3b-thinking": {
+          "name": "Qwen3-Next-Thinking-80B-A3B-FP8",
+          "attachment": false,
+          "tool_call": true,
+          "reasoning": true,
+          "limit": {
+            "context": 262144,
+            "output": 16384
+          }
+        }
+      }
+    },
+
+    // -------------------------------------------------------------------------
+    // Provider 2: Coder Model (코드 집약)
+    // env-setup, git-input, pre-checker, code-fixer, build-tester,
+    // function-tester, git-committer, git-pusher, workspace-analyzer, file-input
+    // -------------------------------------------------------------------------
+    "qwen-coder": {
+      "name": "Qwen3-Coder-Next (Code)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://llm.internal:8001/v1"
+      },
+      "models": {
+        "qwen3-coder-next-80b-a3b": {
+          "name": "Qwen3-Coder-Next-80B-A3B-FP8",
+          "attachment": false,
+          "tool_call": true,
+          "reasoning": false,
+          "limit": {
+            "context": 262144,
+            "output": 16384
+          }
+        }
+      }
+    }
+  }
 }
