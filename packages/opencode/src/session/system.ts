@@ -38,6 +38,27 @@ export namespace SystemPrompt {
 
   export async function environment() {
     const project = Instance.project
+
+    // Shell information
+    const shell = process.env.SHELL || (process.platform === "win32" ? process.env.COMSPEC : "/bin/sh")
+    const shellName = shell ? path.basename(shell) : "unknown"
+
+    // Python environment information
+    const condaEnv = process.env.CONDA_DEFAULT_ENV
+    const condaPrefix = process.env.CONDA_PREFIX
+    const virtualEnv = process.env.VIRTUAL_ENV
+    const pythonEnvLines: string[] = []
+
+    if (condaEnv) {
+      pythonEnvLines.push(`  Active conda environment: ${condaEnv}`)
+      if (condaPrefix) {
+        pythonEnvLines.push(`  Conda prefix: ${condaPrefix}`)
+      }
+    } else if (virtualEnv) {
+      pythonEnvLines.push(`  Active virtual environment: ${path.basename(virtualEnv)}`)
+      pythonEnvLines.push(`  Virtual environment path: ${virtualEnv}`)
+    }
+
     return [
       [
         `Here is some useful information about the environment you are running in:`,
@@ -45,6 +66,8 @@ export namespace SystemPrompt {
         `  Working directory: ${Instance.directory}`,
         `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
         `  Platform: ${process.platform}`,
+        `  Shell: ${shellName} (${shell})`,
+        ...(pythonEnvLines.length > 0 ? pythonEnvLines : []),
         `  Today's date: ${new Date().toDateString()}`,
         `</env>`,
         `<files>`,
