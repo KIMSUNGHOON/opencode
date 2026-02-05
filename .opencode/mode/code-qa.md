@@ -336,7 +336,7 @@ The following Agents MUST receive user input before proceeding:
 
 | Agent | Required Input | Wait State |
 |-------|---------------|------------|
-| env-setup | Shell selection (1-3), Environment type selection (1-4) | `WAITING_INPUT` |
+| env-setup | Environment confirmation (Y/n) or selection when none detected (1-2 steps) | `WAITING_INPUT` |
 | git-input | When no Git repo: init/specify files/exit | `NO_GIT_REPO` |
 | build-tester | Environment confirmation ("confirm/y" or "reset/n") | `WAITING_INPUT` |
 | function-tester | Test execution ("run/y" or "skip/n") | `WAITING_INPUT` |
@@ -555,7 +555,7 @@ Task tool call:
     PROJECT_ROOT: {PROJECT_ROOT}
 
     Check Shell, environment, Python/CUDA versions.
-    You MUST ask the user to select Shell type (zsh/bash/sh) and virtual environment type (conda/uv/venv).
+    Auto-detect current shell and active virtual environment. If an environment is already active, confirm with user (Y/n). Only prompt for selection when no environment is detected.
 
     Note: .opencode/env-config.yaml file is optional. Detect from runtime directly.
 - description: "Environment setup check"
