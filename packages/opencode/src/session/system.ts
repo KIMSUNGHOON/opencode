@@ -2,6 +2,7 @@ import { Ripgrep } from "../file/ripgrep"
 import { Global } from "../global"
 import { Filesystem } from "../util/filesystem"
 import { Config } from "../config/config"
+import { Log } from "../util/log"
 
 import { Instance } from "../project/instance"
 import path from "path"
@@ -16,6 +17,21 @@ import PROMPT_ANTHROPIC_SPOOF from "./prompt/anthropic_spoof.txt"
 import PROMPT_CODEX from "./prompt/codex_header.txt"
 import type { Provider } from "@/provider/provider"
 import { Flag } from "@/flag/flag"
+
+const log = Log.create({ service: "system-prompt" })
+
+async function resolveRelativeInstruction(instruction: string): Promise<string[]> {
+  if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+    return Filesystem.globUp(instruction, Instance.directory, Instance.worktree).catch(() => [])
+  }
+  if (!Flag.OPENCODE_CONFIG_DIR) {
+    log.warn(
+      `Skipping relative instruction "${instruction}" - no OPENCODE_CONFIG_DIR set while project config is disabled`,
+    )
+    return []
+  }
+  return Filesystem.globUp(instruction, Flag.OPENCODE_CONFIG_DIR, Flag.OPENCODE_CONFIG_DIR).catch(() => [])
+}
 
 export namespace SystemPrompt {
   export function header(providerID: string) {
@@ -38,27 +54,6 @@ export namespace SystemPrompt {
 
   export async function environment() {
     const project = Instance.project
-
-    // Shell information
-    const shell = process.env.SHELL || (process.platform === "win32" ? process.env.COMSPEC : "/bin/sh")
-    const shellName = shell ? path.basename(shell) : "unknown"
-
-    // Python environment information
-    const condaEnv = process.env.CONDA_DEFAULT_ENV
-    const condaPrefix = process.env.CONDA_PREFIX
-    const virtualEnv = process.env.VIRTUAL_ENV
-    const pythonEnvLines: string[] = []
-
-    if (condaEnv) {
-      pythonEnvLines.push(`  Active conda environment: ${condaEnv}`)
-      if (condaPrefix) {
-        pythonEnvLines.push(`  Conda prefix: ${condaPrefix}`)
-      }
-    } else if (virtualEnv) {
-      pythonEnvLines.push(`  Active virtual environment: ${path.basename(virtualEnv)}`)
-      pythonEnvLines.push(`  Virtual environment path: ${virtualEnv}`)
-    }
-
     return [
       [
         `Here is some useful information about the environment you are running in:`,
@@ -66,8 +61,6 @@ export namespace SystemPrompt {
         `  Working directory: ${Instance.directory}`,
         `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
         `  Platform: ${process.platform}`,
-        `  Shell: ${shellName} (${shell})`,
-        ...(pythonEnvLines.length > 0 ? pythonEnvLines : []),
         `  Today's date: ${new Date().toDateString()}`,
         `</env>`,
         `<files>`,
@@ -102,11 +95,14 @@ export namespace SystemPrompt {
     const config = await Config.get()
     const paths = new Set<string>()
 
-    for (const localRuleFile of LOCAL_RULE_FILES) {
-      const matches = await Filesystem.findUp(localRuleFile, Instance.directory, Instance.worktree)
-      if (matches.length > 0) {
-        matches.forEach((path) => paths.add(path))
-        break
+    // Only scan local rule files when project discovery is enabled
+    if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+      for (const localRuleFile of LOCAL_RULE_FILES) {
+        const matches = await Filesystem.findUp(localRuleFile, Instance.directory, Instance.worktree)
+        if (matches.length > 0) {
+          matches.forEach((path) => paths.add(path))
+          break
+        }
       }
     }
 
@@ -137,7 +133,7 @@ export namespace SystemPrompt {
             }),
           ).catch(() => [])
         } else {
-          matches = await Filesystem.globUp(instruction, Instance.directory, Instance.worktree).catch(() => [])
+          matches = await resolveRelativeInstruction(instruction)
         }
         matches.forEach((path) => paths.add(path))
       }
