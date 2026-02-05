@@ -1,0 +1,85 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px'}}}%%
+
+sequenceDiagram
+    autonumber
+
+    actor User as 👤 User
+    participant CMD as 🎯 /code-qa
+    participant WA as 🔍 workspace-analyzer
+    participant ENV as 🔧 env-setup
+    participant GIT as 📂 git-input
+    participant QA as 🔬 Host QA
+    participant SANDBOX as 🐳 Docker Sandbox
+    participant COMMIT as 📝 git-committer
+    participant PUSH as 📤 git-pusher
+
+    User->>CMD: /code-qa --last
+
+    rect rgb(155, 89, 182, 0.2)
+        Note over WA: Phase 0: Workspace Analysis
+        CMD->>WA: 워크스페이스 분석 요청
+        WA->>WA: 캐시 확인
+        alt 캐시 없음/만료
+            WA->>WA: 프로젝트 분석
+            WA->>WA: 캐시 저장
+        end
+        WA-->>CMD: 분석 결과 (캐시)
+    end
+
+    rect rgb(149, 165, 166, 0.2)
+        Note over ENV,GIT: Phase 1-2: Setup
+        CMD->>ENV: 환경 확인 요청
+        ENV-->>User: Shell/환경 선택
+        User->>ENV: 선택 완료
+        ENV-->>CMD: 환경 설정 완료
+
+        CMD->>GIT: Git diff 추출
+        GIT-->>CMD: 변경 파일 5개
+    end
+
+    rect rgb(52, 152, 219, 0.2)
+        Note over QA: Phase 3-6: Host QA
+        CMD->>QA: QA 시작
+        QA->>QA: Pre-Check (Lint/Format)
+        QA->>QA: Code Review (CoT)
+        QA->>QA: Code Fix
+        QA->>QA: Quality Check
+
+        alt 점수 < 70%
+            loop 최대 3회
+                QA->>QA: Code Fix 재실행
+                QA->>QA: Quality Check
+            end
+        end
+        QA-->>CMD: QA 완료 (85/100)
+    end
+
+    rect rgb(230, 126, 34, 0.2)
+        Note over SANDBOX: Phase 7-8: Docker Sandbox
+        CMD->>SANDBOX: docker run --gpus all
+        SANDBOX-->>User: 환경 확인 요청
+        User->>SANDBOX: 확인
+        SANDBOX->>SANDBOX: Build Test
+        SANDBOX->>SANDBOX: Function Test
+        SANDBOX-->>CMD: 테스트 통과 ✅
+    end
+
+    rect rgb(39, 174, 96, 0.2)
+        Note over COMMIT,PUSH: Phase 9-11: Git
+        CMD->>COMMIT: 커밋 요청
+        COMMIT-->>User: 커밋 메시지 확인
+        User->>COMMIT: 확인
+        COMMIT-->>CMD: 커밋 완료
+
+        CMD->>CMD: Summary Report 생성
+
+        CMD->>PUSH: Push 요청
+        PUSH-->>User: Push 할까요?
+        User->>PUSH: Yes
+        PUSH->>PUSH: git push
+        PUSH-->>User: PR 생성할까요?
+        User->>PUSH: Yes
+        PUSH-->>User: PR URL 반환
+    end
+
+    CMD-->>User: 🎉 Code QA 완료!

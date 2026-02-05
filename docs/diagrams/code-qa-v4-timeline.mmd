@@ -1,0 +1,66 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '16px', 'primaryColor': '#3498DB'}}}%%
+
+flowchart TB
+    subgraph HEADER[" "]
+        direction LR
+        TITLE["<b>🔄 Code QA v4 Workflow Pipeline</b>"]
+    end
+
+    START(["🚀 시작"])
+
+    subgraph ANALYSIS["🔍 ANALYSIS PHASE"]
+        direction LR
+        WA["<b>workspace-analyzer</b><br/>프로젝트 구조 분석<br/>캐시 생성/로드"]
+    end
+
+    subgraph SETUP["⚙️ SETUP PHASE"]
+        direction LR
+        ES["<b>env-setup</b><br/>Shell/가상환경 확인"]
+        GI["<b>git-input</b><br/>변경 파일 추출"]
+        ES --> GI
+    end
+
+    subgraph QA["🔬 QA PHASE (호스트)"]
+        direction TB
+        PC["<b>pre-checker</b><br/>Lint/Format 자동 수정"]
+        CR["<b>code-reviewer</b><br/>심층 코드 분석 (CoT)"]
+        CF["<b>code-fixer</b><br/>이슈 수정"]
+        QC["<b>quality-checker</b><br/>품질 점수 ≥ 70%"]
+        PC --> CR --> CF --> QC
+        QC -.->|"< 70%<br/>(최대 3회)"| CF
+    end
+
+    subgraph TEST["🧪 TEST PHASE (Docker Sandbox)"]
+        direction LR
+        BT["<b>build-tester</b><br/>빌드 테스트 (GPU)"]
+        FT["<b>function-tester</b><br/>기능 테스트 (GPU)"]
+        BT --> FT
+        BT -.->|"실패"| CF2["code-fixer로 회귀"]
+        FT -.->|"실패"| CF2
+    end
+
+    subgraph GIT["📤 GIT PHASE (호스트)"]
+        direction LR
+        GC["<b>git-committer</b><br/>커밋/Amend"]
+        SR["<b>summary-reporter</b><br/>결과 리포트"]
+        GP["<b>git-pusher</b><br/>Push & PR/MR"]
+        GC --> SR --> GP
+    end
+
+    DONE(["🎉 완료!"])
+
+    START --> ANALYSIS
+    ANALYSIS --> SETUP
+    SETUP --> QA
+    QA --> TEST
+    TEST --> GIT
+    GIT --> DONE
+
+    style HEADER fill:#2C3E50,stroke:#2C3E50,color:#fff
+    style ANALYSIS fill:#9B59B622,stroke:#9B59B6,stroke-width:3px
+    style SETUP fill:#95A5A622,stroke:#95A5A6,stroke-width:3px
+    style QA fill:#3498DB22,stroke:#3498DB,stroke-width:3px
+    style TEST fill:#E67E2222,stroke:#E67E22,stroke-width:3px
+    style GIT fill:#27AE6022,stroke:#27AE60,stroke-width:3px
+    style START fill:#3498DB,stroke:#2980B9,color:#fff
+    style DONE fill:#27AE60,stroke:#1E8449,color:#fff

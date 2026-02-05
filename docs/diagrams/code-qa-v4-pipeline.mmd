@@ -1,0 +1,113 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#3498DB', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2980B9', 'lineColor': '#7F8C8D', 'secondaryColor': '#E74C3C', 'tertiaryColor': '#2ECC71', 'background': '#FFFFFF'}}}%%
+
+flowchart TB
+    subgraph TITLE[" "]
+        direction LR
+        T1["<b>Code QA Workflow v4</b><br/>Environment + Git + Docker Sandbox 통합"]
+    end
+
+    START(["🚀 /code-qa 시작"]) --> CACHE_CHECK
+
+    subgraph PHASE_0["Phase 0: Workspace Analysis"]
+        direction TB
+        CACHE_CHECK{"📦 캐시 확인"}
+        CACHE_CHECK -->|"캐시 유효"| USE_CACHE["캐시 데이터 로드"]
+        CACHE_CHECK -->|"캐시 없음/만료"| RUN_ANALYZER["🔍 workspace-analyzer"]
+        RUN_ANALYZER --> SAVE_CACHE["캐시 저장"]
+        SAVE_CACHE --> USE_CACHE
+    end
+
+    USE_CACHE --> ENV_SETUP
+
+    subgraph PHASE_1["Phase 1: Environment Setup"]
+        direction TB
+        ENV_SETUP["🔧 env-setup"]
+        ENV_SETUP --> SHELL_CHECK["Shell 타입 확인<br/>(zsh/bash/sh)"]
+        SHELL_CHECK --> VENV_CHECK["가상환경 확인<br/>(conda/uv/venv)"]
+        VENV_CHECK --> ENV_CONFIRM{{"👤 사용자 확인"}}
+    end
+
+    ENV_CONFIRM --> GIT_INPUT
+
+    subgraph PHASE_2["Phase 2: File Input"]
+        direction TB
+        GIT_INPUT{"입력 모드?"}
+        GIT_INPUT -->|"Git 모드"| GIT_PARSE["📂 git-input<br/>git diff 파싱"]
+        GIT_INPUT -->|"--files 옵션"| FILE_PARSE["📁 file-input<br/>파일 목록 수집"]
+        GIT_PARSE --> FILE_LIST["changed_files 저장"]
+        FILE_PARSE --> FILE_LIST
+    end
+
+    FILE_LIST --> PRE_CHECK
+
+    subgraph HOST_QA["Phase 3-6: Host QA (호스트 실행)"]
+        direction TB
+        PRE_CHECK["⚡ pre-checker<br/>Lint/Format 자동 수정"]
+        PRE_CHECK --> CODE_REVIEW["🔍 code-reviewer<br/>(Read 권한만, CoT)"]
+        CODE_REVIEW --> CODE_FIX["🔧 code-fixer<br/>이슈 수정"]
+        CODE_FIX --> QUALITY["📋 quality-checker<br/>품질 점수 계산"]
+    end
+
+    QUALITY --> Q_CHECK{"점수 ≥ 70?"}
+    Q_CHECK -->|"❌ No"| RETRY_Q{"회귀 < 3회?"}
+    RETRY_Q -->|"Yes"| CODE_FIX
+    RETRY_Q -->|"No"| HUMAN_INTERVENE["⚠️ 사용자 개입 필요"]
+    HUMAN_INTERVENE --> BUILD_TEST
+
+    Q_CHECK -->|"✅ Yes"| BUILD_TEST
+
+    subgraph SANDBOX["Phase 7-8: Docker Sandbox (GPU 지원)"]
+        direction TB
+        BUILD_TEST["🏗️ build-tester"]
+        BUILD_TEST --> BUILD_CONFIRM{{"👤 환경 확인"}}
+        BUILD_CONFIRM --> BUILD_RUN["빌드 실행"]
+        BUILD_RUN --> B_CHECK{"빌드 성공?"}
+        B_CHECK -->|"✅ Yes"| FUNC_TEST["🧪 function-tester"]
+        FUNC_TEST --> TEST_CONFIRM{{"👤 테스트 확인"}}
+        TEST_CONFIRM --> TEST_RUN["테스트 실행"]
+        TEST_RUN --> T_CHECK{"테스트 통과?"}
+    end
+
+    B_CHECK -->|"❌ No"| CODE_FIX
+    T_CHECK -->|"❌ No"| CODE_FIX
+
+    T_CHECK -->|"✅ Yes"| COMMIT_CHECK
+
+    subgraph GIT_OPS["Phase 9-11: Git Operations (호스트 실행)"]
+        direction TB
+        COMMIT_CHECK{"Git 모드?"}
+        COMMIT_CHECK -->|"Yes"| COMMIT["📝 git-committer"]
+        COMMIT --> COMMIT_CONFIRM{{"👤 커밋 확인"}}
+        COMMIT_CONFIRM --> DO_COMMIT["커밋 실행"]
+        COMMIT_CHECK -->|"--files 모드"| SKIP_GIT["Git 단계 스킵"]
+
+        DO_COMMIT --> SUMMARY["📊 summary-reporter<br/>결과 리포트 생성"]
+        SKIP_GIT --> SUMMARY
+
+        SUMMARY --> PUSH_CHECK{"Push 할까요?"}
+        PUSH_CHECK -->|"Yes"| PUSHER["📤 git-pusher"]
+        PUSHER --> PUSH_CONFIRM{{"👤 Push 확인"}}
+        PUSH_CONFIRM --> DO_PUSH["git push"]
+        DO_PUSH --> PR_CHECK{"PR 생성?"}
+        PR_CHECK -->|"Yes"| CREATE_PR["🔀 PR/MR 생성"]
+        PR_CHECK -->|"No"| DONE_PUSH
+    end
+
+    PUSH_CHECK -->|"No"| DONE_LOCAL(["✅ 완료 (로컬)"])
+    CREATE_PR --> DONE(["🎉 완료!"])
+    DONE_PUSH(["✅ 완료 (Push)"])
+
+    %% Styling
+    style TITLE fill:#2C3E50,stroke:#2C3E50,color:#fff
+    style PHASE_0 fill:#9B59B622,stroke:#9B59B6,stroke-width:2px
+    style PHASE_1 fill:#95A5A622,stroke:#95A5A6,stroke-width:2px
+    style PHASE_2 fill:#34495E22,stroke:#34495E,stroke-width:2px
+    style HOST_QA fill:#3498DB22,stroke:#3498DB,stroke-width:2px
+    style SANDBOX fill:#E67E2222,stroke:#E67E22,stroke-width:2px
+    style GIT_OPS fill:#27AE6022,stroke:#27AE60,stroke-width:2px
+
+    style START fill:#3498DB,stroke:#2980B9,color:#fff
+    style DONE fill:#27AE60,stroke:#1E8449,color:#fff
+    style DONE_LOCAL fill:#27AE60,stroke:#1E8449,color:#fff
+    style DONE_PUSH fill:#27AE60,stroke:#1E8449,color:#fff
+    style HUMAN_INTERVENE fill:#E74C3C,stroke:#C0392B,color:#fff

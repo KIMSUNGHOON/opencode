@@ -1,0 +1,71 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px'}}}%%
+
+flowchart LR
+    subgraph P0["<b>Phase 0</b><br/>Workspace"]
+        A0["🔍 analyzer"]
+    end
+
+    subgraph P1["<b>Phase 1</b><br/>Setup"]
+        A1["🔧 env-setup"]
+    end
+
+    subgraph P2["<b>Phase 2</b><br/>Input"]
+        A2["📂 git-input"]
+    end
+
+    subgraph P3["<b>Phase 3</b><br/>Pre-Check"]
+        A3["⚡ pre-checker"]
+    end
+
+    subgraph P4["<b>Phase 4</b><br/>Review"]
+        A4["🔍 code-reviewer"]
+    end
+
+    subgraph P5["<b>Phase 5</b><br/>Fix"]
+        A5["🔧 code-fixer"]
+    end
+
+    subgraph P6["<b>Phase 6</b><br/>Quality"]
+        A6["📋 quality-checker"]
+    end
+
+    subgraph P7["<b>Phase 7</b><br/>Build"]
+        A7["🏗️ build-tester"]
+    end
+
+    subgraph P8["<b>Phase 8</b><br/>Test"]
+        A8["🧪 function-tester"]
+    end
+
+    subgraph P9["<b>Phase 9</b><br/>Commit"]
+        A9["📝 git-committer"]
+    end
+
+    subgraph P10["<b>Phase 10</b><br/>Report"]
+        A10["📊 summary-reporter"]
+    end
+
+    subgraph P11["<b>Phase 11</b><br/>Push"]
+        A11["📤 git-pusher"]
+    end
+
+    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6
+    P6 --> P7 --> P8 --> P9 --> P10 --> P11
+
+    %% Regression loops
+    A6 -.->|"< 70%"| A5
+    A7 -.->|"실패"| A5
+    A8 -.->|"실패"| A5
+
+    style P0 fill:#9B59B6,stroke:#8E44AD,color:#fff
+    style P1 fill:#95A5A6,stroke:#7F8C8D,color:#fff
+    style P2 fill:#34495E,stroke:#2C3E50,color:#fff
+    style P3 fill:#3498DB,stroke:#2980B9,color:#fff
+    style P4 fill:#3498DB,stroke:#2980B9,color:#fff
+    style P5 fill:#3498DB,stroke:#2980B9,color:#fff
+    style P6 fill:#3498DB,stroke:#2980B9,color:#fff
+    style P7 fill:#E67E22,stroke:#D35400,color:#fff
+    style P8 fill:#E67E22,stroke:#D35400,color:#fff
+    style P9 fill:#27AE60,stroke:#1E8449,color:#fff
+    style P10 fill:#27AE60,stroke:#1E8449,color:#fff
+    style P11 fill:#27AE60,stroke:#1E8449,color:#fff
