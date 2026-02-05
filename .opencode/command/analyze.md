@@ -171,15 +171,21 @@ prompt: |
 5. **환경 정보**: 런타임 버전, Docker 설정
 6. **Git 정보**: remote URL, 현재 브랜치
 
-## Code-QA와 통합
+## Code-QA와의 관계
 
-`/analyze`로 생성된 캐시는 `/code-qa`에서 자동으로 사용됩니다:
+`/code-qa`는 기본적으로 STEP 0에서 캐시가 없거나 만료되면 **자동으로 workspace-analyzer를 실행**합니다.
+따라서 대부분의 경우 `/analyze`를 별도로 실행할 필요가 없습니다.
 
 ```bash
-# 방법 1: 사전 분석 후 QA
-/analyze
-/code-qa
+# 일반적인 사용 (code-qa가 내부에서 자동 분석)
+/code-qa                           # 캐시 없으면 자동 분석 후 QA 진행
+/code-qa --files torch_aim/csrc    # --files 모드에서도 자동 분석 적용
+/code-qa --last                    # 마지막 커밋 모드에서도 자동 분석 적용
 
-# 방법 2: code-qa가 캐시 없으면 자동 분석
-/code-qa
+# /analyze가 유용한 경우
+/analyze --force                   # 프로젝트 구조가 변경되었을 때 캐시 강제 갱신
+/analyze                           # 분석 결과만 확인하고 싶을 때 (QA 없이)
+
+# 캐시 없이 빠르게 QA만 하고 싶을 때
+/code-qa --skip-cache              # 분석 건너뛰고 바로 QA 시작
 ```
