@@ -1240,24 +1240,11 @@ export namespace ACP {
   ): { type: "file"; url: string; filename: string; mime: string } | { type: "text"; text: string } {
     try {
       if (uri.startsWith("file://")) {
-        // Standard file:// URL format:
-        //   file:///absolute/path  → /absolute/path (3 slashes for absolute)
-        //   file://relative/path   → relative/path (2 slashes - non-standard but common)
-        //   file://hostname/path   → network path (rarely used on Linux)
-        let filepath: string
-        if (uri.startsWith("file:///")) {
-          // Standard absolute path: file:///path → /path
-          filepath = decodeURIComponent(uri.slice(7)) // Keep leading slash
-        } else {
-          // Non-standard relative path: file://path → path
-          filepath = decodeURIComponent(uri.slice(7))
-          // If it doesn't start with /, it's a relative path
-          // We should NOT try to resolve it here - let the caller handle it
-        }
-        const name = filepath.split("/").pop() || filepath
+        const path = uri.slice(7)
+        const name = path.split("/").pop() || path
         return {
           type: "file",
-          url: uri.startsWith("file:///") ? uri : `file://${filepath}`,
+          url: uri,
           filename: name,
           mime: "text/plain",
         }
