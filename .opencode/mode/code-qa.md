@@ -532,17 +532,70 @@ IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
 ```
 
 #### Option B: Direct File Mode (use_git_mode == false, --files option)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  🚨🚨🚨 CRITICAL: ACTUALLY CALL THE TASK TOOL! 🚨🚨🚨                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ❌ WRONG - Outputting JSON as text:                                     │
+│     <function_call>                                                      │
+│     ["name": "task", "argument": {...}]                                  │
+│     </function_call>                                                     │
+│                                                                          │
+│  ❌ WRONG - Saying "I will call..." without actually calling:            │
+│     "I will now call file-input to search for files..."                  │
+│                                                                          │
+│  ✅ CORRECT - Actually invoke the Task tool via function call!           │
+│     Use the system's tool invocation mechanism, not text output!         │
+│                                                                          │
+│  The file-input agent will:                                              │
+│  1. Use Glob tool to find files matching patterns                       │
+│  2. Filter code files (C/C++/CUDA: .c, .h, .cpp, .cu, .cuh, etc.)      │
+│  3. Return FILE_INPUT_RESULT with found files                           │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**You MUST actually call the Task tool with these parameters:**
+
 Task tool call:
 - subagent_type: "file-input"
-- prompt: "Find code files in the following path: {--files value}"
+- prompt: |
+    Find code files at the following paths: [actual --files value]
+
+    PROJECT_ROOT: [actual PROJECT_ROOT from STEP 0]
+
+    Use the Glob tool to search for code files in the specified directory.
+    For directories ending with /, search recursively for all code files.
+
+    Example Glob patterns to use:
+    - For "src/": use pattern "src/**/*" then filter by extension
+    - For "csrc/": use pattern "csrc/**/*.{c,h,cpp,hpp,cu,cuh,cc}"
+    - For specific files: use the exact path
+
+    Supported code file extensions:
+    - C/C++: .c, .h, .cpp, .hpp, .cc, .hh, .cxx, .hxx
+    - CUDA: .cu, .cuh
+    - Python: .py, .pyx, .pxd, .pyi
+    - And other language extensions...
+
+    Return FILE_INPUT_RESULT with the list of found files.
 - description: "File input parsing"
 
 ```
 IF Task result contains "FILE_INPUT_RESULT: SUCCESS":
+    → Extract FILE_LIST from result
+    → Store in changed_files variable
     → Proceed to STEP 3
 
-IF Task result contains "FILE_INPUT_RESULT: NO_FILES" or "FILE_INPUT_RESULT: INVALID_PATH":
-    → Output error message and terminate workflow
+IF Task result contains "FILE_INPUT_RESULT: NO_FILES":
+    → Output "No code files found in specified paths"
+    → Terminate workflow
+
+IF Task result contains "FILE_INPUT_RESULT: INVALID_PATH":
+    → Output "Specified path does not exist"
+    → Terminate workflow
 ```
 
 **Store result:** Extract file list from Task result and save to `changed_files`
