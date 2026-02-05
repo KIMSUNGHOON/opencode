@@ -9,7 +9,7 @@
   //   - Node 2 (port 8001): Qwen3-Coder-Next        -> 코드/유틸리티 에이전트
   //
   // Model Assignment:
-  //   Thinking (qwen/qwen3-next-80b-a3b-thinking):
+  //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
   //     - Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
   //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
   //     - env-setup, git-input, workspace-analyzer, pre-checker, code-fixer,
@@ -28,8 +28,8 @@
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "qwen3-next-80b-a3b-thinking": {
-          "name": "Qwen3-Next-Thinking-80B-A3B-FP8",
+        "Qwen3-Next-80B-A3B-Thinking-FP8": {
+          "name": "Qwen3-Next-80B-A3B-Thinking-FP8 (SGLang --served-model-name)",
           "attachment": false,
           "tool_call": true,
           "reasoning": true,

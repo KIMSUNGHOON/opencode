@@ -1,6 +1,6 @@
 ---
 description: "Code QA Workflow - Automated Code Quality Assurance"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 mode: all
 color: "#E74C3C"
 ---
@@ -1225,10 +1225,10 @@ This workflow uses two specialized models on separate GPU nodes:
 
 | Role | Model | Endpoint | Mode |
 |------|-------|----------|------|
-| **Orchestrator** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (reasoning) |
-| **code-reviewer** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (CoT analysis) |
-| **quality-checker** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (score evaluation) |
-| **summary-reporter** | qwen3-next-80b-a3b-thinking | :8000 | Thinking (report generation) |
+| **Orchestrator** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (reasoning) |
+| **code-reviewer** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (CoT analysis) |
+| **quality-checker** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (score evaluation) |
+| **summary-reporter** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (report generation) |
 | **code-fixer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (SWE-Bench) |
 | **pre-checker** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (lint/format) |
 | **build-tester** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (build exec) |
@@ -1313,6 +1313,7 @@ Total: 4x H100 NVL 96GB
 # Node 1: Thinking Model (SGLang, port 8000)
 python3 -m sglang.launch_server \
   --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+  --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
   --tp 2 \
   --context-length 262144 \
   --port 8000 \

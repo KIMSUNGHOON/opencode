@@ -1,7 +1,7 @@
 ---
 description: QA Results Summary Reporter (Chain-of-Thought)
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 color: "#9B59B6"
 tools:
   "*": false

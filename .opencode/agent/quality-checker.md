@@ -1,7 +1,7 @@
 ---
 description: Code Quality Score Checker
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 color: "#F39C12"
 tools:
   "*": false
