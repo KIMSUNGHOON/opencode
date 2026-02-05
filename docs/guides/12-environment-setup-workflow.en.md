@@ -455,7 +455,7 @@ project-root/
 | Item | Value | Description |
 |------|-------|-------------|
 | **mode** | `subagent` | Called from other Agents |
-| **model** | `qwen/qwen3-coder-30b` | Tool calling specialized model |
+| **model** | `qwen-coder/Qwen3-Coder-Next-FP8` | Coder model (vLLM, port 8001) |
 | **color** | `#95A5A6` | UI display color |
 
 ### 7.3 Permission Matrix
@@ -659,4 +659,4 @@ sandbox:
 - [**Code QA v4 Complete Diagram** ⭐](./13-code-qa-v4-complete-diagram.md)
 - [Code QA v4 Quick Start](./14-code-qa-v4-quick-start.md)
 - [Custom Agent Guide](./02-custom-agent-guide.md)
-- [Integrated Configuration Guide](./05-integrated-configuration.md)
+- [Code QA v4 Quick Start](./14-code-qa-v4-quick-start.en.md)

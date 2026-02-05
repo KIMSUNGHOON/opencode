@@ -26,7 +26,9 @@ Code QA v4 is an automated code quality workflow consisting of 11 phases.
 
 ### 1.2 Key Features
 
-- **Single Model Strategy**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling)
+- **Dual Model Strategy**:
+  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
+  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
 - **Regression Loop**: Automatic retry on quality threshold failure (max 3 times)
@@ -36,15 +38,15 @@ Code QA v4 is an automated code quality workflow consisting of 11 phases.
 
 ### 1.3 Model Specifications
 
-| Item | Value |
-|------|-------|
-| **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 |
-| **Context Window** | 256K |
-| **Output Limit** | 16K |
-| **Reasoning** | Yes (thinking mode) |
-| **Tool Calling** | Yes |
-| **VRAM Required** | ~76GB (FP8) |
-| **Recommended GPU** | 2x H100 NVL 96GB |
+| Item | Thinking Model | Coder Model |
+|------|---------------|-------------|
+| **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
+| **Serving Engine** | SGLang (port 8000) | vLLM (port 8001) |
+| **Context Window** | 256K | 256K |
+| **Output Limit** | 16K | 16K |
+| **Reasoning** | Yes (thinking mode) | No |
+| **Tool Calling** | Yes | Yes |
+| **Agents** | Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
 ### 1.4 Official Sampling Parameters
 
@@ -70,8 +72,11 @@ MinP: 0
 # Python 3.10+
 python --version
 
-# SGLang installation
+# SGLang installation (for Thinking Model)
 pip install sglang[all]
+
+# vLLM installation (for Coder Model)
+pip install vllm
 
 # Docker (for Sandbox)
 docker --version
@@ -80,13 +85,16 @@ nvidia-docker --version  # For GPU usage
 
 ### 2.3 Model Server Launch
 
+**Thinking Model — SGLang (port 8000):**
+
 ```bash
 # Serve Qwen3-Next-80B-A3B-Thinking-FP8 with SGLang
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
     --tp 2 \
     --context-length 262144 \
-    --port 30000 \
+    --port 8000 \
     --host 0.0.0.0
 ```
 
@@ -94,11 +102,25 @@ python -m sglang.launch_server \
 ```bash
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
     --tp 2 \
     --context-length 262144 \
     --speculative-algorithm NEXTN \
     --speculative-num-draft-tokens 3 \
-    --port 30000 \
+    --port 8000 \
+    --host 0.0.0.0
+```
+
+**Coder Model — vLLM (port 8001):**
+
+```bash
+# Serve Qwen3-Coder-Next-FP8 with vLLM
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3-Coder-Next-FP8 \
+    --served-model-name Qwen3-Coder-Next-FP8 \
+    --tensor-parallel-size 2 \
+    --max-model-len 262144 \
+    --port 8001 \
     --host 0.0.0.0
 ```
 
@@ -142,7 +164,8 @@ Create the config files manually as described in Section 5.
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-export QWEN_BASE_URL="http://localhost:30000/v1"
+export QWEN_BASE_URL="http://localhost:8000/v1"
+export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ```
 
 ---
@@ -210,26 +233,50 @@ Copy and use the following content:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "qwen/qwen3-next-80b-a3b-thinking",
   "provider": {
     "qwen": {
-      "name": "Qwen3-Next-Thinking Server (SGLang)",
+      "name": "Qwen3-Next-Thinking (Reasoning)",
       "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8000/v1",
+      "env": [],
       "options": {
-        "timeout": 600000,
-        "baseURL": "{env:QWEN_BASE_URL}"
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "qwen3-next-80b-a3b-thinking": {
+        "Qwen3-Next-80B-A3B-Thinking-FP8": {
           "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",
+          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
           "tool_call": true,
-          "reasoning": true,
           "temperature": true,
-          "limit": {
-            "context": 262144,
-            "output": 16384
-          }
+          "reasoning": true,
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
+        }
+      }
+    },
+    "qwen-coder": {
+      "name": "Qwen3-Coder-Next (Code)",
+      "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8001/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8001/v1"
+      },
+      "models": {
+        "Qwen3-Coder-Next-FP8": {
+          "name": "Qwen3-Coder-Next-FP8",
+          "id": "Qwen3-Coder-Next-FP8",
+          "tool_call": true,
+          "temperature": true,
+          "reasoning": false,
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
         }
       }
     }
@@ -435,11 +482,15 @@ Error: Failed to connect to model server
 
 **Solution**:
 ```bash
-# Check server status
-curl http://localhost:30000/v1/models
+# Check Thinking Model server status (SGLang, port 8000)
+curl http://localhost:8000/v1/models
 
-# Check environment variable
+# Check Coder Model server status (vLLM, port 8001)
+curl http://localhost:8001/v1/models
+
+# Check environment variables
 echo $QWEN_BASE_URL
+echo $QWEN_CODER_BASE_URL
 ```
 
 ### 8.3 Docker Sandbox Failed
@@ -523,10 +574,11 @@ List of tools available to each agent:
 
 | Agent | Bash | Read | Edit | Write | Glob | Grep | Primary Role |
 |-------|:----:|:----:|:----:|:-----:|:----:|:----:|-------------|
+| **workspace-analyzer** | Yes | Yes | No | No | Yes | Yes | Workspace analysis |
 | env-setup | Yes | Yes | No | No | Yes | Yes | Environment detection |
 | git-input | Yes | Yes | No | No | Yes | No | Git parsing |
 | pre-checker | Yes | Yes | No | No | Yes | Yes | Lint/Format |
-| code-reviewer | Yes | Yes | No | No | Yes | Yes | Code analysis |
+| **code-reviewer** | **No** | Yes | No | No | **No** | **No** | Code analysis |
 | code-fixer | Yes | Yes | Yes | Yes | Yes | Yes | Code modification |
 | quality-checker | Yes | Yes | No | No | Yes | Yes | Quality check |
 | build-tester | Yes | Yes | No | No | Yes | No | Build testing |
@@ -537,7 +589,7 @@ List of tools available to each agent:
 
 **Key Permission Notes:**
 - **code-fixer**: Only agent with Edit/Write permissions (code modification required)
-- **code-reviewer, summary-reporter**: Can analyze file contents with Bash/Read permissions
+- **code-reviewer**: Read permission only (Glob/Grep/Bash disabled). Can only analyze files explicitly passed by the orchestrator.
 - **All Agents**: Dangerous commands blocked (rm -rf, git push --force, etc.)
 
 ---
@@ -626,7 +678,8 @@ commit_result = ""           # Commit result
 ### Environment Variables (Required)
 
 ```bash
-QWEN_BASE_URL="http://localhost:30000/v1"
+QWEN_BASE_URL="http://localhost:8000/v1"
+QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ```
 
 ### Command Summary
@@ -647,6 +700,5 @@ QWEN_BASE_URL="http://localhost:30000/v1"
 
 ## Related Documents
 
-- [05-integrated-configuration.md](./05-integrated-configuration.md) - Complete configuration guide
 - [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - Environment setup details
 - [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - Full workflow diagram

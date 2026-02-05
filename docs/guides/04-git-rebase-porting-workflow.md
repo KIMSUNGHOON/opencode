@@ -1,3 +1,5 @@
+> **Note**: This document references `sglang/gpt-oss-120b` model IDs which are outdated. The current system uses a dual model strategy: `qwen/Qwen3-Next-80B-A3B-Thinking-FP8` (Thinking) and `qwen-coder/Qwen3-Coder-Next-FP8` (Coder). See [14-code-qa-v4-quick-start.md](./14-code-qa-v4-quick-start.md) for current configuration. The rebase/porting workflow described here remains valid.
+
 # Git Rebase/Porting 워크플로우 가이드
 
 ## 개요

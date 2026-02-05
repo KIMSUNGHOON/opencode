@@ -1,3 +1,5 @@
+> **Note**: This document references `sglang/gpt-oss-120b` model IDs which are outdated. See [14-code-qa-v4-quick-start.md](./14-code-qa-v4-quick-start.md) for current model configuration.
+
 # Git Rebase/Porting Workflow - Agent 다이어그램
 
 이 문서는 Git Rebase/Porting 워크플로우의 Agent 구성과 데이터 흐름을 시각화합니다.
@@ -496,4 +498,4 @@ flowchart TB
 
 - [Git Rebase/Porting 워크플로우 가이드](./04-git-rebase-porting-workflow.md)
 - [Custom Agent 가이드](./02-custom-agent-guide.md)
-- [통합 설정 가이드](./05-integrated-configuration.md)
+- [Code QA v4 Quick Start](./14-code-qa-v4-quick-start.md)

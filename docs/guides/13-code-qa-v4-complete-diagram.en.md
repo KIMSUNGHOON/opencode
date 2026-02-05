@@ -74,50 +74,51 @@ This document provides an integrated diagram of the complete **Code QA v4 Workfl
 
 | Phase | Agent | Model | Role | Execution Environment |
 |-------|-------|-------|------|----------------------|
-| **-1** | `@env-setup` | Qwen3-Next-Thinking | Shell/conda/venv environment detection | Host |
-| **0** | `@git-input` | Qwen3-Next-Thinking | Git diff extraction, changed file list | Host |
-| **1** | `@pre-checker` | Qwen3-Next-Thinking | Auto-fix (lint --fix, format) | Host |
+| **-1** | `@env-setup` | Qwen3-Coder-Next | Shell/conda/venv environment detection | Host |
+| **0** | `@git-input` | Qwen3-Coder-Next | Git diff extraction, changed file list | Host |
+| **1** | `@pre-checker` | Qwen3-Coder-Next | Auto-fix (lint --fix, format) | Host |
 | **2** | `@code-reviewer` | Qwen3-Next-Thinking | Deep code analysis, issue detection (CoT) | Host |
-| **3** | `@code-fixer` | Qwen3-Next-Thinking | Fix discovered issues | Host |
+| **3** | `@code-fixer` | Qwen3-Coder-Next | Fix discovered issues (SWE-Bench) | Host |
 | **4** | `@quality-checker` | Qwen3-Next-Thinking | Quality score check (≥70%) | Host |
-| **5** | `@build-tester` | Qwen3-Next-Thinking | Build test (GPU) | **Sandbox** |
-| **6** | `@function-tester` | Qwen3-Next-Thinking | Function test (GPU) | **Sandbox** |
-| **7** | `@git-committer` | Qwen3-Next-Thinking | Commit or Amend | Host |
+| **5** | `@build-tester` | Qwen3-Coder-Next | Build test (GPU) | **Sandbox** |
+| **6** | `@function-tester` | Qwen3-Coder-Next | Function test (GPU) | **Sandbox** |
+| **7** | `@git-committer` | Qwen3-Coder-Next | Commit or Amend | Host |
 | **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown result report (CoT) | Host |
-| **9** | `@git-pusher` | Qwen3-Next-Thinking | Push & PR creation | Host |
+| **9** | `@git-pusher` | Qwen3-Coder-Next | Push & PR creation | Host |
 
-### 2.1 Single Model Strategy
+> ⚠️ **Note**: code-reviewer has Read permission only (Glob/Grep/Bash disabled). It can only analyze files explicitly passed by the orchestrator.
+
+### 2.1 Dual Model Strategy
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Single Model Strategy                                        │
+│                              Dual Model Strategy                                          │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  Qwen3-Next-80B-A3B-Thinking-FP8 (All Agents - 100%)                            │   │
+│  │  [Thinking] Qwen3-Next-80B-A3B-Thinking-FP8 (SGLang, port 8000)               │   │
 │  │  ──────────────────────────────────────────────────                             │   │
-│  │  • Thinking Mode + Tool Calling both supported                                  │   │
-│  │  • 256K Context Window                                                          │   │
-│  │  • 16K Output Limit                                                             │   │
-│  │  • FP8 quantization ~76GB VRAM                                                  │   │
-│  │                                                                                  │   │
-│  │  Advantages:                                                                     │   │
-│  │  • No model switching → Consistent performance, low latency                     │   │
-│  │  • Simple infrastructure → Single model server needed                           │   │
-│  │  • Reasoning + Tool Calling integrated                                          │   │
-│  │                                                                                  │   │
-│  │  Applied: Orchestrator + All 11 Agents                                          │   │
+│  │  • Thinking Mode + CoT reasoning specialized (4 agents)                        │   │
+│  │  • Applied: Orchestrator, code-reviewer, quality-checker, summary-reporter     │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  [Coder] Qwen3-Coder-Next-FP8 (vLLM, port 8001)                               │   │
+│  │  ──────────────────────────────────────────────────                             │   │
+│  │  • Tool Calling + code generation/modification specialized (10 agents)         │   │
+│  │  • Applied: env-setup, git-input, file-input, workspace-analyzer, pre-checker, │   │
+│  │    code-fixer, build-tester, function-tester, git-committer, git-pusher        │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
 │  ═══════════════════════════════════════════════════════════════════════════════════   │
 │                                                                                          │
 │   Phase -1  Phase 0   Phase 1   Phase 2   Phase 3   Phase 4   Phase 5-6   Phase 7-9   │
 │   ┌─────┐  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌───────┐   ┌───────┐   │
-│   │Qwen3│  │Qwen3│   │Qwen3│   │Qwen3│   │Qwen3│   │Qwen3│   │ Qwen3 │   │ Qwen3 │   │
-│   │Next │→ │Next │ → │Next │ → │Next │ → │Next │ → │Next │ → │ Next  │ → │ Next  │   │
+│   │Coder│  │Coder│   │Coder│   │Think│   │Coder│   │Think│   │ Coder │   │ Mixed │   │
+│   │     │→ │     │ → │     │ → │ ing │ → │     │ → │ ing │ → │       │ → │       │   │
 │   └─────┘  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘   └───────┘   └───────┘   │
 │    env      git       pre      review     fix      quality   build/test  commit/     │
-│   setup    input     check      (CoT)    (tool)    check      (agent)    summary     │
+│   setup    input     check      (CoT)    (SWE)    check      (Coder)    summary     │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -440,7 +441,8 @@ project-root/
 │ @pre-checker      │  ✅   │  ❌   │ diff           │ lint --fix,    │ ❌                    │
 │                   │       │       │                │ format         │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
-│ @code-reviewer    │  ✅   │  ❌   │ diff, log      │ ❌             │ ❌                    │
+│ @code-reviewer    │  ✅   │  ❌   │ ❌ (Read only!)│ ❌             │ ❌                    │
+│ ⚠️ Read only     │       │       │                │                │                       │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤
 │ @code-fixer       │  ✅   │  ✅   │ diff, status   │ ❌             │ ❌                    │
 ├───────────────────┼───────┼───────┼────────────────┼────────────────┼───────────────────────┤

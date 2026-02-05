@@ -1,3 +1,5 @@
+> **Note**: This document references `gpt-oss-120b` model IDs which are outdated. The current system uses a dual model strategy: `qwen/Qwen3-Next-80B-A3B-Thinking-FP8` (Thinking, SGLang port 8000) and `qwen-coder/Qwen3-Coder-Next-FP8` (Coder, vLLM port 8001). See [14-code-qa-v4-quick-start.md](./14-code-qa-v4-quick-start.md) for current configuration. The air-gapped infrastructure patterns described here remain valid.
+
 # 사내 보안 인프라 (Air-gapped) 환경 구축 가이드
 
 ## 개요

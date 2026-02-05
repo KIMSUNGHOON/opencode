@@ -210,10 +210,11 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  ├── quality-checker   (Phase 4)                                  │
 │  └── summary-reporter  (Phase 8)                                  │
 │                                                                    │
-│  Coder 모델: 9개 Agent                                             │
+│  Coder 모델: 10개 Agent                                            │
 │  ├── env-setup           (Phase -1)                               │
 │  ├── workspace-analyzer  (Phase 0B)                               │
 │  ├── git-input           (Phase 0)                                │
+│  ├── file-input          (Non-Git 입력)                           │
 │  ├── pre-checker         (Phase 1)                                │
 │  ├── code-fixer          (Phase 3)   ★ 가장 큰 임팩트             │
 │  ├── build-tester        (Phase 5)                                │
@@ -221,7 +222,7 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  ├── git-committer       (Phase 7)                                │
 │  └── git-pusher          (Phase 9)                                │
 │                                                                    │
-│  비율: Thinking 30% vs Coder 70% (에이전트 수 기준)                 │
+│  비율: Thinking 29% vs Coder 71% (에이전트 수 기준, 4:10)           │
 │  추론 부하: Thinking 60% vs Coder 40% (추론 시간 기준, 추정)         │
 │                                                                    │
 └───────────────────────────────────────────────────────────────────┘
@@ -556,37 +557,51 @@ python3 -m sglang.launch_server \
 
 ```jsonc
 {
-  // Provider 설정
+  // 실제 구현된 Provider 설정 (opencode.jsonc)
   "provider": {
-    "qwen-thinking": {
-      "name": "Qwen3-Next-Thinking (추론)",
+    "qwen": {
+      "name": "Qwen3-Next-Thinking (Reasoning)",
       "npm": "@ai-sdk/openai-compatible",
-      "api": "http://llm.internal:8000/v1",
+      "api": "http://localhost:8000/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8000/v1"
+      },
       "models": {
-        "qwen3-next-80b-a3b-thinking": {
-          "name": "Qwen3-Next-Thinking-80B-A3B",
+        "Qwen3-Next-80B-A3B-Thinking-FP8": {
+          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
+          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
           "tool_call": true,
+          "temperature": true,
           "reasoning": true,
-          "limit": {
-            "context": 262144,
-            "output": 16384
-          }
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
         }
       }
     },
     "qwen-coder": {
-      "name": "Qwen3-Coder-Next (코드)",
+      "name": "Qwen3-Coder-Next (Code)",
       "npm": "@ai-sdk/openai-compatible",
-      "api": "http://llm.internal:8001/v1",
+      "api": "http://localhost:8001/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8001/v1"
+      },
       "models": {
-        "qwen3-coder-next-fp8": {
+        "Qwen3-Coder-Next-FP8": {
           "name": "Qwen3-Coder-Next-FP8",
+          "id": "Qwen3-Coder-Next-FP8",
           "tool_call": true,
+          "temperature": true,
           "reasoning": false,
-          "limit": {
-            "context": 262144,
-            "output": 16384
-          }
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
         }
       }
     }
@@ -599,15 +614,15 @@ python3 -m sglang.launch_server \
 각 에이전트 `.md` 파일의 frontmatter에서 `model` 필드를 변경:
 
 ```yaml
-# Thinking 모델 유지 에이전트 (4개)
-# code-qa.md, code-reviewer.md, quality-checker.md, summary-reporter.md
-model: qwen-thinking/qwen3-next-80b-a3b-thinking
+# Thinking 모델 에이전트 (4개)
+# code-qa.md (mode), code-reviewer.md, quality-checker.md, summary-reporter.md
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 
-# Coder 모델 변경 에이전트 (9개)
-# env-setup.md, git-input.md, pre-checker.md, code-fixer.md,
-# build-tester.md, function-tester.md, git-committer.md,
-# git-pusher.md, workspace-analyzer.md
-model: qwen-coder/qwen3-coder-next-fp8
+# Coder 모델 에이전트 (10개)
+# env-setup.md, git-input.md, file-input.md, workspace-analyzer.md,
+# pre-checker.md, code-fixer.md, build-tester.md, function-tester.md,
+# git-committer.md, git-pusher.md
+model: qwen-coder/Qwen3-Coder-Next-FP8
 ```
 
 ---
@@ -672,9 +687,9 @@ model: qwen-coder/qwen3-coder-next-fp8
 │  workflow-settings.yaml에 fallback 설정 추가:                                         │
 │                                                                                      │
 │  model:                                                                               │
-│    thinking: "qwen-thinking/qwen3-next-80b-a3b-thinking"                             │
-│    coder: "qwen-coder/qwen3-coder-next-fp8"                                         │
-│    fallback: "qwen-thinking/qwen3-next-80b-a3b-thinking"  # 장애 시 전환              │
+│    thinking: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"                                 │
+│    coder: "qwen-coder/Qwen3-Coder-Next-FP8"                                         │
+│    fallback: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"  # 장애 시 전환                  │
 │                                                                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -683,17 +698,18 @@ model: qwen-coder/qwen3-coder-next-fp8
 
 ## 8. 구현 로드맵
 
-### Phase 1: 인프라 준비
-- [ ] Qwen3-Coder-Next-FP8 모델 다운로드 및 내부 전송
-- [ ] GPU 노드 배포 (옵션 A 또는 B 선택)
-- [ ] SGLang >= 0.5.8 설치 및 Coder 모델 서빙 테스트
-- [ ] 엔드포인트 health check 및 추론 테스트
+### Phase 1: 인프라 준비 ✅ 완료
+- [x] Qwen3-Coder-Next-FP8 모델 다운로드 및 내부 전송
+- [x] GPU 노드 배포 (옵션 A: 별도 노드 2대)
+- [x] SGLang (Thinking, port 8000) + vLLM (Coder, port 8001) 서빙
+- [x] 엔드포인트 health check 및 추론 테스트
 
-### Phase 2: 설정 변경
-- [ ] opencode.jsonc에 `qwen-coder` provider 추가
-- [ ] 9개 에이전트 `.md` 파일의 `model` 필드 변경
-- [ ] workflow-settings.yaml에 듀얼 모델 설정 추가
-- [ ] Fallback 설정 추가
+### Phase 2: 설정 변경 ✅ 완료
+- [x] opencode.jsonc에 `qwen` + `qwen-coder` 듀얼 provider 추가
+- [x] 10개 에이전트 `.md` 파일의 `model` 필드를 Coder 모델로 변경
+- [x] 9개 command `.md` 파일의 `model` 필드 듀얼 모델 반영
+- [x] workflow-settings.yaml에 듀얼 모델 설정 추가
+- [x] Fallback 설정 추가
 
 ### Phase 3: 통합 테스트
 - [ ] 각 에이전트별 단독 테스트 (Coder 모델)
@@ -713,7 +729,7 @@ model: qwen-coder/qwen3-coder-next-fp8
 
 | 결론 항목 | 요약 |
 |-----------|------|
-| **모델 할당** | Thinking 4개 (추론 집약) + Coder 9개 (코드/유틸리티) |
+| **모델 할당** | Thinking 4개 (추론 집약) + Coder 10개 (코드/유틸리티) |
 | **Context 관리** | Orchestrator가 Context Broker로 3-Layer 프로토콜 적용 |
 | **핵심 개선점** | code-fixer의 SWE-Bench 성능 활용, Non-thinking 속도 이점 |
 | **인프라** | 2x H100 NVL 추가 (또는 4-GPU 단일 노드) |

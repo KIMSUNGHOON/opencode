@@ -74,41 +74,40 @@
 
 | Phase | Agent | 모델 | 역할 | 실행 환경 |
 |-------|-------|------|------|-----------|
-| **-1** | `@env-setup` | Qwen3-Next-Thinking | Shell/conda/venv 환경 감지 | 호스트 |
-| **0** | `@git-input` | Qwen3-Next-Thinking | Git diff 추출, 변경 파일 목록 | 호스트 |
-| **1** | `@pre-checker` | Qwen3-Next-Thinking | 자동 수정 (lint --fix, format) | 호스트 |
+| **-1** | `@env-setup` | Qwen3-Coder-Next | Shell/conda/venv 환경 감지 | 호스트 |
+| **0** | `@git-input` | Qwen3-Coder-Next | Git diff 추출, 변경 파일 목록 | 호스트 |
+| **1** | `@pre-checker` | Qwen3-Coder-Next | 자동 수정 (lint --fix, format) | 호스트 |
 | **2** | `@code-reviewer` | Qwen3-Next-Thinking | 심층 코드 분석 (Read만, CoT) | 호스트 |
-| **3** | `@code-fixer` | Qwen3-Next-Thinking | 발견된 이슈 수정 | 호스트 |
+| **3** | `@code-fixer` | Qwen3-Coder-Next | 발견된 이슈 수정 (SWE-Bench) | 호스트 |
 | **4** | `@quality-checker` | Qwen3-Next-Thinking | 품질 점수 검사 (≥70%) | 호스트 |
-| **5** | `@build-tester` | Qwen3-Next-Thinking | 빌드 테스트 (GPU) | **Sandbox** |
-| **6** | `@function-tester` | Qwen3-Next-Thinking | 기능 테스트 (GPU) | **Sandbox** |
-| **7** | `@git-committer` | Qwen3-Next-Thinking | Commit 또는 Amend | 호스트 |
+| **5** | `@build-tester` | Qwen3-Coder-Next | 빌드 테스트 (GPU) | **Sandbox** |
+| **6** | `@function-tester` | Qwen3-Coder-Next | 기능 테스트 (GPU) | **Sandbox** |
+| **7** | `@git-committer` | Qwen3-Coder-Next | Commit 또는 Amend | 호스트 |
 | **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown 결과 리포트 (CoT) | 호스트 |
-| **9** | `@git-pusher` | Qwen3-Next-Thinking | Push & PR 생성 | 호스트 |
+| **9** | `@git-pusher` | Qwen3-Coder-Next | Push & PR 생성 | 호스트 |
 
 > ⚠️ **Note**: code-reviewer는 Read 권한만 보유 (Glob/Grep/Bash 비활성화). 오케스트레이터가 전달한 파일만 분석 가능.
 
-### 2.1 단일 모델 전략
+### 2.1 듀얼 모델 전략
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              단일 모델 전략                                               │
+│                              듀얼 모델 전략                                               │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  Qwen3-Next-80B-A3B-Thinking-FP8 (모든 Agent - 100%)                            │   │
+│  │  [Thinking] Qwen3-Next-80B-A3B-Thinking-FP8 (SGLang, port 8000)               │   │
 │  │  ──────────────────────────────────────────────────                             │   │
-│  │  • Thinking Mode + Tool Calling 모두 지원                                        │   │
-│  │  • 256K Context Window                                                          │   │
-│  │  • 16K Output Limit                                                             │   │
-│  │  • FP8 양자화로 ~76GB VRAM                                                       │   │
-│  │                                                                                  │   │
-│  │  장점:                                                                           │   │
-│  │  • 모델 전환 없음 → 일관된 성능, 낮은 지연시간                                    │   │
-│  │  • 단순한 인프라 → 하나의 모델 서버만 필요                                        │   │
-│  │  • Reasoning + Tool Calling 통합                                                │   │
-│  │                                                                                  │   │
-│  │  적용: 오케스트레이터 + 모든 11개 Agent                                           │   │
+│  │  • Thinking Mode + CoT 추론 특화 (4 agents)                                     │   │
+│  │  • 적용: Orchestrator, code-reviewer, quality-checker, summary-reporter         │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  [Coder] Qwen3-Coder-Next-FP8 (vLLM, port 8001)                               │   │
+│  │  ──────────────────────────────────────────────────                             │   │
+│  │  • Tool Calling + 코드 생성/수정 특화 (10 agents)                                │   │
+│  │  • 적용: env-setup, git-input, file-input, workspace-analyzer, pre-checker,     │   │
+│  │    code-fixer, build-tester, function-tester, git-committer, git-pusher         │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
 │  ═══════════════════════════════════════════════════════════════════════════════════   │

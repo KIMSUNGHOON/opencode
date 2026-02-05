@@ -637,6 +637,32 @@ IF Task result contains "GIT_INPUT_RESULT: NO_GIT_REPO":
     → If user inputs "exit" or "quit":
         → terminate workflow
 
+IF Task result contains "GIT_INPUT_RESULT: NO_CHANGES":
+    → Output "No changed files found. Working directory is clean."
+    → Terminate workflow (nothing to review)
+
+IF Task result contains "GIT_INPUT_RESULT: DELETED_ONLY":
+    → Output "Only deleted files found. No code to analyze."
+    → Terminate workflow (deleted files cannot be reviewed)
+
+IF Task result contains "GIT_INPUT_RESULT: NO_CODE_FILES":
+    → Output "No code files changed (only config/docs files). Skipping code review."
+    → Terminate workflow (no code to review)
+
+IF Task result contains "GIT_INPUT_RESULT: DETACHED_HEAD":
+    → Wait for user response (WAITING_FOR: USER_CHOICE)
+    → If user inputs branch name: call git-input again with "Create branch: {name}"
+    → If user inputs "qa-only" or "continue": proceed with changed_files, set use_git_mode = false (skip commit/push)
+    → If user inputs "exit": terminate workflow
+
+IF Task result contains "GIT_INPUT_RESULT: MERGE_CONFLICT":
+    → Output "Merge conflict detected. Please resolve conflicts before running Code QA."
+    → Terminate workflow (user must resolve conflicts manually)
+
+IF Task result contains "GIT_INPUT_RESULT: REBASE_IN_PROGRESS":
+    → Output "Rebase in progress. Please complete or abort rebase before running Code QA."
+    → Terminate workflow (user must complete/abort rebase manually)
+
 IF Task result contains "GIT_INPUT_RESULT: WAITING_INPUT" AND "WAITING_FOR: INIT_CONFIRMATION":
     → User is confirming initial commit
     → Wait for user response (commit/y, .gitignore, abort)
@@ -967,11 +993,22 @@ IF Task result contains "BUILD_RESULT: SUCCESS":
     → Proceed to STEP 8
 
 IF Task result contains "BUILD_RESULT: FAIL":
-    → Regress to STEP 5 (max 3 times)
+    IF retry_count < 3:
+        retry_count += 1
+        → Regress to STEP 5 (code-fixer) with build error details
+    ELSE:
+        → Abort workflow, output "Maximum retry count exceeded"
+
+IF Task result contains "BUILD_RESULT: FAIL_DEPS":
+    → Output dependency error info and suggested fix command
+    → Wait for user response:
+        → If user inputs "retry/y": retry build (install deps first)
+        → If user inputs "skip/n": skip build, proceed to STEP 8
 ```
 
 → Success: go to STEP 8
-→ Failure: regress to STEP 5 (max 3 times)
+→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
+→ Dependency error: wait for user to install deps, then retry
 → Reset: regress to STEP 1
 
 ### STEP 8: Function Test (User Confirmation Required)
@@ -1009,14 +1046,18 @@ IF Task result contains "TEST_RESULT: SUCCESS":
     → Proceed to STEP 9
 
 IF Task result contains "TEST_RESULT: FAIL":
-    → Regress to STEP 5 (max 3 times)
+    IF retry_count < 3:
+        retry_count += 1
+        → Regress to STEP 5 (code-fixer) with test failure details
+    ELSE:
+        → Abort workflow, output "Maximum retry count exceeded"
 
 IF Task result contains "TEST_RESULT: SKIPPED" or "TEST_RESULT: NO_TESTS":
     → Proceed to STEP 9 (test skipped)
 ```
 
 → Success/Skip: go to STEP 9
-→ Failure: regress to STEP 5 (max 3 times)
+→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
 
 ### STEP 9: Git Commit (User Confirmation Required) - Git Mode Only
 

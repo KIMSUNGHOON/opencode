@@ -455,7 +455,7 @@ project-root/
 | 항목 | 값 | 설명 |
 |------|-----|------|
 | **mode** | `subagent` | 다른 Agent에서 호출 |
-| **model** | `qwen/qwen3-next-80b-a3b-thinking` | Thinking + Tool calling 모델 |
+| **model** | `qwen-coder/Qwen3-Coder-Next-FP8` | Coder 모델 (vLLM, port 8001) |
 | **color** | `#95A5A6` | UI 표시 색상 |
 
 ### 7.3 권한 매트릭스
@@ -478,7 +478,7 @@ project-root/
 ---
 description: 개발 환경 감지 및 설정 전문가
 mode: subagent
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/Qwen3-Coder-Next-FP8
 color: "#95A5A6"
 tools:
   "*": false
@@ -653,7 +653,7 @@ project-root/
 ```markdown
 ---
 description: "Code QA 워크플로우 v4 (Environment + Git + Sandbox 통합)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 ---
 
 # Code QA Workflow v4
@@ -766,52 +766,56 @@ Build와 Test는 **기본적으로 Docker Sandbox에서 실행**됩니다.
 
 | Phase | Agent | 역할 | 모델 | 실행 환경 |
 |-------|-------|------|------|-----------|
-| -1 | `@env-setup` | 환경 설정 | Qwen3-Next-Thinking | 호스트 |
-| 0 | `@git-input` | Git diff 추출 | Qwen3-Next-Thinking | 호스트 |
-| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | Qwen3-Next-Thinking | 호스트 |
+| -1 | `@env-setup` | 환경 설정 | Qwen3-Coder-Next | 호스트 |
+| 0 | `@git-input` | Git diff 추출 | Qwen3-Coder-Next | 호스트 |
+| 1 | `@pre-checker` | 자동 수정 (lint --fix, format) | Qwen3-Coder-Next | 호스트 |
 | 2 | `@code-reviewer` | 심층 코드 분석 (Read만 가능) | Qwen3-Next-Thinking | 호스트 |
-| 3 | `@code-fixer` | 이슈 수정 | Qwen3-Next-Thinking | 호스트 |
+| 3 | `@code-fixer` | 이슈 수정 | Qwen3-Coder-Next | 호스트 |
 | 4 | `@quality-checker` | 품질 검사 (≥70%) | Qwen3-Next-Thinking | 호스트 |
-| 5 | `@build-tester` | 빌드 테스트 | Qwen3-Next-Thinking | **Sandbox (기본)** |
-| 6 | `@function-tester` | 기능 테스트 | Qwen3-Next-Thinking | **Sandbox (기본)** |
-| 7 | `@git-committer` | 커밋/amend | Qwen3-Next-Thinking | 호스트 |
+| 5 | `@build-tester` | 빌드 테스트 | Qwen3-Coder-Next | **Sandbox (기본)** |
+| 6 | `@function-tester` | 기능 테스트 | Qwen3-Coder-Next | **Sandbox (기본)** |
+| 7 | `@git-committer` | 커밋/amend | Qwen3-Coder-Next | 호스트 |
 | 8 | `@summary-reporter` | 결과 리포트 | Qwen3-Next-Thinking | 호스트 |
-| 9 | `@git-pusher` | Push & PR (사용자 확인) | Qwen3-Next-Thinking | 호스트 |
+| 9 | `@git-pusher` | Push & PR (사용자 확인) | Qwen3-Coder-Next | 호스트 |
 
 > ⚠️ **Note**: code-reviewer는 Read 권한만 가집니다. 오케스트레이터가 전달한 파일만 분석할 수 있습니다.
 
-### 8.6 단일 모델 전략
+### 8.6 듀얼 모델 전략
 
 #### 모델 특성
 
-| 모델 | 총 파라미터 | 활성 파라미터 | 특화 영역 |
-|------|------------|--------------|-----------|
-| **Qwen3-Next-80B-A3B-Thinking-FP8** | 80B | ~3B/token (A3B) | Thinking + Tool Calling |
+| 모델 | 서빙 엔진 | 포트 | 특화 영역 |
+|------|----------|------|-----------|
+| **Qwen3-Next-80B-A3B-Thinking-FP8** | SGLang | 8000 | Thinking + Reasoning (오케스트레이션, 코드 리뷰, 품질 검사, 요약) |
+| **Qwen3-Coder-Next-FP8** | vLLM | 8001 | Code Generation + Tool Calling (환경 설정, 코드 수정, 빌드/테스트, Git 작업) |
 
 #### 전략 설명
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              단일 모델 전략                                               │
+│                              듀얼 모델 전략                                               │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
-│  Qwen3-Next-80B-A3B-Thinking-FP8 (모든 Agent - 100%)                                    │
-│  ────────────────────────────────────────────────────                                   │
-│  • Thinking Mode + Tool Calling 모두 지원                                                │
-│  • 256K Context Window                                                                  │
-│  • 16K Output Limit                                                                     │
-│  • FP8 양자화로 ~76GB VRAM                                                               │
+│  [Thinking] Qwen3-Next-80B-A3B-Thinking-FP8 (SGLang, port 8000)                       │
+│  ──────────────────────────────────────────────────────────────                         │
+│  • Thinking Mode + Deep Reasoning 특화 (4 agents)                                      │
+│  • 적용: Orchestrator, code-reviewer, quality-checker, summary-reporter                │
 │                                                                                          │
-│  장점:                                                                                   │
-│  • 모델 전환 없음 → 일관된 성능, 낮은 지연시간                                            │
-│  • 단순한 인프라 → 하나의 모델 서버만 필요                                                │
-│  • Reasoning + Tool Calling 통합                                                        │
+│  [Coder] Qwen3-Coder-Next-FP8 (vLLM, port 8001)                                      │
+│  ──────────────────────────────────────────────────────────────                         │
+│  • Code Generation + Tool Calling 특화 (10 agents)                                     │
+│  • 적용: env-setup, git-input, file-input, workspace-analyzer, pre-checker,            │
+│    code-fixer, build-tester, function-tester, git-committer, git-pusher                │
 │                                                                                          │
 │  ═══════════════════════════════════════════════════════════════════════════════════    │
 │                                                                                          │
-│  @code-reviewer → Qwen3-Next-Thinking (CoT로 깊은 코드 분석, Read 권한만)               │
-│  @code-fixer    → Qwen3-Next-Thinking (코드 수정, Edit/Write 권한)                      │
-│  @summary-reporter → Qwen3-Next-Thinking (CoT로 결과 종합)                              │
+│  @code-reviewer     → Thinking (CoT로 깊은 코드 분석, Read 권한만)                      │
+│  @quality-checker   → Thinking (CoT로 품질 점수 평가)                                    │
+│  @summary-reporter  → Thinking (CoT로 결과 종합)                                        │
+│  @code-fixer        → Coder (코드 수정, Edit/Write 권한)                                │
+│  @env-setup         → Coder (환경 감지 및 설정, Bash/Read 권한)                          │
+│  @build-tester      → Coder (빌드 실행, Bash 권한)                                      │
+│  @function-tester   → Coder (테스트 실행, Bash 권한)                                    │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -972,4 +976,4 @@ sandbox:
 - [**Code QA v4 전체 다이어그램** ⭐](./13-code-qa-v4-complete-diagram.md)
 - [Code QA v4 Quick Start](./14-code-qa-v4-quick-start.md)
 - [Custom Agent 가이드](./02-custom-agent-guide.md)
-- [통합 설정 가이드](./05-integrated-configuration.md)
+- [Code QA v4 Quick Start](./14-code-qa-v4-quick-start.md)

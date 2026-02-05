@@ -35,7 +35,9 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 ### 1.2 주요 특징
 
-- **단일 모델 전략**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling)
+- **듀얼 모델 전략**:
+  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
+  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
 - **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
 - **회귀 루프**: 품질 기준 미달 시 자동 재시도 (최대 3회)
@@ -45,15 +47,18 @@ Code QA v4는 11개의 Phase로 구성된 자동화된 코드 품질 검사 워�
 
 ### 1.3 모델 스펙
 
-| 항목 | 값 |
-|------|-----|
-| **모델** | Qwen3-Next-80B-A3B-Thinking-FP8 |
-| **Context Window** | 256K |
-| **Output Limit** | 16K |
-| **Reasoning** | ✅ (thinking mode) |
-| **Tool Calling** | ✅ |
-| **VRAM 요구량** | ~76GB (FP8) |
-| **권장 GPU** | 2x H100 NVL 96GB |
+| 항목 | Thinking Model | Coder Model |
+|------|---------------|-------------|
+| **모델** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
+| **서빙 엔진** | SGLang | vLLM |
+| **포트** | 8000 | 8001 |
+| **Context Window** | 256K | 256K |
+| **Output Limit** | 16K | 16K |
+| **Reasoning** | ✅ (thinking mode) | ❌ |
+| **Tool Calling** | ✅ | ✅ |
+| **VRAM 요구량** | ~76GB (FP8) | ~40GB (FP8) |
+| **권장 GPU** | 2x H100 NVL 96GB | 1x H100 NVL 96GB |
+| **담당 Agent** | Orchestrator, code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
 ### 1.4 공식 샘플링 파라미터
 
@@ -70,8 +75,8 @@ MinP: 0
 
 ### 2.1 하드웨어
 
-- GPU: 2x H100 NVL 96GB (또는 동급)
-- VRAM: 최소 160GB (모델 + KV cache)
+- GPU: 3x H100 NVL 96GB (또는 동급) — Thinking 2x + Coder 1x
+- VRAM: 최소 240GB (두 모델 + KV cache)
 
 ### 2.2 소프트웨어
 
@@ -79,8 +84,11 @@ MinP: 0
 # Python 3.10+
 python --version
 
-# SGLang 설치
+# SGLang 설치 (Thinking Model 서빙)
 pip install sglang[all]
+
+# vLLM 설치 (Coder Model 서빙)
+pip install vllm
 
 # Docker (Sandbox 사용 시)
 docker --version
@@ -89,13 +97,16 @@ nvidia-docker --version  # GPU 사용 시
 
 ### 2.3 모델 서버 실행
 
+**Thinking Model — SGLang (포트 8000):**
+
 ```bash
 # SGLang으로 Qwen3-Next-80B-A3B-Thinking-FP8 서빙
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
     --tp 2 \
     --context-length 262144 \
-    --port 30000 \
+    --port 8000 \
     --host 0.0.0.0
 ```
 
@@ -103,11 +114,25 @@ python -m sglang.launch_server \
 ```bash
 python -m sglang.launch_server \
     --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
+    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
     --tp 2 \
     --context-length 262144 \
     --speculative-algorithm NEXTN \
     --speculative-num-draft-tokens 3 \
-    --port 30000 \
+    --port 8000 \
+    --host 0.0.0.0
+```
+
+**Coder Model — vLLM (포트 8001):**
+
+```bash
+# vLLM으로 Qwen3-Coder-Next-FP8 서빙
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3-Coder-Next-FP8 \
+    --served-model-name Qwen3-Coder-Next-FP8 \
+    --tensor-parallel-size 2 \
+    --max-model-len 262144 \
+    --port 8001 \
     --host 0.0.0.0
 ```
 
@@ -151,7 +176,8 @@ rm -rf /tmp/opencode-setup
 
 ```bash
 # ~/.bashrc 또는 ~/.zshrc에 추가
-export QWEN_BASE_URL="http://localhost:30000/v1"
+export QWEN_THINKING_URL="http://localhost:8000/v1"   # Thinking Model (SGLang)
+export QWEN_CODER_URL="http://localhost:8001/v1"      # Coder Model (vLLM)
 ```
 
 ---
@@ -219,26 +245,50 @@ your-project/
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "qwen/qwen3-next-80b-a3b-thinking",
   "provider": {
     "qwen": {
-      "name": "Qwen3-Next-Thinking Server (SGLang)",
+      "name": "Qwen3-Next-Thinking (Reasoning)",
       "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8000/v1",
+      "env": [],
       "options": {
-        "timeout": 600000,
-        "baseURL": "{env:QWEN_BASE_URL}"
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "qwen3-next-80b-a3b-thinking": {
+        "Qwen3-Next-80B-A3B-Thinking-FP8": {
           "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen/Qwen3-Next-80B-A3B-Thinking-FP8",
+          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
           "tool_call": true,
-          "reasoning": true,
           "temperature": true,
-          "limit": {
-            "context": 262144,
-            "output": 16384
-          }
+          "reasoning": true,
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
+        }
+      }
+    },
+    "qwen-coder": {
+      "name": "Qwen3-Coder-Next (Code)",
+      "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8001/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8001/v1"
+      },
+      "models": {
+        "Qwen3-Coder-Next-FP8": {
+          "name": "Qwen3-Coder-Next-FP8",
+          "id": "Qwen3-Coder-Next-FP8",
+          "tool_call": true,
+          "temperature": true,
+          "reasoning": false,
+          "attachment": false,
+          "modalities": { "input": ["text"], "output": ["text"] },
+          "limit": { "context": 262144, "output": 16384 },
+          "cost": { "input": 0, "output": 0 }
         }
       }
     }
@@ -687,11 +737,15 @@ Error: Failed to connect to model server
 
 **해결**:
 ```bash
-# 서버 상태 확인
-curl http://localhost:30000/v1/models
+# Thinking Model 서버 상태 확인 (SGLang, port 8000)
+curl http://localhost:8000/v1/models
+
+# Coder Model 서버 상태 확인 (vLLM, port 8001)
+curl http://localhost:8001/v1/models
 
 # 환경 변수 확인
-echo $QWEN_BASE_URL
+echo $QWEN_THINKING_URL
+echo $QWEN_CODER_URL
 ```
 
 ### 8.3 Docker Sandbox 실패
@@ -1096,7 +1150,8 @@ commit_result = ""           # 커밋 결과
 ### 환경 변수 (필수)
 
 ```bash
-QWEN_BASE_URL="http://localhost:30000/v1"   ✅
+QWEN_THINKING_URL="http://localhost:8000/v1"   ✅ Thinking Model (SGLang)
+QWEN_CODER_URL="http://localhost:8001/v1"      ✅ Coder Model (vLLM)
 ```
 
 ### 커맨드 요약
@@ -1118,7 +1173,6 @@ QWEN_BASE_URL="http://localhost:30000/v1"   ✅
 
 ## 관련 문서
 
-- [05-integrated-configuration.md](./05-integrated-configuration.md) - 전체 설정 통합 가이드
 - [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - 환경 설정 상세
 - [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - 전체 워크플로우 다이어그램
 - [15-workspace-analysis-workflow.md](./15-workspace-analysis-workflow.md) - 워크스페이스 분석 워크플로우 설계
