@@ -285,6 +285,7 @@ use_git_mode = true          # true if no --files, false otherwise
 env_result = ""              # Content after ENV_SETUP_RESULT: SUCCESS
 changed_files = []           # File list after FILE_LIST:
 review_issues = []           # Issue list after ISSUE_LIST:
+pre_check_result = ""        # PRE_CHECK_RESULT: SUCCESS/PARTIAL
 fix_result = ""              # Content after FIX_RESULT:
 build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
 test_result = ""             # TEST_RESULT: SUCCESS/FAIL/SKIPPED
@@ -304,6 +305,7 @@ Find and save the following patterns from each Agent's result:
 | workspace-analyzer | JSON after `CACHE_DATA:` | `workspace_cache` |
 | env-setup | Everything after `ENV_SETUP_RESULT:` | `env_result` |
 | git-input | Comma-separated files after `FILE_LIST:` | `changed_files` |
+| pre-checker | `SUCCESS` or `PARTIAL` after `PRE_CHECK_RESULT:` | `pre_check_result` |
 | code-reviewer | Newline-separated items after `ISSUE_LIST:` | `review_issues` |
 | code-fixer | Everything after `FIX_RESULT:` | `fix_result` |
 | quality-checker | Number from `QUALITY_SCORE: XX/100` | `quality_score` |
@@ -794,6 +796,8 @@ Task tool call:
     ```
 - description: "Lint/Format fix"
 
+**Store result:** Extract `PRE_CHECK_RESULT: SUCCESS` or `PRE_CHECK_RESULT: PARTIAL` from the pre-checker result and save to `pre_check_result`.
+
 → On completion, go to STEP 4
 
 ### STEP 4: Code Review
@@ -1100,6 +1104,8 @@ IF Task result contains "COMMIT_RESULT: SUCCESS":
 IF Task result contains "COMMIT_RESULT: SKIPPED" or "COMMIT_RESULT: NO_CHANGES":
     → Proceed to STEP 10 (commit skipped)
 ```
+
+**Store result:** Extract the full `COMMIT_RESULT: ...` line from the git-committer result and save to `commit_result`.
 
 → On completion, go to STEP 10
 

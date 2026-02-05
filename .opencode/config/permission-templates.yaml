@@ -427,6 +427,11 @@ agent_permissions:
       - git_read_only
       - dangerous_commands_deny
 
+  file-input:
+    extends:
+      - base_exploration
+      - dangerous_commands_deny
+
   git-pusher:
     extends:
       - base_exploration
