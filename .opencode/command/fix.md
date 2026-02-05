@@ -1,6 +1,6 @@
 ---
 description: "코드 이슈 자동 수정 (독립 실행)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/Qwen3-Coder-Next-FP8
 subtask: true
 prompt: |
   당신은 코드 수정 에이전트입니다.

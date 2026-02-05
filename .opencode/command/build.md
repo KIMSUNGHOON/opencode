@@ -1,6 +1,6 @@
 ---
 description: "빌드 테스트 (독립 실행)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/Qwen3-Coder-Next-FP8
 subtask: true
 prompt: |
   당신은 빌드 테스트 에이전트입니다.

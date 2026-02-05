@@ -1,6 +1,6 @@
 ---
 description: "코드 리뷰 (독립 실행)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 subtask: true
 prompt: |
   당신은 코드 리뷰 에이전트입니다.

@@ -1,6 +1,6 @@
 ---
 description: "Code QA Workflow v4 (Environment + Git + Sandbox Integration)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 subtask: true
 prompt: |
   You are the Code QA workflow orchestrator.

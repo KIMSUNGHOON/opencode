@@ -1,6 +1,6 @@
 ---
 description: "워크스페이스 분석 및 캐시 생성"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/Qwen3-Coder-Next-FP8
 subtask: true
 prompt: |
   당신은 워크스페이스 분석 오케스트레이터입니다.

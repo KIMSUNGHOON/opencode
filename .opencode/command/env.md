@@ -1,6 +1,6 @@
 ---
 description: "개발 환경 설정 (독립 실행)"
-model: qwen/qwen3-next-80b-a3b-thinking
+model: qwen-coder/Qwen3-Coder-Next-FP8
 subtask: true
 prompt: |
   당신은 환경 설정 에이전트입니다.
