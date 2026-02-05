@@ -91,7 +91,9 @@ test_agent_files() {
 
     AGENTS=(
         "env-setup"
+        "workspace-analyzer"
         "git-input"
+        "file-input"
         "pre-checker"
         "code-reviewer"
         "code-fixer"
@@ -166,7 +168,9 @@ test_result_tokens() {
     # Check if each Agent outputs result tokens
     declare -A TOKENS
     TOKENS["env-setup"]="ENV_SETUP_RESULT:"
+    TOKENS["workspace-analyzer"]="WORKSPACE_ANALYSIS_RESULT:"
     TOKENS["git-input"]="FILE_LIST:"
+    TOKENS["file-input"]="FILE_LIST:"
     TOKENS["pre-checker"]="PRE_CHECK_RESULT:"
     TOKENS["code-reviewer"]="ISSUE_LIST:"
     TOKENS["code-fixer"]="FIX_RESULT:"

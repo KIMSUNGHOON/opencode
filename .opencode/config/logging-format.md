@@ -77,6 +77,32 @@ ENV_SETUP_RESULT: {SUCCESS/FAIL/WAITING_INPUT}
 ───────────────────────────────────────────────────────────────
 ```
 
+### workspace-analyzer
+
+```
+═══════════════════════════════════════════════════════════════
+📂 Workspace Analysis
+═══════════════════════════════════════════════════════════════
+
+📁 Project Structure
+┌──────────────┬─────────────────────────────────────────────┐
+│ Project Type │ {project_type}                              │
+│ Languages    │ {languages}                                 │
+│ Build System │ {build_system}                              │
+│ Total Files  │ {file_count}                                │
+└──────────────┴─────────────────────────────────────────────┘
+
+📦 Dependencies
+┌─────────────────────────────────────────────────────────────┐
+│ {dependency_manager}: {dependency_count} packages           │
+└─────────────────────────────────────────────────────────────┘
+
+───────────────────────────────────────────────────────────────
+WORKSPACE_ANALYSIS_RESULT: {COMPLETE/TIMEOUT/EMPTY/FAILED}
+CACHE_DATA: {json_data}
+───────────────────────────────────────────────────────────────
+```
+
 ### git-input
 
 ```
