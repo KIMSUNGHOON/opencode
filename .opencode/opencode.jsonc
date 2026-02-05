@@ -4,9 +4,9 @@
   // =============================================================================
   // Dual Model Provider Configuration
   // =============================================================================
-  // Option A: 별도 GPU 노드 2대 구성
-  //   - Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> 추론 집약 에이전트
-  //   - Node 2 (port 8001): Qwen3-Coder-Next (vLLM)       -> 코드/유틸리티 에이전트
+  // Option A: Separate 2 GPU node configuration
+  //   - Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
+  //   - Node 2 (port 8001): Qwen3-Coder-Next (vLLM)       -> Code/utility agents
   //
   // Model Assignment:
   //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):

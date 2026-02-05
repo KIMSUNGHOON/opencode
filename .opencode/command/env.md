@@ -1,69 +1,69 @@
 ---
-description: "개발 환경 설정 (독립 실행)"
+description: "Development environment setup (standalone)"
 model: qwen-coder/Qwen3-Coder-Next-FP8
 subtask: true
 prompt: |
-  당신은 환경 설정 에이전트입니다.
+  You are an environment setup agent.
 
-  ## 지시사항
+  ## Instructions
 
-  1. env-setup agent를 호출하여 환경을 설정합니다.
-  2. 사용자에게 Shell과 가상 환경 타입을 선택받습니다.
+  1. Call the env-setup agent to configure the environment.
+  2. Have the user select shell and virtual environment type.
 
-  ## 입력 파싱
+  ## Input Parsing
 
-  $ARGUMENTS를 파싱하세요:
-  - --shell <타입>: Shell 타입 미리 지정 (zsh/bash/sh)
-  - --env <타입>: 환경 타입 미리 지정 (conda/uv/venv/none)
-  - 지정되지 않음: 대화형으로 선택
+  Parse $ARGUMENTS:
+  - --shell <type>: pre-specify shell type (zsh/bash/sh)
+  - --env <type>: pre-specify environment type (conda/uv/venv/none)
+  - Not specified: interactive selection
 
-  ## 실행
+  ## Execution
 
-  Task 도구 호출:
+  Task tool call:
   - subagent_type: "env-setup"
-  - prompt: "Shell, 환경, Python/CUDA 버전을 확인하세요. 옵션: $ARGUMENTS. 옵션이 없으면 사용자에게 Shell 타입과 가상 환경 타입을 선택받으세요."
-  - description: "환경 설정 확인"
+  - prompt: "Check Shell, environment, Python/CUDA versions. Options: $ARGUMENTS. If no options provided, have the user select shell type and virtual environment type."
+  - description: "Environment setup check"
 ---
 
-# /env - 개발 환경 설정
+# /env - Development Environment Setup
 
-**사용법:**
+**Usage:**
 ```bash
-# 대화형 환경 설정 (기본)
+# Interactive environment setup (default)
 /env
 
-# Shell과 환경 타입 미리 지정
+# Pre-specify shell and environment type
 /env --shell zsh --env conda
 
-# 현재 환경 정보만 확인
+# View current environment info only
 /env --info
 
-# 환경 초기화 (새로 설정)
+# Reset environment (fresh setup)
 /env --reset
 ```
 
-**감지되는 Shell:**
-- `zsh` (oh-my-zsh 포함)
+**Detected shells:**
+- `zsh` (including oh-my-zsh)
 - `bash`
 - `sh`
 
-**감지되는 가상 환경:**
+**Detected virtual environments:**
 - `conda` (Anaconda, Miniconda)
 - `uv` (uv venv)
-- `venv` (Python 내장)
-- `poetry` (Poetry 환경)
-- `none` (시스템 Python)
+- `venv` (Python built-in)
+- `poetry` (Poetry environment)
+- `none` (system Python)
 
-**감지되는 런타임:**
-- Python 버전
-- CUDA 버전 (GPU 환경)
-- Node.js 버전
-- Go 버전
-- Rust 버전
+**Detected runtimes:**
+- Python version
+- CUDA version (GPU environment)
+- Node.js version
+- Go version
+- Rust version
 
-**옵션:**
-- `--shell <타입>`: Shell 타입 지정 (zsh/bash/sh)
-- `--env <타입>`: 환경 타입 지정 (conda/uv/venv/none)
-- `--info`: 현재 환경 정보만 출력
-- `--reset`: 환경 설정 초기화
-- `--save`: 설정을 .opencode/env-config.yaml에 저장
+**Options:**
+- `--shell <type>`: Specify shell type (zsh/bash/sh)
+- `--env <type>`: Specify environment type (conda/uv/venv/none)
+- `--info`: Display current environment info only
+- `--reset`: Reset environment configuration
+- `--save`: Save configuration to .opencode/env-config.yaml

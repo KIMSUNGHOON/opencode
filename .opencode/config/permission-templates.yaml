@@ -1,30 +1,30 @@
 # Code QA Permission Templates
-# Agent에서 사용할 수 있는 공통 Bash 권한 템플릿입니다.
+# Common Bash permission templates for use by Agents.
 #
-# 사용 방법:
-# Agent 파일에서 "extends: template_name" 형식으로 참조
-# 예: extends: read_only_git
+# Usage:
+# Reference in Agent files with "extends: template_name" format
+# e.g., extends: read_only_git
 
 # =============================================================================
-# 기본 템플릿 (모든 Agent 공통)
+# Base Templates (shared across all Agents)
 # =============================================================================
 templates:
 
   # ---------------------------------------------------------------------------
-  # 기본 탐색 권한 (대부분의 Agent에서 사용)
+  # Base Exploration Permissions (used by most Agents)
   # ---------------------------------------------------------------------------
   base_exploration:
-    description: "기본 파일/디렉토리 탐색 권한"
+    description: "Base file/directory exploration permissions"
     bash:
       "ls *": allow
       "which *": allow
       "echo *": allow
 
   # ---------------------------------------------------------------------------
-  # Git 읽기 전용 권한
+  # Git Read-Only Permissions
   # ---------------------------------------------------------------------------
   git_read_only:
-    description: "Git 상태/이력 조회만 허용"
+    description: "Allow Git status/history queries only"
     bash:
       "git status *": allow
       "git diff *": allow
@@ -32,7 +32,7 @@ templates:
       "git show *": allow
       "git branch *": allow
       "git rev-parse *": allow
-      # 차단
+      # Blocked
       "git push *": deny
       "git reset *": deny
       "git checkout *": deny
@@ -40,10 +40,10 @@ templates:
       "git rebase *": deny
 
   # ---------------------------------------------------------------------------
-  # Git 커밋 권한 (git-committer용)
+  # Git Commit Permissions (for git-committer)
   # ---------------------------------------------------------------------------
   git_commit:
-    description: "Git add/commit 허용, push 차단"
+    description: "Allow Git add/commit, block push"
     extends: git_read_only
     bash:
       "git add *": allow
@@ -51,10 +51,10 @@ templates:
       "git commit --amend *": ask
 
   # ---------------------------------------------------------------------------
-  # Git Push 권한 (git-pusher용)
+  # Git Push Permissions (for git-pusher)
   # ---------------------------------------------------------------------------
   git_push:
-    description: "Git push 및 GitHub CLI 허용"
+    description: "Allow Git push and GitHub CLI"
     extends: git_read_only
     bash:
       "git remote *": allow
@@ -64,14 +64,14 @@ templates:
       "gh pr view *": allow
       "gh pr list *": allow
       "gh auth status *": allow
-      # 차단
+      # Blocked
       "git push --force *": deny
 
   # ---------------------------------------------------------------------------
-  # Python Lint/Format 권한 (pre-checker용)
+  # Python Lint/Format Permissions (for pre-checker)
   # ---------------------------------------------------------------------------
   python_lint_format:
-    description: "Python Lint/Format 도구 실행"
+    description: "Run Python Lint/Format tools"
     bash:
       "ruff check * --fix": allow
       "ruff format *": allow
@@ -82,10 +82,10 @@ templates:
       "mypy *": allow
 
   # ---------------------------------------------------------------------------
-  # JavaScript/TypeScript Lint/Format 권한
+  # JavaScript/TypeScript Lint/Format Permissions
   # ---------------------------------------------------------------------------
   js_lint_format:
-    description: "JS/TS Lint/Format 도구 실행"
+    description: "Run JS/TS Lint/Format tools"
     bash:
       "eslint * --fix": allow
       "prettier * --write": allow
@@ -95,10 +95,10 @@ templates:
       "npx tsc *": allow
 
   # ---------------------------------------------------------------------------
-  # C/C++ 도구 권한
+  # C/C++ Tool Permissions
   # ---------------------------------------------------------------------------
   cpp_tools:
-    description: "C/C++ 빌드 및 정적 분석"
+    description: "C/C++ build and static analysis"
     bash:
       "clang-format *": allow
       "clang-tidy *": allow
@@ -112,10 +112,10 @@ templates:
       "clang++ *": allow
 
   # ---------------------------------------------------------------------------
-  # Java 도구 권한
+  # Java Tool Permissions
   # ---------------------------------------------------------------------------
   java_tools:
-    description: "Java 빌드 및 정적 분석"
+    description: "Java build and static analysis"
     bash:
       "mvn *": allow
       "gradle *": allow
@@ -127,10 +127,10 @@ templates:
       "google-java-format *": allow
 
   # ---------------------------------------------------------------------------
-  # Go 도구 권한
+  # Go Tool Permissions
   # ---------------------------------------------------------------------------
   go_tools:
-    description: "Go 빌드, 테스트, 정적 분석"
+    description: "Go build, test, and static analysis"
     bash:
       "go build *": allow
       "go test *": allow
@@ -143,10 +143,10 @@ templates:
       "golangci-lint *": allow
 
   # ---------------------------------------------------------------------------
-  # Rust 도구 권한
+  # Rust Tool Permissions
   # ---------------------------------------------------------------------------
   rust_tools:
-    description: "Rust 빌드, 테스트, 정적 분석"
+    description: "Rust build, test, and static analysis"
     bash:
       "cargo build *": allow
       "cargo test *": allow
@@ -156,10 +156,10 @@ templates:
       "rustfmt *": allow
 
   # ---------------------------------------------------------------------------
-  # Ruby 도구 권한
+  # Ruby Tool Permissions
   # ---------------------------------------------------------------------------
   ruby_tools:
-    description: "Ruby 빌드, 테스트, 정적 분석"
+    description: "Ruby build, test, and static analysis"
     bash:
       "bundle install *": allow
       "bundle exec rspec *": allow
@@ -169,10 +169,10 @@ templates:
       "gem build *": allow
 
   # ---------------------------------------------------------------------------
-  # PHP 도구 권한
+  # PHP Tool Permissions
   # ---------------------------------------------------------------------------
   php_tools:
-    description: "PHP 빌드, 테스트, 정적 분석"
+    description: "PHP build, test, and static analysis"
     bash:
       "composer install *": allow
       "composer build *": allow
@@ -185,10 +185,10 @@ templates:
       "php-cs-fixer *": allow
 
   # ---------------------------------------------------------------------------
-  # Swift 도구 권한
+  # Swift Tool Permissions
   # ---------------------------------------------------------------------------
   swift_tools:
-    description: "Swift 빌드, 테스트, 정적 분석"
+    description: "Swift build, test, and static analysis"
     bash:
       "swift build *": allow
       "swift test *": allow
@@ -197,20 +197,20 @@ templates:
       "xcodebuild *": allow
 
   # ---------------------------------------------------------------------------
-  # Kotlin 도구 권한
+  # Kotlin Tool Permissions
   # ---------------------------------------------------------------------------
   kotlin_tools:
-    description: "Kotlin 빌드, 테스트, 정적 분석"
+    description: "Kotlin build, test, and static analysis"
     bash:
       "kotlinc *": allow
       "ktlint *": allow
       "detekt *": allow
 
   # ---------------------------------------------------------------------------
-  # Python 테스트 권한
+  # Python Test Permissions
   # ---------------------------------------------------------------------------
   python_test:
-    description: "Python 테스트 프레임워크 실행"
+    description: "Run Python test frameworks"
     bash:
       "python -m pytest *": allow
       "pytest *": allow
@@ -219,10 +219,10 @@ templates:
       "coverage *": allow
 
   # ---------------------------------------------------------------------------
-  # Node.js 테스트 권한
+  # Node.js Test Permissions
   # ---------------------------------------------------------------------------
   node_test:
-    description: "Node.js 테스트 프레임워크 실행"
+    description: "Run Node.js test frameworks"
     bash:
       "npm test *": allow
       "npm run test *": allow
@@ -233,24 +233,24 @@ templates:
       "nyc *": allow
 
   # ---------------------------------------------------------------------------
-  # Docker 권한
+  # Docker Permissions
   # ---------------------------------------------------------------------------
   docker_sandbox:
-    description: "Docker Sandbox 빌드/실행"
+    description: "Docker Sandbox build/run"
     bash:
       "docker build *": allow
       "docker run *": allow
       "docker images *": allow
       "docker ps *": allow
-      # 차단
+      # Blocked
       "docker rm *": deny
       "docker rmi *": deny
 
   # ---------------------------------------------------------------------------
-  # 환경 감지 권한 (env-setup용)
+  # Environment Detection Permissions (for env-setup)
   # ---------------------------------------------------------------------------
   env_detection:
-    description: "Shell 및 런타임 환경 감지"
+    description: "Shell and runtime environment detection"
     bash:
       "echo $SHELL": allow
       "echo $0": allow
@@ -275,10 +275,10 @@ templates:
       "nvcc --version": allow
 
   # ---------------------------------------------------------------------------
-  # Conda 환경 관리 권한
+  # Conda Environment Management Permissions
   # ---------------------------------------------------------------------------
   conda_env:
-    description: "Conda 환경 조회 및 활성화"
+    description: "Conda environment query and activation"
     bash:
       "conda --version": allow
       "conda info *": allow
@@ -288,14 +288,14 @@ templates:
       "source */conda.sh": allow
       "source */profile.d/conda.sh": allow
       "conda activate *": ask
-      # 차단
+      # Blocked
       "conda remove *": deny
 
   # ---------------------------------------------------------------------------
-  # 공통 위험 명령 차단 (모든 Agent에 적용)
+  # Common Dangerous Command Blocking (applied to all Agents)
   # ---------------------------------------------------------------------------
   dangerous_commands_deny:
-    description: "위험한 명령 차단"
+    description: "Block dangerous commands"
     bash:
       "rm -rf *": deny
       "rm -r *": deny
@@ -315,7 +315,7 @@ templates:
       ":(){:|:&};:": deny
 
 # =============================================================================
-# Agent별 권한 조합
+# Per-Agent Permission Composition
 # =============================================================================
 agent_permissions:
 

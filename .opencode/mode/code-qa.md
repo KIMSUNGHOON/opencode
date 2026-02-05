@@ -1285,20 +1285,20 @@ This workflow uses two specialized models on separate GPU nodes:
 
 ```
 Thinking Model (port 8000) - 4 agents:
-  추론이 핵심인 에이전트. CoT reasoning이 품질에 직접 영향.
-  - Orchestrator: 워크플로우 상태 관리, 조건 분기, 회귀 판단
-  - code-reviewer: 보안 취약점, 논리적 오류 심층 분석
-  - quality-checker: 정적 분석 결과 종합 평가, 점수 산정
-  - summary-reporter: 전체 QA 결과 종합 분석 리포트 생성
+  Agents where reasoning is critical. CoT reasoning directly impacts quality.
+  - Orchestrator: Workflow state management, conditional branching, regression decisions
+  - code-reviewer: Deep analysis of security vulnerabilities and logical errors
+  - quality-checker: Comprehensive evaluation of static analysis results, score calculation
+  - summary-reporter: Comprehensive QA result analysis and report generation
 
 Coder Model (port 8001) - 10 agents:
-  코드 생성/수정 또는 도구 실행이 핵심인 에이전트.
-  Non-thinking 모드로 빠른 응답, SWE-Bench 70.6% 성능 활용.
-  - code-fixer: SWE-Bench 스타일 코드 수정/버그 픽스 (핵심 임팩트)
-  - pre-checker: Lint/Format 도구 실행
-  - build-tester / function-tester: 빌드/테스트 명령 실행
-  - env-setup / git-input / workspace-analyzer: 환경/파일 탐색
-  - git-committer / git-pusher / file-input: Git/파일 유틸리티
+  Agents focused on code generation/modification or tool execution.
+  Non-thinking mode for fast responses, leveraging SWE-Bench 70.6% performance.
+  - code-fixer: SWE-Bench style code fix/bug fix (core impact)
+  - pre-checker: Lint/Format tool execution
+  - build-tester / function-tester: Build/test command execution
+  - env-setup / git-input / workspace-analyzer: Environment/file exploration
+  - git-committer / git-pusher / file-input: Git/file utilities
 ```
 
 ### Context Transfer Between Models
@@ -1367,7 +1367,9 @@ vllm serve Qwen/Qwen3-Coder-Next-FP8 \
   --tensor-parallel-size 2 \
   --max-model-len 262144 \
   --port 8001 \
-  --host 0.0.0.0
+  --host 0.0.0.0 \
+  --enable-auto-tool-choice \
+  --tool-call-parser qwen3_coder
 ```
 
 ---

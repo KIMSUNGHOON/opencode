@@ -1,13 +1,13 @@
 # =============================================================================
-# OpenCode QA Sandbox - Python/CUDA 범용 템플릿
+# OpenCode QA Sandbox - Python/CUDA Universal Template
 # =============================================================================
 #
-# 사용법:
+# Usage:
 #   docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
 #   docker run --gpus all -v $(pwd):/workspace qa-sandbox <command>
 #
-# CA 인증서 설정:
-#   빌드 전에 호스트의 CA 인증서를 .opencode/docker/certs/ 에 복사하세요:
+# CA Certificate Setup:
+#   Before building, copy the host's CA certificates to .opencode/docker/certs/:
 #   cp /usr/local/share/ca-certificates/*.crt .opencode/docker/certs/
 #   cp /usr/local/share/ca-certificates/*.pem .opencode/docker/certs/
 #
@@ -39,10 +39,10 @@ ENV PYTHON_VERSION=${PYTHON_VERSION}
 WORKDIR /workspace
 
 # -----------------------------------------------------------------------------
-# CA Certificates (호스트에서 복사)
+# CA Certificates (copied from host)
 # -----------------------------------------------------------------------------
-# 호스트의 CA 인증서를 Docker 내부로 복사
-# 빌드 전에 .opencode/docker/certs/ 디렉토리에 인증서를 복사해두세요
+# Copy host CA certificates into Docker
+# Place certificates in .opencode/docker/certs/ directory before building
 COPY .opencode/docker/certs/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true
 COPY .opencode/docker/certs/*.pem /usr/local/share/ca-certificates/ 2>/dev/null || true
 
@@ -85,8 +85,8 @@ RUN python -m pip install --upgrade setuptools wheel
 # -----------------------------------------------------------------------------
 # Project Dependencies (if requirements.txt exists)
 # -----------------------------------------------------------------------------
-# 이 부분은 빌드 시 프로젝트 의존성을 설치합니다.
-# 캐시 레이어를 활용하기 위해 requirements.txt만 먼저 복사합니다.
+# This section installs project dependencies during build.
+# Only requirements.txt is copied first to leverage cache layers.
 
 COPY requirements*.txt ./
 RUN if [ -f requirements.txt ]; then \
@@ -97,9 +97,9 @@ RUN if [ -f requirements.txt ]; then \
     fi
 
 # -----------------------------------------------------------------------------
-# Source Code (마지막에 복사 - 캐시 활용)
+# Source Code (copied last for cache efficiency)
 # -----------------------------------------------------------------------------
-# 실제 실행 시에는 볼륨 마운트를 사용하므로 이 단계는 선택적입니다.
+# In practice, volume mounts are used at runtime, so this step is optional.
 # COPY . .
 
 # -----------------------------------------------------------------------------

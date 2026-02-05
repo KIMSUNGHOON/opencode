@@ -1,23 +1,23 @@
 #!/bin/bash
 # Code QA Workflow Test Script
-# 워크플로우의 각 단계를 테스트합니다.
+# Tests each step of the workflow.
 
 set -e
 
-# 색상 정의
+# Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 테스트 결과 카운터
+# Test result counters
 PASSED=0
 FAILED=0
 SKIPPED=0
 
 # =============================================================================
-# 유틸리티 함수
+# Utility Functions
 # =============================================================================
 
 log_info() {
@@ -47,47 +47,47 @@ log_section() {
 }
 
 # =============================================================================
-# 설정 파일 테스트
+# Config File Tests
 # =============================================================================
 
 test_config_files() {
-    log_section "1. 설정 파일 검증"
+    log_section "1. Config File Validation"
 
-    # workflow-settings.yaml 확인
+    # Check workflow-settings.yaml
     if [ -f ".opencode/config/workflow-settings.yaml" ]; then
-        log_success "workflow-settings.yaml 존재"
+        log_success "workflow-settings.yaml exists"
     else
-        log_fail "workflow-settings.yaml 없음"
+        log_fail "workflow-settings.yaml missing"
     fi
 
-    # permission-templates.yaml 확인
+    # Check permission-templates.yaml
     if [ -f ".opencode/config/permission-templates.yaml" ]; then
-        log_success "permission-templates.yaml 존재"
+        log_success "permission-templates.yaml exists"
     else
-        log_fail "permission-templates.yaml 없음"
+        log_fail "permission-templates.yaml missing"
     fi
 
-    # logging-format.md 확인
+    # Check logging-format.md
     if [ -f ".opencode/config/logging-format.md" ]; then
-        log_success "logging-format.md 존재"
+        log_success "logging-format.md exists"
     else
-        log_fail "logging-format.md 없음"
+        log_fail "logging-format.md missing"
     fi
 
-    # mode/code-qa.md 확인
+    # Check mode/code-qa.md
     if [ -f ".opencode/mode/code-qa.md" ]; then
-        log_success "mode/code-qa.md 존재"
+        log_success "mode/code-qa.md exists"
     else
-        log_fail "mode/code-qa.md 없음"
+        log_fail "mode/code-qa.md missing"
     fi
 }
 
 # =============================================================================
-# Agent 파일 테스트
+# Agent File Tests
 # =============================================================================
 
 test_agent_files() {
-    log_section "2. Agent 파일 검증"
+    log_section "2. Agent File Validation"
 
     AGENTS=(
         "env-setup"
@@ -105,65 +105,65 @@ test_agent_files() {
 
     for agent in "${AGENTS[@]}"; do
         if [ -f ".opencode/agent/${agent}.md" ]; then
-            log_success "Agent: ${agent}.md 존재"
+            log_success "Agent: ${agent}.md exists"
 
-            # tools 섹션 확인
+            # Check tools section
             if grep -q "^tools:" ".opencode/agent/${agent}.md"; then
-                log_success "  └─ tools 섹션 존재"
+                log_success "  └─ tools section exists"
             else
-                log_fail "  └─ tools 섹션 없음"
+                log_fail "  └─ tools section missing"
             fi
 
-            # permission 섹션 확인
+            # Check permission section
             if grep -q "^permission:" ".opencode/agent/${agent}.md"; then
-                log_success "  └─ permission 섹션 존재"
+                log_success "  └─ permission section exists"
             else
-                log_fail "  └─ permission 섹션 없음"
+                log_fail "  └─ permission section missing"
             fi
         else
-            log_fail "Agent: ${agent}.md 없음"
+            log_fail "Agent: ${agent}.md missing"
         fi
     done
 }
 
 # =============================================================================
-# Tool 권한 테스트
+# Tool Permission Tests
 # =============================================================================
 
 test_tool_permissions() {
-    log_section "3. Tool 권한 검증"
+    log_section "3. Tool Permission Validation"
 
-    # code-reviewer가 Read tool을 가지고 있는지 확인
+    # Check if code-reviewer has Read tool
     if grep -q '"Read": true' ".opencode/agent/code-reviewer.md"; then
-        log_success "code-reviewer: Read tool 활성화"
+        log_success "code-reviewer: Read tool enabled"
     else
-        log_fail "code-reviewer: Read tool 비활성화"
+        log_fail "code-reviewer: Read tool disabled"
     fi
 
-    # summary-reporter가 Bash tool을 가지고 있는지 확인
+    # Check if summary-reporter has Bash tool
     if grep -q '"Bash": true' ".opencode/agent/summary-reporter.md"; then
-        log_success "summary-reporter: Bash tool 활성화"
+        log_success "summary-reporter: Bash tool enabled"
     else
-        log_fail "summary-reporter: Bash tool 비활성화"
+        log_fail "summary-reporter: Bash tool disabled"
     fi
 
-    # code-fixer가 Edit/Write tool을 가지고 있는지 확인
+    # Check if code-fixer has Edit/Write tools
     if grep -q '"Edit": true' ".opencode/agent/code-fixer.md" && \
        grep -q '"Write": true' ".opencode/agent/code-fixer.md"; then
-        log_success "code-fixer: Edit/Write tool 활성화"
+        log_success "code-fixer: Edit/Write tools enabled"
     else
-        log_fail "code-fixer: Edit/Write tool 비활성화"
+        log_fail "code-fixer: Edit/Write tools disabled"
     fi
 }
 
 # =============================================================================
-# 결과 토큰 형식 테스트
+# Result Token Format Tests
 # =============================================================================
 
 test_result_tokens() {
-    log_section "4. 결과 토큰 형식 검증"
+    log_section "4. Result Token Format Validation"
 
-    # 각 Agent가 결과 토큰을 출력하는지 확인
+    # Check if each Agent outputs result tokens
     declare -A TOKENS
     TOKENS["env-setup"]="ENV_SETUP_RESULT:"
     TOKENS["git-input"]="FILE_LIST:"
@@ -179,134 +179,134 @@ test_result_tokens() {
     for agent in "${!TOKENS[@]}"; do
         token="${TOKENS[$agent]}"
         if grep -q "$token" ".opencode/agent/${agent}.md"; then
-            log_success "${agent}: ${token} 토큰 정의됨"
+            log_success "${agent}: ${token} token defined"
         else
-            log_fail "${agent}: ${token} 토큰 없음"
+            log_fail "${agent}: ${token} token missing"
         fi
     done
 }
 
 # =============================================================================
-# 오케스트레이터 테스트
+# Orchestrator Tests
 # =============================================================================
 
 test_orchestrator() {
-    log_section "5. 오케스트레이터 검증"
+    log_section "5. Orchestrator Validation"
 
     MODE_FILE=".opencode/mode/code-qa.md"
 
-    # 상태 관리 섹션 확인
-    if grep -q "## 워크플로우 상태 관리" "$MODE_FILE"; then
-        log_success "상태 관리 섹션 존재"
+    # Check state management section
+    if grep -q "## Workflow State Management" "$MODE_FILE"; then
+        log_success "State management section exists"
     else
-        log_fail "상태 관리 섹션 없음"
+        log_fail "State management section missing"
     fi
 
-    # 토큰 파싱 규칙 확인
-    if grep -q "### 결과 토큰 파싱 규칙" "$MODE_FILE"; then
-        log_success "토큰 파싱 규칙 존재"
+    # Check token parsing rules
+    if grep -q "### Result Token Parsing Rules" "$MODE_FILE"; then
+        log_success "Token parsing rules exist"
     else
-        log_fail "토큰 파싱 규칙 없음"
+        log_fail "Token parsing rules missing"
     fi
 
-    # 에러 핸들링 섹션 확인
-    if grep -q "## 에러 핸들링" "$MODE_FILE"; then
-        log_success "에러 핸들링 섹션 존재"
+    # Check error handling section
+    if grep -q "## Error Handling" "$MODE_FILE"; then
+        log_success "Error handling section exists"
     else
-        log_fail "에러 핸들링 섹션 없음"
+        log_fail "Error handling section missing"
     fi
 
-    # 에러 코드 정의 확인
-    if grep -q "### 에러 코드 정의" "$MODE_FILE"; then
-        log_success "에러 코드 정의 존재"
+    # Check error code definitions
+    if grep -q "### Error Code Definitions" "$MODE_FILE"; then
+        log_success "Error code definitions exist"
     else
-        log_fail "에러 코드 정의 없음"
+        log_fail "Error code definitions missing"
     fi
 
-    # 설정 파일 참조 확인
+    # Check config file reference
     if grep -q "workflow-settings.yaml" "$MODE_FILE"; then
-        log_success "설정 파일 참조 존재"
+        log_success "Config file reference exists"
     else
-        log_fail "설정 파일 참조 없음"
+        log_fail "Config file reference missing"
     fi
 }
 
 # =============================================================================
-# 문서 동기화 테스트
+# Documentation Sync Tests
 # =============================================================================
 
 test_documentation() {
-    log_section "6. 문서 동기화 검증"
+    log_section "6. Documentation Sync Validation"
 
     QUICK_START="docs/guides/14-code-qa-v4-quick-start.md"
 
     if [ -f "$QUICK_START" ]; then
-        log_success "Quick Start 문서 존재"
+        log_success "Quick Start document exists"
 
-        # Agent Tool 권한 매트릭스 확인
-        if grep -q "Agent Tool 권한 매트릭스" "$QUICK_START"; then
-            log_success "  └─ Agent Tool 권한 매트릭스 존재"
+        # Check Agent Tool Permission Matrix
+        if grep -q "Agent Tool" "$QUICK_START"; then
+            log_success "  └─ Agent Tool Permission Matrix exists"
         else
-            log_fail "  └─ Agent Tool 권한 매트릭스 없음"
+            log_fail "  └─ Agent Tool Permission Matrix missing"
         fi
 
-        # 결과 토큰 및 상태 관리 확인
-        if grep -q "결과 토큰 및 상태 관리" "$QUICK_START"; then
-            log_success "  └─ 결과 토큰 및 상태 관리 섹션 존재"
+        # Check Result Token and State Management
+        if grep -q "Result Token" "$QUICK_START" || grep -q "State Management" "$QUICK_START"; then
+            log_success "  └─ Result Token and State Management section exists"
         else
-            log_fail "  └─ 결과 토큰 및 상태 관리 섹션 없음"
+            log_fail "  └─ Result Token and State Management section missing"
         fi
     else
-        log_fail "Quick Start 문서 없음"
+        log_fail "Quick Start document missing"
     fi
 
     DIAGRAM="docs/guides/13-code-qa-v4-complete-diagram.md"
 
     if [ -f "$DIAGRAM" ]; then
-        log_success "Complete Diagram 문서 존재"
+        log_success "Complete Diagram document exists"
     else
-        log_fail "Complete Diagram 문서 없음"
+        log_fail "Complete Diagram document missing"
     fi
 }
 
 # =============================================================================
-# Git 상태 테스트
+# Git Status Tests
 # =============================================================================
 
 test_git_status() {
-    log_section "7. Git 상태 검증"
+    log_section "7. Git Status Validation"
 
-    # Git 저장소 확인
+    # Check Git repository
     if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-        log_success "Git 저장소 확인됨"
+        log_success "Git repository confirmed"
 
-        # 현재 브랜치
+        # Current branch
         BRANCH=$(git branch --show-current)
-        log_info "현재 브랜치: $BRANCH"
+        log_info "Current branch: $BRANCH"
 
-        # 변경 사항 확인
+        # Check for changes
         if git diff --quiet && git diff --staged --quiet; then
-            log_success "변경 사항 없음 (clean)"
+            log_success "No changes (clean)"
         else
             CHANGED=$(git diff --name-only | wc -l)
             STAGED=$(git diff --staged --name-only | wc -l)
-            log_info "변경된 파일: $CHANGED개, Staged: $STAGED개"
+            log_info "Changed files: $CHANGED, Staged: $STAGED"
         fi
     else
-        log_fail "Git 저장소가 아님"
+        log_fail "Not a Git repository"
     fi
 }
 
 # =============================================================================
-# 종합 결과
+# Summary Results
 # =============================================================================
 
 print_summary() {
-    log_section "테스트 결과 요약"
+    log_section "Test Results Summary"
 
     echo ""
     echo "┌──────────────┬──────────────┐"
-    echo "│ 결과         │ 개수         │"
+    echo "│ Result       │ Count        │"
     echo "├──────────────┼──────────────┤"
     printf "│ ${GREEN}PASSED${NC}       │ %-12s │\n" "$PASSED"
     printf "│ ${RED}FAILED${NC}       │ %-12s │\n" "$FAILED"
@@ -317,16 +317,16 @@ print_summary() {
     echo ""
 
     if [ $FAILED -eq 0 ]; then
-        echo -e "${GREEN}✅ 모든 테스트 통과!${NC}"
+        echo -e "${GREEN}All tests passed!${NC}"
         exit 0
     else
-        echo -e "${RED}❌ $FAILED개의 테스트 실패${NC}"
+        echo -e "${RED}$FAILED test(s) failed${NC}"
         exit 1
     fi
 }
 
 # =============================================================================
-# 메인 실행
+# Main Execution
 # =============================================================================
 
 main() {
@@ -336,12 +336,12 @@ main() {
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 
-    # 프로젝트 루트로 이동
+    # Navigate to project root
     cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-    log_info "작업 디렉토리: $(pwd)"
+    log_info "Working directory: $(pwd)"
 
-    # 테스트 실행
+    # Run tests
     test_config_files
     test_agent_files
     test_tool_permissions
@@ -350,9 +350,9 @@ main() {
     test_documentation
     test_git_status
 
-    # 결과 출력
+    # Print results
     print_summary
 }
 
-# 스크립트 실행
+# Execute script
 main "$@"

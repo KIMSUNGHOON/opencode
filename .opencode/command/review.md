@@ -1,62 +1,62 @@
 ---
-description: "코드 리뷰 (독립 실행)"
+description: "Code review (standalone)"
 model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 subtask: true
 prompt: |
-  당신은 코드 리뷰 에이전트입니다.
+  You are a code review agent.
 
-  ## 지시사항
+  ## Instructions
 
-  1. code-reviewer agent를 호출하여 코드 분석을 수행합니다.
-  2. 보안 취약점, 버그, 성능 이슈, 코드 스타일 문제를 찾습니다.
+  1. Call the code-reviewer agent to perform code analysis.
+  2. Find security vulnerabilities, bugs, performance issues, and code style problems.
 
-  ## 입력 파싱
+  ## Input Parsing
 
-  $ARGUMENTS를 파싱하세요:
-  - 파일/경로가 지정됨: 해당 파일에 대해 리뷰
-  - --staged: staged 변경만 리뷰
-  - --last: 마지막 커밋 리뷰
-  - 지정되지 않음: working directory 변경 리뷰
+  Parse $ARGUMENTS:
+  - File/path specified: review that file
+  - --staged: review staged changes only
+  - --last: review last commit
+  - Not specified: review working directory changes
 
-  ## 실행
+  ## Execution
 
-  Task 도구 호출:
+  Task tool call:
   - subagent_type: "code-reviewer"
-  - prompt: "다음 파일/경로의 코드를 분석하고 이슈를 찾으세요: $ARGUMENTS. 발견된 이슈는 파일명, 라인번호, 이슈 설명 형식으로 출력하세요."
-  - description: "코드 리뷰"
+  - prompt: "Analyze the code at the following file/path and find issues: $ARGUMENTS. Output discovered issues in the format: filename, line number, issue description."
+  - description: "Code review"
 ---
 
-# /review - 코드 리뷰
+# /review - Code Review
 
-**사용법:**
+**Usage:**
 ```bash
-# Working directory 변경 리뷰 (git diff)
+# Review working directory changes (git diff)
 /review
 
-# Staged 변경만 리뷰
+# Review staged changes only
 /review --staged
 
-# 마지막 커밋 리뷰
+# Review last commit
 /review --last
 
-# 특정 파일 리뷰
+# Review specific file
 /review src/main.py
 
-# 특정 디렉토리 리뷰
+# Review specific directory
 /review src/
 
-# 여러 파일 리뷰
+# Review multiple files
 /review src/main.py,src/utils.py
 ```
 
-**검사 항목:**
-- **보안 (Security)**: SQL Injection, XSS, 인증/인가 취약점
-- **버그 (Bug)**: Null 참조, 타입 오류, 논리 오류
-- **성능 (Performance)**: N+1 쿼리, 메모리 누수, 비효율적 알고리즘
-- **코드 품질 (Quality)**: 중복 코드, 복잡도, 명명 규칙
+**Inspection items:**
+- **Security**: SQL Injection, XSS, authentication/authorization vulnerabilities
+- **Bug**: Null reference, type errors, logic errors
+- **Performance**: N+1 queries, memory leaks, inefficient algorithms
+- **Code Quality**: Duplicate code, complexity, naming conventions
 
-**옵션:**
-- `--staged`: staged 변경만 리뷰
-- `--last`: 마지막 커밋만 리뷰
-- `--security`: 보안 이슈만 집중
-- `--verbose`: 상세 분석 결과 출력
+**Options:**
+- `--staged`: Review staged changes only
+- `--last`: Review last commit only
+- `--security`: Focus on security issues only
+- `--verbose`: Verbose analysis output

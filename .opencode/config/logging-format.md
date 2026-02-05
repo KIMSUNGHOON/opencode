@@ -1,21 +1,21 @@
 # Code QA Logging Format Specification
 
-모든 Agent가 준수해야 하는 통합 로그 형식입니다.
+Unified log format that all Agents must follow.
 
-## 로그 레벨
+## Log Levels
 
-| 레벨 | 아이콘 | 용도 |
-|------|-------|------|
-| DEBUG | 🔍 | 상세 디버깅 정보 |
-| INFO | ℹ️ | 일반 진행 정보 |
-| SUCCESS | ✅ | 성공 완료 |
-| WARNING | ⚠️ | 경고 (진행 가능) |
-| ERROR | ❌ | 오류 (진행 불가) |
-| WAITING | ⏳ | 사용자 입력 대기 |
+| Level | Icon | Usage |
+|-------|------|-------|
+| DEBUG | 🔍 | Detailed debugging information |
+| INFO | ℹ️ | General progress information |
+| SUCCESS | ✅ | Successful completion |
+| WARNING | ⚠️ | Warning (can continue) |
+| ERROR | ❌ | Error (cannot continue) |
+| WAITING | ⏳ | Waiting for user input |
 
-## 기본 로그 형식
+## Base Log Format
 
-### 단계 시작
+### Step Start
 
 ```
 ═══════════════════════════════════════════════════════════════
@@ -23,7 +23,7 @@
 ═══════════════════════════════════════════════════════════════
 ```
 
-### 단계 완료
+### Step Complete
 
 ```
 ───────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@
 ───────────────────────────────────────────────────────────────
 ```
 
-### 정보 테이블
+### Info Table
 
 ```
 ┌──────────────┬─────────────────────────────────────────────┐
@@ -41,7 +41,7 @@
 └──────────────┴─────────────────────────────────────────────┘
 ```
 
-## Agent별 로그 템플릿
+## Per-Agent Log Templates
 
 ### env-setup
 
@@ -476,53 +476,53 @@ PR_URL: {url or N/A}
 ───────────────────────────────────────────────────────────────
 ```
 
-## 에러 로그 형식
+## Error Log Format
 
 ```
 ═══════════════════════════════════════════════════════════════
-⚠️ Task 실패: {agent_name}
+⚠️ Task Failed: {agent_name}
 ═══════════════════════════════════════════════════════════════
-에러 코드: {error_code}
-에러 유형: {error_type}
-시도 횟수: {retry_count}/{max_retry}
-에러 메시지: {error_message}
+Error Code: {error_code}
+Error Type: {error_type}
+Attempt: {retry_count}/{max_retry}
+Error Message: {error_message}
 
-복구 동작: {recovery_action}
-═══════════════════════════════════════════════════════════════
-```
-
-## 워크플로우 완료 로그
-
-```
-═══════════════════════════════════════════════════════════════
-🎉 Code QA 워크플로우 완료!
-═══════════════════════════════════════════════════════════════
-
-총 소요 시간: {duration}
-최종 품질 점수: {score}/100
-회귀 횟수: {retry_count}
-
-결과:
-- 분석 파일: {file_count}개
-- 발견 이슈: {issue_count}개
-- 수정 이슈: {fixed_count}개
-- 테스트: {passed}/{total} 통과
-
-커밋: {commit_hash}
-PR: {pr_url or "생성 안 함"}
-
+Recovery Action: {recovery_action}
 ═══════════════════════════════════════════════════════════════
 ```
 
-## 사용자 입력 대기 로그
+## Workflow Completion Log
 
 ```
 ═══════════════════════════════════════════════════════════════
-⏳ 사용자 입력 대기 중
+Code QA Workflow Complete!
+═══════════════════════════════════════════════════════════════
+
+Total Duration: {duration}
+Final Quality Score: {score}/100
+Regression Count: {retry_count}
+
+Results:
+- Files Analyzed: {file_count}
+- Issues Found: {issue_count}
+- Issues Fixed: {fixed_count}
+- Tests: {passed}/{total} passed
+
+Commit: {commit_hash}
+PR: {pr_url or "Not created"}
+
+═══════════════════════════════════════════════════════════════
+```
+
+## User Input Wait Log
+
+```
+═══════════════════════════════════════════════════════════════
+Waiting for User Input
 ═══════════════════════════════════════════════════════════════
 
 {input_prompt}
 
-➡️ {input_instruction}
+→ {input_instruction}
 ═══════════════════════════════════════════════════════════════
 ```
