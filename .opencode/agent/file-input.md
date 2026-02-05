@@ -107,19 +107,37 @@ Extract `--files` option from $ARGUMENTS:
 
 ### STEP 2: Search Files
 
+**⚠️ CRITICAL: You MUST actually call the Glob tool! Do NOT just output text!**
+
 **Using Glob tool (recommended):**
+
+For each directory, call Glob tool with appropriate patterns:
+
+| Input Path | Glob Pattern to Use |
+|------------|---------------------|
+| `src/` | `src/**/*.py` |
+| `lib/` | `lib/**/*.js` |
+| `csrc/` | `csrc/**/*.cpp`, `csrc/**/*.cu`, `csrc/**/*.h` |
+| `torch_aim/csrc/` | `torch_aim/csrc/**/*.cpp`, `torch_aim/csrc/**/*.cu`, `torch_aim/csrc/**/*.cuh`, `torch_aim/csrc/**/*.h` |
+
+**Example for C/C++/CUDA directories (like csrc/):**
 ```
-Glob pattern: src/**/*.py
-Glob pattern: lib/**/*.js
+# Call Glob tool multiple times for different extensions:
+Glob pattern: csrc/**/*.c
+Glob pattern: csrc/**/*.cpp
+Glob pattern: csrc/**/*.cu    ← CUDA source files
+Glob pattern: csrc/**/*.cuh   ← CUDA header files
+Glob pattern: csrc/**/*.h
+Glob pattern: csrc/**/*.hpp
 ```
 
-**Or using Bash:**
+**Or using Bash (alternative):**
 ```bash
-# Search files in directory
-find src/ -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null
+# Search files in directory (including CUDA files)
+find csrc/ -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.cu" -o -name "*.cuh" -o -name "*.h" -o -name "*.hpp" \) 2>/dev/null
 
-# Expand wildcard
-ls -1 src/*.py 2>/dev/null
+# For PyTorch extensions
+find torch_aim/csrc/ -type f \( -name "*.cpp" -o -name "*.cu" -o -name "*.cuh" -o -name "*.h" \) 2>/dev/null
 ```
 
 ### STEP 3: File Filtering
@@ -135,6 +153,9 @@ Filter code files only:
 **C/C++**
 - `*.c`, `*.h`, `*.cpp`, `*.hpp`, `*.cc`, `*.hh`
 - `*.cxx`, `*.hxx`, `*.c++`, `*.h++`, `*.ipp`, `*.tpp`
+
+**CUDA**
+- `*.cu`, `*.cuh`
 
 **Java/Kotlin**
 - `*.java`, `*.kt`, `*.kts`
