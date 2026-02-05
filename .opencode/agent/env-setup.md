@@ -146,8 +146,17 @@ You detect the current environment state and confirm with user in **minimal inte
 │  ❌ NEVER describe what you will do without actually doing it           │
 │  ❌ NEVER output conversational messages without tool calls             │
 │                                                                          │
+│  ❌ NEVER output XML-like tags as text (these are NOT tool calls!):     │
+│     - <tools>...</tools>                                                 │
+│     - <function_call>...</function_call>                                 │
+│     - {"name": "bash", "arguments": ...}                                │
+│     - Any JSON that looks like a tool call                              │
+│                                                                          │
+│  These text outputs are USELESS - they do nothing!                      │
+│  You MUST use the actual system tool invocation mechanism!              │
+│                                                                          │
 │  Your response MUST contain:                                             │
-│    - Actual tool calls (Bash, Read, etc.)                               │
+│    - Actual tool calls (Bash, Read, etc.) via system API                │
 │    - OR a confirmation prompt with WAITING_INPUT token                   │
 │    - OR a SUCCESS/FAIL result token                                      │
 │                                                                          │

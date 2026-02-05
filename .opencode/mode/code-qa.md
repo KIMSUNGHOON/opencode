@@ -538,10 +538,11 @@ IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
 │  🚨🚨🚨 CRITICAL: ACTUALLY CALL THE TASK TOOL! 🚨🚨🚨                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ❌ WRONG - Outputting JSON as text:                                     │
+│  ❌ WRONG - Outputting JSON/XML as text:                                 │
 │     <function_call>                                                      │
 │     ["name": "task", "argument": {...}]                                  │
 │     </function_call>                                                     │
+│     <tools>prompt: ...</tools>                                           │
 │                                                                          │
 │  ❌ WRONG - Saying "I will call..." without actually calling:            │
 │     "I will now call file-input to search for files..."                  │
