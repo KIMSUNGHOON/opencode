@@ -1,6 +1,7 @@
 #!/bin/bash
 # Code QA Workflow Test Script
 # Tests each step of the workflow.
+# P2-3: Fixed file references, permission validation, JSON structure checks.
 
 set -e
 
@@ -26,17 +27,17 @@ log_info() {
 
 log_success() {
     echo -e "${GREEN}[PASS]${NC} $1"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $1"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 }
 
 log_skip() {
     echo -e "${YELLOW}[SKIP]${NC} $1"
-    ((SKIPPED++))
+    SKIPPED=$((SKIPPED + 1))
 }
 
 log_section() {
@@ -47,7 +48,7 @@ log_section() {
 }
 
 # =============================================================================
-# Config File Tests
+# 1. Config File Tests
 # =============================================================================
 
 test_config_files() {
@@ -67,11 +68,11 @@ test_config_files() {
         log_fail "permission-templates.yaml missing"
     fi
 
-    # Check logging-format.md
-    if [ -f ".opencode/config/logging-format.md" ]; then
-        log_success "logging-format.md exists"
+    # Check context-schema.md (structured context passing definitions)
+    if [ -f ".opencode/config/context-schema.md" ]; then
+        log_success "context-schema.md exists"
     else
-        log_fail "logging-format.md missing"
+        log_fail "context-schema.md missing"
     fi
 
     # Check mode/code-qa.md
@@ -80,10 +81,17 @@ test_config_files() {
     else
         log_fail "mode/code-qa.md missing"
     fi
+
+    # Check command/code-qa.md
+    if [ -f ".opencode/command/code-qa.md" ]; then
+        log_success "command/code-qa.md exists"
+    else
+        log_fail "command/code-qa.md missing"
+    fi
 }
 
 # =============================================================================
-# Agent File Tests
+# 2. Agent File Tests
 # =============================================================================
 
 test_agent_files() {
@@ -109,18 +117,25 @@ test_agent_files() {
         if [ -f ".opencode/agent/${agent}.md" ]; then
             log_success "Agent: ${agent}.md exists"
 
-            # Check tools section
+            # Check YAML frontmatter has tools section
             if grep -q "^tools:" ".opencode/agent/${agent}.md"; then
                 log_success "  └─ tools section exists"
             else
                 log_fail "  └─ tools section missing"
             fi
 
-            # Check permission section
+            # Check YAML frontmatter has permission section
             if grep -q "^permission:" ".opencode/agent/${agent}.md"; then
                 log_success "  └─ permission section exists"
             else
                 log_fail "  └─ permission section missing"
+            fi
+
+            # Check model field exists in frontmatter
+            if grep -q "^model:" ".opencode/agent/${agent}.md"; then
+                log_success "  └─ model field exists"
+            else
+                log_fail "  └─ model field missing"
             fi
         else
             log_fail "Agent: ${agent}.md missing"
@@ -129,7 +144,7 @@ test_agent_files() {
 }
 
 # =============================================================================
-# Tool Permission Tests
+# 3. Tool Permission Tests
 # =============================================================================
 
 test_tool_permissions() {
@@ -159,29 +174,27 @@ test_tool_permissions() {
 }
 
 # =============================================================================
-# Result Token Format Tests
+# 4. Result Token Format Tests
 # =============================================================================
 
 test_result_tokens() {
     log_section "4. Result Token Format Validation"
 
-    # Check if each Agent outputs result tokens
-    declare -A TOKENS
-    TOKENS["env-setup"]="ENV_SETUP_RESULT:"
-    TOKENS["workspace-analyzer"]="WORKSPACE_ANALYSIS_RESULT:"
-    TOKENS["git-input"]="FILE_LIST:"
-    TOKENS["file-input"]="FILE_LIST:"
-    TOKENS["pre-checker"]="PRE_CHECK_RESULT:"
-    TOKENS["code-reviewer"]="ISSUE_LIST:"
-    TOKENS["code-fixer"]="FIX_RESULT:"
-    TOKENS["quality-checker"]="QUALITY_SCORE:"
-    TOKENS["build-tester"]="BUILD_RESULT:"
-    TOKENS["function-tester"]="TEST_RESULT:"
-    TOKENS["git-committer"]="COMMIT_RESULT:"
-    TOKENS["git-pusher"]="PUSH_RESULT:"
+    # Check if each Agent outputs result tokens (parallel arrays for bash 3.x compat)
+    TOKEN_AGENTS=(
+        "env-setup" "workspace-analyzer" "git-input" "file-input"
+        "pre-checker" "code-reviewer" "code-fixer" "quality-checker"
+        "build-tester" "function-tester" "git-committer" "git-pusher"
+    )
+    TOKEN_VALUES=(
+        "ENV_SETUP_RESULT:" "WORKSPACE_ANALYSIS_RESULT:" "FILE_LIST:" "FILE_LIST:"
+        "PRE_CHECK_RESULT:" "ISSUE_LIST:" "FIX_RESULT:" "QUALITY_SCORE:"
+        "BUILD_RESULT:" "TEST_RESULT:" "COMMIT_RESULT:" "PUSH_RESULT:"
+    )
 
-    for agent in "${!TOKENS[@]}"; do
-        token="${TOKENS[$agent]}"
+    for i in "${!TOKEN_AGENTS[@]}"; do
+        agent="${TOKEN_AGENTS[$i]}"
+        token="${TOKEN_VALUES[$i]}"
         if grep -q "$token" ".opencode/agent/${agent}.md"; then
             log_success "${agent}: ${token} token defined"
         else
@@ -191,11 +204,171 @@ test_result_tokens() {
 }
 
 # =============================================================================
-# Orchestrator Tests
+# 5. Structured JSON Output Tests (P2-3: validates JSON format requirements)
+# =============================================================================
+
+test_structured_output() {
+    log_section "5. Structured JSON Output Validation"
+
+    # Agents that MUST output structured JSON (per context-schema.md)
+    JSON_AGENTS=("code-reviewer" "code-fixer" "quality-checker" "build-tester" "function-tester")
+    JSON_KEYS=('"review"' '"fix"' '"quality"' '"build"' '"test"')
+
+    for i in "${!JSON_AGENTS[@]}"; do
+        agent="${JSON_AGENTS[$i]}"
+        key="${JSON_KEYS[$i]}"
+        if grep -q "$key" ".opencode/agent/${agent}.md"; then
+            log_success "${agent}: structured JSON key ${key} documented"
+        else
+            log_fail "${agent}: structured JSON key ${key} not found in agent prompt"
+        fi
+    done
+
+    # Check context-schema.md has schema definitions for all structured agents
+    SCHEMA_FILE=".opencode/config/context-schema.md"
+    if [ -f "$SCHEMA_FILE" ]; then
+        for agent in "code-reviewer" "code-fixer" "quality-checker" "build-tester" "function-tester"; do
+            if grep -q "$agent" "$SCHEMA_FILE"; then
+                log_success "context-schema: ${agent} schema defined"
+            else
+                log_fail "context-schema: ${agent} schema missing"
+            fi
+        done
+
+        # Check error format is defined
+        if grep -q '"error"' "$SCHEMA_FILE"; then
+            log_success "context-schema: explicit error format defined"
+        else
+            log_fail "context-schema: explicit error format missing"
+        fi
+    else
+        log_fail "context-schema.md not found (cannot validate schemas)"
+    fi
+}
+
+# =============================================================================
+# 6. Model ID Validation Tests (P2-3: validates model assignment consistency)
+# =============================================================================
+
+test_model_ids() {
+    log_section "6. Model ID Validation"
+
+    SETTINGS_FILE=".opencode/config/workflow-settings.yaml"
+
+    if [ ! -f "$SETTINGS_FILE" ]; then
+        log_fail "workflow-settings.yaml missing (cannot validate model IDs)"
+        return
+    fi
+
+    # Extract expected model IDs from workflow-settings.yaml
+    THINKING_MODEL=$(grep "^  thinking:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
+    CODER_MODEL=$(grep "^  coder:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
+
+    if [ -n "$THINKING_MODEL" ]; then
+        log_success "Thinking model defined: $THINKING_MODEL"
+    else
+        log_fail "Thinking model not defined in workflow-settings.yaml"
+    fi
+
+    if [ -n "$CODER_MODEL" ]; then
+        log_success "Coder model defined: $CODER_MODEL"
+    else
+        log_fail "Coder model not defined in workflow-settings.yaml"
+    fi
+
+    # Validate Thinking agents use Thinking model
+    THINKING_AGENTS=("code-reviewer" "quality-checker" "summary-reporter")
+    for agent in "${THINKING_AGENTS[@]}"; do
+        if [ -f ".opencode/agent/${agent}.md" ]; then
+            AGENT_MODEL=$(grep "^model:" ".opencode/agent/${agent}.md" | sed 's/model: *//')
+            if [ "$AGENT_MODEL" = "$THINKING_MODEL" ]; then
+                log_success "${agent}: model matches Thinking ($AGENT_MODEL)"
+            else
+                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$THINKING_MODEL')"
+            fi
+        fi
+    done
+
+    # Validate Coder agents use Coder model
+    CODER_AGENTS=("env-setup" "git-input" "workspace-analyzer" "file-input" "pre-checker" "code-fixer" "build-tester" "function-tester" "git-committer" "git-pusher")
+    for agent in "${CODER_AGENTS[@]}"; do
+        if [ -f ".opencode/agent/${agent}.md" ]; then
+            AGENT_MODEL=$(grep "^model:" ".opencode/agent/${agent}.md" | sed 's/model: *//')
+            if [ "$AGENT_MODEL" = "$CODER_MODEL" ]; then
+                log_success "${agent}: model matches Coder ($AGENT_MODEL)"
+            else
+                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$CODER_MODEL')"
+            fi
+        fi
+    done
+
+    # Validate orchestrator uses Thinking model
+    if [ -f ".opencode/mode/code-qa.md" ]; then
+        ORCH_MODEL=$(grep "^model:" ".opencode/mode/code-qa.md" | sed 's/model: *//')
+        if [ "$ORCH_MODEL" = "$THINKING_MODEL" ]; then
+            log_success "orchestrator (mode): model matches Thinking ($ORCH_MODEL)"
+        else
+            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$THINKING_MODEL')"
+        fi
+    fi
+}
+
+# =============================================================================
+# 7. Permission Template Consistency Tests (P2-3: cross-validates templates)
+# =============================================================================
+
+test_permission_templates() {
+    log_section "7. Permission Template Consistency"
+
+    TEMPLATE_FILE=".opencode/config/permission-templates.yaml"
+
+    if [ ! -f "$TEMPLATE_FILE" ]; then
+        log_fail "permission-templates.yaml missing"
+        return
+    fi
+
+    # Check all QA agents are listed in agent_permissions section
+    QA_AGENTS=(
+        "env-setup" "workspace-analyzer" "git-input" "file-input"
+        "pre-checker" "code-reviewer" "code-fixer" "quality-checker"
+        "build-tester" "function-tester" "git-committer" "summary-reporter"
+        "git-pusher"
+    )
+
+    for agent in "${QA_AGENTS[@]}"; do
+        if grep -q "  ${agent}:" "$TEMPLATE_FILE"; then
+            log_success "template: ${agent} entry exists"
+        else
+            log_fail "template: ${agent} entry missing from agent_permissions"
+        fi
+    done
+
+    # Check required base templates exist
+    BASE_TEMPLATES=("base_exploration" "file_discovery" "git_read_only" "dangerous_commands_deny")
+    for tmpl in "${BASE_TEMPLATES[@]}"; do
+        if grep -q "  ${tmpl}:" "$TEMPLATE_FILE"; then
+            log_success "template: base '${tmpl}' exists"
+        else
+            log_fail "template: base '${tmpl}' missing"
+        fi
+    done
+
+    # Check all agents include dangerous_commands_deny
+    for agent in "${QA_AGENTS[@]}"; do
+        if grep -A 20 "  ${agent}:" "$TEMPLATE_FILE" | grep -q "dangerous_commands_deny"; then
+            log_success "  └─ ${agent}: includes dangerous_commands_deny"
+        else
+            log_fail "  └─ ${agent}: missing dangerous_commands_deny"
+        fi
+    done
+}
+
+# =============================================================================
+# 8. Orchestrator Tests
 # =============================================================================
 
 test_orchestrator() {
-    log_section "5. Orchestrator Validation"
+    log_section "8. Orchestrator Validation"
 
     MODE_FILE=".opencode/mode/code-qa.md"
 
@@ -233,14 +406,28 @@ test_orchestrator() {
     else
         log_fail "Config file reference missing"
     fi
+
+    # Check model health check section (P2-1)
+    if grep -q "Model Server Health Check" "$MODE_FILE"; then
+        log_success "Model health check section exists"
+    else
+        log_fail "Model health check section missing"
+    fi
+
+    # Check explicit cache error handling (P2-2)
+    if grep -q "E004" "$MODE_FILE"; then
+        log_success "Explicit error codes used in cache handling"
+    else
+        log_fail "Explicit error codes missing from cache handling"
+    fi
 }
 
 # =============================================================================
-# Documentation Sync Tests
+# 9. Documentation Sync Tests
 # =============================================================================
 
 test_documentation() {
-    log_section "6. Documentation Sync Validation"
+    log_section "9. Documentation Sync Validation"
 
     QUICK_START="docs/guides/14-code-qa-v4-quick-start.md"
 
@@ -260,6 +447,20 @@ test_documentation() {
         else
             log_fail "  └─ Result Token and State Management section missing"
         fi
+
+        # Check per-source retry counter documentation (P0 sync)
+        if grep -q "retry_counters" "$QUICK_START" || grep -q "per_source" "$QUICK_START"; then
+            log_success "  └─ Per-source retry counters documented"
+        else
+            log_fail "  └─ Per-source retry counters not documented (outdated?)"
+        fi
+
+        # Check context_store documentation (P0 sync)
+        if grep -q "context_store" "$QUICK_START"; then
+            log_success "  └─ Structured context store documented"
+        else
+            log_fail "  └─ Structured context store not documented (outdated?)"
+        fi
     else
         log_fail "Quick Start document missing"
     fi
@@ -269,16 +470,16 @@ test_documentation() {
     if [ -f "$DIAGRAM" ]; then
         log_success "Complete Diagram document exists"
     else
-        log_fail "Complete Diagram document missing"
+        log_skip "Complete Diagram document missing (optional)"
     fi
 }
 
 # =============================================================================
-# Git Status Tests
+# 10. Git Status Tests
 # =============================================================================
 
 test_git_status() {
-    log_section "7. Git Status Validation"
+    log_section "10. Git Status Validation"
 
     # Check Git repository
     if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
@@ -336,7 +537,7 @@ print_summary() {
 main() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║           Code QA Workflow Test Suite                        ║"
+    echo "║           Code QA Workflow Test Suite v2                     ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 
@@ -350,6 +551,9 @@ main() {
     test_agent_files
     test_tool_permissions
     test_result_tokens
+    test_structured_output
+    test_model_ids
+    test_permission_templates
     test_orchestrator
     test_documentation
     test_git_status

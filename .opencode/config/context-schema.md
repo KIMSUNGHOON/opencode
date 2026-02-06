@@ -228,3 +228,83 @@ The Orchestrator maintains a `context_store` dict that accumulates all agent out
 ```
 
 When passing context to downstream agents, the Orchestrator includes relevant portions of this store in the prompt.
+
+---
+
+## Explicit Error Format (P2-2: No Silent Failures)
+
+All failures MUST produce an explicit error block instead of failing silently.
+When an agent encounters an error, it MUST output the following JSON format:
+
+```json
+{
+  "error": {
+    "code": "E004",
+    "type": "PARSE",
+    "agent": "quality-checker",
+    "phase": 4,
+    "message": "Failed to parse quality score from tool output",
+    "details": "ruff returned exit code 2: config file not found",
+    "recovery": "retry_with_defaults"
+  }
+}
+```
+
+**Required fields:** `code`, `type`, `agent`, `message`
+**Optional fields:** `phase`, `details`, `recovery`
+
+### Error Types and Orchestrator Responses
+
+| Error Code | Type | Orchestrator Action |
+|------------|------|-------------------|
+| `E001` | TIMEOUT | Retry (max 3x), then abort |
+| `E002` | NETWORK | Retry with backoff, then abort |
+| `E003` | OOM | Reduce context by 50%, retry 1x |
+| `E004` | PARSE | Re-call agent (max 2x), then use default |
+| `E005` | TOOL_DENIED | Log error, ask user for permission |
+| `E010` | AGENT_ERROR | Retry (max 2x), then abort |
+
+### Cache Validation Errors (STEP 0)
+
+When workspace cache read fails, the Orchestrator MUST handle explicitly:
+
+```
+IF cache file exists but JSON is corrupt:
+    → Output: "⚠️ WARNING [E004]: Workspace cache is corrupt. Re-running analysis."
+    → Delete corrupt cache, run workspace-analyzer
+
+IF cache timestamp cannot be parsed:
+    → Output: "⚠️ WARNING [E004]: Cache timestamp invalid. Re-running analysis."
+    → Treat as stale, run workspace-analyzer
+
+IF cache read returns permission error:
+    → Output: "⚠️ WARNING [E005]: Cannot read cache file. Proceeding without cache."
+    → workspace_cache = null, continue workflow
+```
+
+### Permission Template Lookup Errors
+
+When an agent's permission template is not found:
+
+```
+IF agent references undefined template:
+    → Output: "❌ ERROR [E010]: Permission template '{name}' not found for agent '{agent}'."
+    → Do NOT silently default to empty permissions
+    → Abort the agent call, log the error
+
+IF template extends a non-existent base:
+    → Output: "❌ ERROR [E010]: Base template '{base}' not found in extends chain."
+    → Use only the templates that DO exist, warn about missing ones
+```
+
+### Model Routing Errors
+
+When model server is unreachable during workflow:
+
+```
+IF agent call fails with connection error:
+    → Output: "⚠️ WARNING [E002]: Model server unreachable for agent '{agent}'."
+    → Check fallback server availability
+    → IF fallback available: retry with fallback, log degraded mode
+    → IF no fallback: output "❌ ERROR [E002]: No model servers available." and abort
+```

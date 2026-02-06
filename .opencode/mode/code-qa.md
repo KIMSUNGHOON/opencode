@@ -353,6 +353,52 @@ The following Agents MUST receive user input before proceeding:
 Use Task tool (function call) to invoke agents at each STEP.
 **When Task completes, check the result and immediately proceed to the next STEP.**
 
+### PRE-STEP: Model Server Health Check (Automatic)
+
+**⚠️ This check runs BEFORE the workflow starts. No Task call needed.**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  P2-1: Model Server Health Check (prevents silent routing failures)     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Before starting the workflow, verify that model servers are reachable: │
+│                                                                          │
+│  1. Check Thinking Model (port 8000):                                   │
+│     curl -s --max-time 5 http://localhost:8000/v1/models                │
+│                                                                          │
+│  2. Check Coder Model (port 8001):                                      │
+│     curl -s --max-time 5 http://localhost:8001/v1/models                │
+│                                                                          │
+│  Decision logic:                                                         │
+│    Both UP    → Normal dual-model workflow                              │
+│    Only 8000  → Route all agents to Thinking model (degraded)           │
+│    Only 8001  → Route all agents to Coder model (degraded)              │
+│    Neither UP → ABORT workflow with explicit error                       │
+│                                                                          │
+│  On degraded mode, output:                                               │
+│    ⚠️ WARNING: {server} is unavailable.                                 │
+│    Falling back to {fallback_server} for all agents.                    │
+│    Performance may be degraded.                                          │
+│                                                                          │
+│  On complete failure, output:                                            │
+│    ❌ ERROR [E002]: No model servers available.                          │
+│    Thinking server (port 8000): UNREACHABLE                              │
+│    Coder server (port 8001): UNREACHABLE                                 │
+│    → Please start model servers before running /code-qa                  │
+│    → See: docs/guides/14-code-qa-v4-quick-start.md §2.3                │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+```bash
+# Health check commands (run via Bash tool)
+curl -s --max-time 5 http://localhost:8000/v1/models 2>/dev/null && echo "THINKING_OK" || echo "THINKING_FAIL"
+curl -s --max-time 5 http://localhost:8001/v1/models 2>/dev/null && echo "CODER_OK" || echo "CODER_FAIL"
+```
+
+→ On both OK or fallback confirmed, proceed to STEP 0
+
 ### STEP 0: Project Root Detection + Workspace Analysis (Automatic)
 
 **This step has TWO phases:**
@@ -492,21 +538,34 @@ Use Read tool to read `.opencode/workspace-cache/analysis.json` file.
 
 ```
 IF file exists and read successfully:
-    1. Check analyzed_at timestamp
-    2. Cache is valid if within 24 hours
+    1. Try to parse JSON
+       IF JSON parse fails:
+           → Output: "⚠️ WARNING [E004]: Workspace cache is corrupt. Re-running analysis."
+           → Delete corrupt file, run auto-analysis (see below)
 
-    IF cache is valid:
-        workspace_cache = {read JSON data}
-        → Output: "✓ Using workspace cache (analyzed: {analyzed_at})"
-        → Proceed to STEP 1 (using cache)
+    2. Check analyzed_at timestamp
+       IF timestamp is missing or invalid:
+           → Output: "⚠️ WARNING [E004]: Cache timestamp invalid. Re-running analysis."
+           → Treat as stale, run auto-analysis (see below)
 
-    ELSE (cache is stale):
-        → Output: "Cache expired. Running workspace analysis..."
-        → Run auto-analysis (see below)
+    3. Cache is valid if within 24 hours
+       IF cache is valid:
+           workspace_cache = {read JSON data}
+           → Output: "✓ Using workspace cache (analyzed: {analyzed_at})"
+           → Proceed to STEP 1 (using cache)
+
+       ELSE (cache is stale):
+           → Output: "Cache expired. Running workspace analysis..."
+           → Run auto-analysis (see below)
 
 ELSE IF file not found:
     → Output: "No workspace cache. Running workspace analysis..."
     → Run auto-analysis (see below)
+
+ELSE IF permission error reading file:
+    → Output: "⚠️ WARNING [E005]: Cannot read cache file. Proceeding without cache."
+    → workspace_cache = null
+    → Proceed to STEP 1
 ```
 
 **Auto-analysis (default behavior when cache missing or stale):**

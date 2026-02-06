@@ -103,6 +103,21 @@ model:
       - git-pusher         # Phase 9: Push/PR
       - file-input         # Direct file input
 
+  # Model ID validation (P2-1: prevent routing failures)
+  # All QA workflow agents MUST use model IDs matching this format:
+  #   {provider}/{model-name}
+  # Valid providers for QA workflow: "qwen", "qwen-coder"
+  # Non-QA commands (commit, issues, triage) may use other providers.
+  validation:
+    required_format: "{provider}/{model-name}"
+    valid_providers:
+      - "qwen"           # Thinking model provider
+      - "qwen-coder"     # Coder model provider
+    health_check:
+      thinking_endpoint: "http://localhost:8000/v1/models"
+      coder_endpoint: "http://localhost:8001/v1/models"
+      timeout_ms: 5000   # Health check timeout
+
   # Context settings
   context:
     max_length: 262144      # Maximum context length (256K)
