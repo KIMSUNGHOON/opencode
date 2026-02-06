@@ -49,11 +49,10 @@ permission:
     "git diff *": allow
     "which *": allow
     "ls *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "rm *": deny
     "git push *": deny
     "git reset *": deny
-    "*": deny
   read: allow
   edit: deny
   glob: allow

@@ -19,13 +19,12 @@ permission:
     "git add *": allow
     "git commit *": allow
     "git commit --amend *": ask
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "git push *": deny
     "git reset --hard *": deny
     "git checkout *": deny
     "git merge *": deny
     "git rebase *": deny
-    "*": deny
   read: allow
   edit: deny
 ---

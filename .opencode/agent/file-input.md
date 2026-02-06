@@ -14,11 +14,10 @@ permission:
     "ls *": allow
     "find *": allow
     "wc *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "rm *": deny
     "mv *": deny
     "cp *": deny
-    "*": deny
   read: allow
   edit: deny
   glob: allow

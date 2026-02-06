@@ -23,11 +23,10 @@ permission:
     # Git status check
     "git status *": allow
     "git diff *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny - it disables bash tool!)
     "rm -rf *": deny
     "git push *": deny
     "git reset --hard *": deny
-    "*": deny
   read: allow
   edit: allow
   write: allow

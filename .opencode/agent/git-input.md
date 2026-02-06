@@ -23,13 +23,12 @@ permission:
     "git init *": ask
     "git add *": ask
     "git commit *": ask
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "git push *": deny
     "git reset *": deny
     "git checkout *": deny
     "git merge *": deny
     "git rebase *": deny
-    "*": deny
   read: allow
   write:
     # Only allow writing .gitignore

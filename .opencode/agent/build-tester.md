@@ -80,12 +80,11 @@ permission:
     "which *": allow
     # Git status
     "git status *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "docker rm *": deny
     "docker rmi *": deny
     "rm -rf *": deny
     "git push *": deny
-    "*": deny
   read: allow
   edit: deny
   glob: allow

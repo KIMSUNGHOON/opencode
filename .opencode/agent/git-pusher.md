@@ -35,10 +35,9 @@ permission:
     # GPG check
     "gpg --list-keys *": allow
     "gpg --list-secret-keys *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "git push --force *": deny
     "git reset *": deny
-    "*": deny
   read: allow
   edit: deny
 ---

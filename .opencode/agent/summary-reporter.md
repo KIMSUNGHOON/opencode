@@ -16,11 +16,10 @@ permission:
     "git show *": allow
     # Navigation commands
     "ls *": allow
-    # Block dangerous commands
+    # Block dangerous commands (no catch-all deny)
     "git push *": deny
     "git reset *": deny
     "rm *": deny
-    "*": deny
   read: allow
   edit: deny
 ---

@@ -55,11 +55,12 @@ permission:
     # Environment activation (user confirmation)
     "conda activate *": ask
     "source */bin/activate": ask
-    # Block dangerous commands
+    # Block dangerous commands only (not catch-all deny)
     "rm *": deny
     "conda remove *": deny
     "pip uninstall *": deny
-    "*": deny
+    # NOTE: Removed "*": deny - it was disabling bash tool entirely!
+    # Unlisted commands will trigger "ask" permission prompt
   read: allow
   edit: deny
   glob: allow
