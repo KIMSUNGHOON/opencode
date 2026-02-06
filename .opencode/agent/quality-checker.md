@@ -54,15 +54,30 @@ permission:
     # Complexity check
     "radon cc *": allow
     "radon mi *": allow
-    # Git status
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "find *": allow
+    # Package installation (for static analysis tools)
+    "pip install *": allow
+    "pip *": allow
+    "npm install *": allow
+    "yarn add *": allow
+    # Git status (read-only)
     "git status *": allow
     "git diff *": allow
+    "git log *": allow
     # Navigation commands
     "which *": allow
     "ls *": allow
     # Block dangerous commands (no catch-all deny)
     "rm *": deny
+    "rm -rf *": deny
     "git push *": deny
+    "git reset *": deny
   read: allow
   edit: deny
   glob: allow

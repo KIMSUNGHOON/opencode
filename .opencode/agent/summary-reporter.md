@@ -9,17 +9,29 @@ tools:
   "Read": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
+    "wc *": allow
     # Git read commands (for commit info verification)
     "git log *": allow
     "git diff *": allow
     "git status *": allow
     "git show *": allow
+    "git branch *": allow
+    "git rev-parse *": allow
     # Navigation commands
     "ls *": allow
     # Block dangerous commands (no catch-all deny)
     "git push *": deny
     "git reset *": deny
     "rm *": deny
+    "rm -rf *": deny
   read: allow
   edit: deny
 ---

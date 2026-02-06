@@ -11,6 +11,16 @@ tools:
   "Glob": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "ls *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
+    "wc *": allow
     # Git read commands
     "git status *": allow
     "git diff *": allow
@@ -19,6 +29,8 @@ permission:
     "git rev-parse *": allow
     "git branch *": allow
     "git ls-files *": allow
+    "git remote *": allow
+    "git config *": allow
     # Git init commands (for new repos - requires user confirmation)
     "git init *": ask
     "git add *": ask
@@ -29,6 +41,7 @@ permission:
     "git checkout *": deny
     "git merge *": deny
     "git rebase *": deny
+    "rm *": deny
   read: allow
   write:
     # Only allow writing .gitignore (no catch-all deny - it disables the tool!)

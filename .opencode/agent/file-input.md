@@ -10,14 +10,27 @@ tools:
   "Glob": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
     # File navigation commands
     "ls *": allow
     "find *": allow
     "wc *": allow
+    "file *": allow
+    "stat *": allow
+    "du *": allow
     # Block dangerous commands (no catch-all deny)
     "rm *": deny
+    "rm -rf *": deny
     "mv *": deny
     "cp *": deny
+    "git push *": deny
+    "git reset *": deny
   read: allow
   edit: deny
   glob: allow

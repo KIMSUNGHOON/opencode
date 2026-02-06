@@ -75,16 +75,39 @@ permission:
     "xcodebuild *": allow
     # Kotlin build
     "kotlinc *": allow
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "find *": allow
     # Navigation commands
     "ls *": allow
     "which *": allow
-    # Git status
+    # uv package manager
+    "uv *": allow
+    "uv pip *": allow
+    "uv sync *": allow
+    "uv venv *": allow
+    # pdm package manager
+    "pdm *": allow
+    "pdm install *": allow
+    # bun
+    "bun *": allow
+    "bun install *": allow
+    "bun run *": allow
+    # Git status (read-only)
     "git status *": allow
+    "git diff *": allow
+    "git log *": allow
     # Block dangerous commands (no catch-all deny)
     "docker rm *": deny
     "docker rmi *": deny
+    "rm *": deny
     "rm -rf *": deny
     "git push *": deny
+    "git reset *": deny
   read: allow
   edit: deny
   glob: allow

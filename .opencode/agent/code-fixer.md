@@ -13,17 +13,69 @@ tools:
   "Grep": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "ls *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
+    # Package installation (for dependencies)
+    "pip install *": allow
+    "pip3 install *": allow
+    "pip *": allow
+    "uv pip *": allow
+    "npm install *": allow
+    "npm ci *": allow
+    "yarn install *": allow
+    "yarn *": allow
+    "pnpm install *": allow
+    "bun install *": allow
+    "bundle install *": allow
+    "composer install *": allow
+    "go mod *": allow
+    "cargo build *": allow
     # Test execution (for verification)
+    "python *": allow
+    "python3 *": allow
     "python -m pytest *": allow
+    "pytest *": allow
     "npm test *": allow
-    "npm run test *": allow
-    # Type check
+    "npm run *": allow
+    "npx *": allow
+    "yarn test *": allow
+    "pnpm test *": allow
+    "go test *": allow
+    "cargo test *": allow
+    "make *": allow
+    "make test *": allow
+    # Type check / Lint
     "mypy *": allow
+    "ruff *": allow
+    "pylint *": allow
+    "flake8 *": allow
+    "tsc *": allow
     "tsc --noEmit *": allow
-    # Git status check
+    "eslint *": allow
+    "cargo check *": allow
+    "go vet *": allow
+    # Build commands
+    "npm run build *": allow
+    "yarn build *": allow
+    "cargo build *": allow
+    "go build *": allow
+    "mvn *": allow
+    "gradle *": allow
+    "./gradlew *": allow
+    # Git status check (read-only)
     "git status *": allow
     "git diff *": allow
+    "git log *": allow
+    "git show *": allow
     # Block dangerous commands (no catch-all deny - it disables bash tool!)
+    "rm *": deny
     "rm -rf *": deny
     "git push *": deny
     "git reset --hard *": deny

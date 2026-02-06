@@ -11,26 +11,65 @@ tools:
   "Grep": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "ls *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
+    # Package installation (for linters/formatters)
+    "pip install *": allow
+    "pip3 install *": allow
+    "pip *": allow
+    "uv pip *": allow
+    "npm install *": allow
+    "npm ci *": allow
+    "yarn install *": allow
+    "yarn add *": allow
+    "pnpm install *": allow
+    "pnpm add *": allow
+    "bun install *": allow
+    "bun add *": allow
+    "gem install *": allow
+    "bundle install *": allow
+    "composer require *": allow
     # Python Linter/Formatter
+    "ruff *": allow
+    "ruff check *": allow
     "ruff check * --fix": allow
     "ruff format *": allow
     "black *": allow
     "isort *": allow
+    "autopep8 *": allow
+    "yapf *": allow
+    "pyupgrade *": allow
     # JavaScript/TypeScript
+    "eslint *": allow
     "eslint * --fix": allow
+    "prettier *": allow
     "prettier * --write": allow
+    "npx *": allow
+    "npx eslint *": allow
     "npx eslint * --fix": allow
+    "npx prettier *": allow
     "npx prettier * --write": allow
+    "npm run lint *": allow
+    "npm run format *": allow
+    "yarn lint *": allow
+    "yarn format *": allow
     # C/C++
     "clang-format *": allow
+    "clang-tidy *": allow
     "clang-tidy * --fix *": allow
-    "find * clang-format *": allow
     # Java
     "google-java-format *": allow
-    "find * google-java-format *": allow
     # Go
     "gofmt *": allow
     "goimports *": allow
+    "go fmt *": allow
     # Rust
     "rustfmt *": allow
     "cargo fmt *": allow
@@ -41,16 +80,18 @@ permission:
     "phpcbf *": allow
     # Swift
     "swiftformat *": allow
+    "swiftlint *": allow
     "swiftlint * --fix": allow
     # Kotlin
     "ktlint *": allow
-    # Read/navigation commands
+    "ktlint * --format": allow
+    # Git (read-only)
     "git status *": allow
     "git diff *": allow
-    "which *": allow
-    "ls *": allow
+    "git log *": allow
     # Block dangerous commands (no catch-all deny)
     "rm *": deny
+    "rm -rf *": deny
     "git push *": deny
     "git reset *": deny
   read: allow

@@ -29,16 +29,49 @@ permission:
     "conda run *": allow
     "uv --version": allow
     "uv venv *": allow
+    "uv pip *": allow
+    "uv sync *": allow
     # File/directory check
     "ls *": allow
-    # Python detection
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "find *": allow
+    "pwd": allow
+    # Python detection and package management
     "python --version": allow
     "python3 --version": allow
     "python -c *": allow
     "python3 -c *": allow
-    # Other language runtime detection
+    "pip --version": allow
+    "pip list *": allow
+    "pip show *": allow
+    "pip install *": allow
+    "pip freeze *": allow
+    "pip3 *": allow
+    "poetry --version": allow
+    "poetry install *": allow
+    "poetry show *": allow
+    "pdm --version": allow
+    "pdm install *": allow
+    # Node.js detection and package management
     "node --version": allow
+    "npm --version": allow
+    "npm install *": allow
+    "npm list *": allow
+    "npm ci *": allow
+    "yarn --version": allow
+    "yarn install *": allow
+    "yarn *": allow
+    "pnpm --version": allow
+    "pnpm install *": allow
+    "pnpm *": allow
+    "bun --version": allow
+    "bun install *": allow
+    "bun *": allow
+    # Other language runtime detection
     "go version": allow
+    "go mod *": allow
     "rustc --version": allow
     "cargo --version": allow
     "java --version": allow
@@ -46,6 +79,14 @@ permission:
     "gcc --version": allow
     "g++ --version": allow
     "clang --version": allow
+    "ruby --version": allow
+    "bundle --version": allow
+    "bundle install *": allow
+    "gem --version": allow
+    "gem install *": allow
+    "php --version": allow
+    "composer --version": allow
+    "composer install *": allow
     # GPU/CUDA detection
     "nvidia-smi *": allow
     "nvcc --version": allow
@@ -57,8 +98,11 @@ permission:
     "source */bin/activate": ask
     # Block dangerous commands only (not catch-all deny)
     "rm *": deny
+    "rm -rf *": deny
     "conda remove *": deny
     "pip uninstall *": deny
+    "git push *": deny
+    "git reset --hard *": deny
     # NOTE: Removed "*": deny - it was disabling bash tool entirely!
     # Unlisted commands will trigger "ask" permission prompt
   read: allow

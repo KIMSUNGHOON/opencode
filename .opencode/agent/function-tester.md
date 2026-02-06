@@ -11,10 +11,35 @@ tools:
   "Grep": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "ls *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
     # Docker commands
     "docker run *": allow
     "docker ps *": allow
+    "docker build *": allow
+    # Package installation (for test dependencies)
+    "pip install *": allow
+    "pip3 install *": allow
+    "pip *": allow
+    "uv pip *": allow
+    "npm install *": allow
+    "npm ci *": allow
+    "yarn install *": allow
+    "yarn *": allow
+    "pnpm install *": allow
+    "bun install *": allow
+    "bundle install *": allow
+    "composer install *": allow
     # Python tests
+    "python *": allow
+    "python3 *": allow
     "python -m pytest *": allow
     "pytest *": allow
     "python -m unittest *": allow
@@ -22,47 +47,58 @@ permission:
     # JavaScript/TypeScript tests
     "npm test *": allow
     "npm run test *": allow
+    "npm run *": allow
+    "npx *": allow
     "npx jest *": allow
     "npx mocha *": allow
     "yarn test *": allow
     "pnpm test *": allow
+    "bun test *": allow
     # C/C++ tests
     "ctest *": allow
+    "make *": allow
     "make test *": allow
     "./test *": allow
     # Java tests
+    "mvn *": allow
     "mvn test *": allow
+    "./gradlew *": allow
     "./gradlew test *": allow
+    "gradle *": allow
     "gradle test *": allow
     # Go tests
     "go test *": allow
+    "go *": allow
     # Rust tests
     "cargo test *": allow
+    "cargo *": allow
     # Ruby tests
     "rspec *": allow
+    "rake *": allow
     "rake test *": allow
+    "bundle exec *": allow
     "bundle exec rspec *": allow
     # PHP tests
     "phpunit *": allow
     "./vendor/bin/phpunit *": allow
+    "./vendor/bin/*": allow
     # Swift tests
     "swift test *": allow
     "xcodebuild test *": allow
-    # Kotlin tests
-    "./gradlew test *": allow
     # Coverage
     "coverage *": allow
     "nyc *": allow
     "gcov *": allow
     "lcov *": allow
-    # Navigation commands
-    "ls *": allow
-    "which *": allow
-    # Git status
+    # Git status (read-only)
     "git status *": allow
+    "git diff *": allow
+    "git log *": allow
     # Block dangerous commands (no catch-all deny)
+    "rm *": deny
     "rm -rf *": deny
     "git push *": deny
+    "git reset *": deny
   read: allow
   edit: deny
   glob: allow

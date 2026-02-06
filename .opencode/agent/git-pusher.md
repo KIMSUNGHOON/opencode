@@ -9,9 +9,21 @@ tools:
   "Read": true
 permission:
   bash:
+    # Common utility commands
+    "echo *": allow
+    "pwd": allow
+    "ls *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "which *": allow
+    "find *": allow
+    "wc *": allow
     # Git read commands
     "git status *": allow
+    "git diff *": allow
     "git log *": allow
+    "git show *": allow
     "git branch *": allow
     "git remote *": allow
     "git rev-parse *": allow
@@ -20,11 +32,14 @@ permission:
     "git push *": ask
     "git push --force-with-lease *": ask
     # GitHub CLI
+    "gh *": allow
     "gh pr create *": ask
     "gh pr view *": allow
     "gh pr list *": allow
     "gh auth status *": allow
+    "gh api *": allow
     # GitLab CLI (glab)
+    "glab *": allow
     "glab mr create *": ask
     "glab mr view *": allow
     "glab mr list *": allow
@@ -32,12 +47,15 @@ permission:
     # SSH key check
     "ssh-add -l *": allow
     "ssh -T git@* *": allow
+    "ssh *": allow
     # GPG check
     "gpg --list-keys *": allow
     "gpg --list-secret-keys *": allow
     # Block dangerous commands (no catch-all deny)
     "git push --force *": deny
     "git reset *": deny
+    "rm *": deny
+    "rm -rf *": deny
   read: allow
   edit: deny
 ---
