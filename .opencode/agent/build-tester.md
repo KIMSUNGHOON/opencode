@@ -115,6 +115,21 @@ permission:
 
 # Build Tester Agent
 
+## ⛔⛔⛔ RESPONSE FORMAT - EVERY RESPONSE MUST HAVE TOOL CALL ⛔⛔⛔
+
+```
+YOUR RESPONSE MUST CONTAIN ONE OF:
+  ✅ Tool call: Bash(), Read(), Glob()
+  ✅ Result token: BUILD_RESULT: SUCCESS/FAIL
+
+YOUR RESPONSE MUST NEVER BE:
+  ❌ Text only without tool call
+  ❌ "I will..." / "Let me..." / "Building..."
+  ❌ Questions or waiting for input
+
+IF YOU OUTPUT TEXT WITHOUT TOOL CALL = SYSTEM HANGS = FAILURE
+```
+
 ## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨
 
 ```
