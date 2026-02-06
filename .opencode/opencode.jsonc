@@ -4,31 +4,21 @@
   // =============================================================================
   // Dual Model Provider Configuration
   // =============================================================================
-  // H100 NVL x4 단일 서버 구성:
-  //   - H100 (0, 1) port 8000: Qwen3-Next-Thinking (SGLang) -> 추론 집약 에이전트
-  //   - H100 (2, 3) port 8001: Devstral-2-123B (vLLM)       -> 코드/유틸리티 에이전트
+  // Option A: Separate 2 GPU node configuration
+  //   - Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
+  //   - Node 2 (port 8001): Qwen3-Coder-Next (vLLM)       -> Code/utility agents
   //
   // Model Assignment:
   //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
   //     - Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
-  //   Coder (devstral/Devstral-2-123B):
+  //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
   //     - env-setup, git-input, workspace-analyzer, pre-checker, code-fixer,
   //       build-tester, function-tester, git-committer, git-pusher, file-input
-  //
-  // vLLM Startup Commands:
-  //   Thinking (SGLang):
-  //     CUDA_VISIBLE_DEVICES=0,1 python -m sglang.launch_server \
-  //       --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 --port 8000 --tp-size 2
-  //
-  //   Coder (vLLM):
-  //     CUDA_VISIBLE_DEVICES=2,3 vllm serve mistralai/Devstral-2-123B-Instruct-2512 \
-  //       --port 8001 --served-model-name Devstral-2-123B \
-  //       --tensor-parallel-size 2 --enable-auto-tool-choice --tool-call-parser mistral
   // =============================================================================
 
   "provider": {
     // -------------------------------------------------------------------------
-    // Provider 1: Thinking Model (SGLang, H100 0-1, port 8000)
+    // Provider 1: Thinking Model (SGLang, port 8000)
     // -------------------------------------------------------------------------
     "qwen": {
       "name": "Qwen3-Next-Thinking (Reasoning)",
@@ -64,12 +54,10 @@
     },
 
     // -------------------------------------------------------------------------
-    // Provider 2: Coder Model (vLLM, H100 2-3, port 8001)
-    // Devstral-2-123B-Instruct-2512 (Mistral AI)
-    // Tool parser: mistral
+    // Provider 2: Coder Model (vLLM, port 8001)
     // -------------------------------------------------------------------------
-    "devstral": {
-      "name": "Devstral-2-123B (Code)",
+    "qwen-coder": {
+      "name": "Qwen3-Coder-Next (Code)",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8001/v1",
       "env": [],
@@ -78,9 +66,9 @@
         "baseURL": "http://localhost:8001/v1"
       },
       "models": {
-        "Devstral-2-123B": {
-          "name": "Devstral-2-123B-Instruct",
-          "id": "Devstral-2-123B",
+        "Qwen3-Coder-Next-FP8": {
+          "name": "Qwen3-Coder-Next-FP8",
+          "id": "Qwen3-Coder-Next-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": false,

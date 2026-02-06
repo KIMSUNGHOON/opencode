@@ -1,7 +1,7 @@
 ---
 description: Development Environment Detection and Setup Expert
 mode: subagent
-model: devstral/Devstral-2-123B
+model: qwen-coder/Qwen3-Coder-Next-FP8
 color: "#95A5A6"
 tools:
   "*": false

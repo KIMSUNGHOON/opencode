@@ -1,7 +1,7 @@
 ---
 description: Git Push and PR Creation Expert
 mode: subagent
-model: devstral/Devstral-2-123B
+model: qwen-coder/Qwen3-Coder-Next-FP8
 color: "#2ECC71"
 tools:
   "*": false

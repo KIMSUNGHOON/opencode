@@ -1,143 +1,145 @@
 # Code QA Workflow Settings
-# 이 파일에서 워크플로우의 모든 설정 값을 관리합니다.
+# All workflow configuration values are managed in this file.
 
 # =============================================================================
-# 타임아웃 설정 (밀리초)
+# Timeout Settings (milliseconds)
 # =============================================================================
 timeout:
-  # Agent별 Task 타임아웃
+  # Per-agent Task timeout
   agent:
-    env-setup: 60000        # 1분 (환경 감지)
-    git-input: 30000        # 30초 (Git 파싱)
-    pre-checker: 120000     # 2분 (Lint/Format)
-    code-reviewer: 300000   # 5분 (코드 분석)
-    code-fixer: 300000      # 5분 (코드 수정)
-    quality-checker: 180000 # 3분 (품질 검사)
-    build-tester: 600000    # 10분 (빌드 테스트)
-    function-tester: 600000 # 10분 (기능 테스트)
-    git-committer: 60000    # 1분 (Git 커밋)
-    summary-reporter: 120000 # 2분 (리포트 생성)
-    git-pusher: 120000      # 2분 (Push/PR)
+    env-setup: 60000        # 1 min (environment detection)
+    git-input: 30000        # 30 sec (Git parsing)
+    pre-checker: 120000     # 2 min (Lint/Format)
+    code-reviewer: 300000   # 5 min (code analysis)
+    code-fixer: 300000      # 5 min (code fix)
+    quality-checker: 180000 # 3 min (quality check)
+    build-tester: 600000    # 10 min (build test)
+    function-tester: 600000 # 10 min (function test)
+    git-committer: 60000    # 1 min (Git commit)
+    summary-reporter: 120000 # 2 min (report generation)
+    git-pusher: 120000      # 2 min (Push/PR)
 
-  # 전체 워크플로우 타임아웃
-  workflow: 3600000         # 1시간
+  # Overall workflow timeout
+  workflow: 3600000         # 1 hour
 
-  # 사용자 입력 대기 타임아웃 (0 = 무제한)
+  # User input wait timeout (0 = unlimited)
   user_input: 0
 
 # =============================================================================
-# 재시도 설정
+# Retry Settings
 # =============================================================================
 retry:
-  # Task 호출 재시도
+  # Task call retry
   task:
-    max_attempts: 3         # 최대 재시도 횟수
-    delay_ms: 2000          # 재시도 간격 (밀리초)
-    backoff_multiplier: 2   # 지수 백오프 승수
+    max_attempts: 3         # Maximum retry count
+    delay_ms: 2000          # Retry interval (milliseconds)
+    backoff_multiplier: 2   # Exponential backoff multiplier
 
-  # 회귀 루프 재시도 (quality < 70 또는 build/test 실패)
+  # Regression loop retry (quality < 70 or build/test failure)
   regression:
-    max_attempts: 3         # 최대 회귀 횟수
+    max_attempts: 3         # Maximum regression count
 
-  # 토큰 파싱 실패 시 재시도
+  # Token parsing failure retry
   parse:
     max_attempts: 2
 
 # =============================================================================
-# 품질 기준
+# Quality Criteria
 # =============================================================================
 quality:
-  # 최소 품질 점수 (이 점수 미만이면 회귀)
+  # Minimum quality score (regress if below this score)
   threshold: 70
 
-  # 점수 계산 가중치
+  # Score calculation weights
   weights:
-    critical: 20            # Critical 이슈 1개당 감점
-    high: 10                # High 이슈 1개당 감점
-    medium: 5               # Medium 이슈 1개당 감점
-    low: 1                  # Low 이슈 1개당 감점
+    critical: 20            # Points deducted per Critical issue
+    high: 10                # Points deducted per High issue
+    medium: 5               # Points deducted per Medium issue
+    low: 1                  # Points deducted per Low issue
 
-  # 파싱 실패 시 기본 점수
+  # Default score on parsing failure
   default_score: 50
 
 # =============================================================================
-# 모델 설정 (Dual Model Strategy)
+# Model Settings (Dual Model Strategy)
 # =============================================================================
-# H100 NVL x4 단일 서버:
-#   - H100 (0, 1) port 8000: Qwen3-Next-Thinking (SGLang)
-#   - H100 (2, 3) port 8001: Devstral-2-123B (vLLM, --tool-call-parser mistral)
 model:
-  # 추론 모델 (Thinking) - Orchestrator, Reviewer, QC, Reporter
+  # Reasoning model (Thinking) - Orchestrator, Reviewer, QC, Reporter
   thinking: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"
 
-  # 코드 모델 (Coder) - Fixer, Tester, Git, Utility agents
-  coder: "devstral/Devstral-2-123B"
+  # Code model (Coder) - Fixer, Tester, Git, Utility agents
+  coder: "qwen-coder/Qwen3-Coder-Next-FP8"
 
-  # Fallback 모델 (한쪽 서버 장애 시)
+  # Fallback model (when one server is down)
   fallback: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"
 
-  # Agent별 모델 할당
+  # Per-agent model assignment
   assignment:
-    # Thinking Model (port 8000) - 추론 집약 에이전트
+    # Thinking Model (port 8000) - Reasoning-intensive agents
     thinking_agents:
       - code-qa          # Orchestrator
-      - code-reviewer    # Phase 2: 심층 코드 분석 (CoT)
-      - quality-checker  # Phase 4: 품질 평가/점수 산정
-      - summary-reporter # Phase 8: 종합 리포트 생성
+      - code-reviewer    # Phase 2: Deep code analysis (CoT)
+      - quality-checker  # Phase 4: Quality evaluation/scoring
+      - summary-reporter # Phase 8: Comprehensive report generation
 
-    # Coder Model (port 8001) - 코드/유틸리티 에이전트
+    # Coder Model (port 8001) - Code/utility agents
     coder_agents:
-      - env-setup          # Phase -1: 환경 감지
-      - git-input          # Phase 0: Git 파싱
-      - workspace-analyzer # Phase 0B: 파일 구조 분석
+      - env-setup          # Phase -1: Environment detection
+      - git-input          # Phase 0: Git parsing
+      - workspace-analyzer # Phase 0B: File structure analysis
       - pre-checker        # Phase 1: Lint/Format
-      - code-fixer         # Phase 3: 코드 수정 (SWE-Bench)
-      - build-tester       # Phase 5: 빌드 테스트
-      - function-tester    # Phase 6: 기능 테스트
-      - git-committer      # Phase 7: Git 커밋
+      - code-fixer         # Phase 3: Code fix (SWE-Bench)
+      - build-tester       # Phase 5: Build test
+      - function-tester    # Phase 6: Function test
+      - git-committer      # Phase 7: Git commit
       - git-pusher         # Phase 9: Push/PR
-      - file-input         # 파일 직접 입력
+      - file-input         # Direct file input
 
-  # Context 설정
+  # Context settings
   context:
-    max_length: 262144      # 최대 Context 길이 (256K)
-    reduce_ratio: 0.5       # OOM 시 축소 비율
+    max_length: 262144      # Maximum context length (256K)
+    reduce_ratio: 0.5       # Reduction ratio on OOM
 
-  # 샘플링 파라미터
+  # Sampling parameters (per-model, from official recommendations)
   sampling:
-    temperature: 0.6
-    top_p: 0.95
-    top_k: 20
-    min_p: 0
+    thinking:
+      temperature: 0.6
+      top_p: 0.95
+      top_k: 20
+      min_p: 0
+    coder:
+      temperature: 1.0
+      top_p: 0.95
+      top_k: 40
 
 # =============================================================================
-# Docker Sandbox 설정
+# Docker Sandbox Settings
 # =============================================================================
 sandbox:
   enabled: true
   image_name: "qa-sandbox"
   dockerfile: ".opencode/docker/Dockerfile.sandbox"
   gpu: true
-  build_timeout: 600000     # 10분
-  test_timeout: 600000      # 10분
+  build_timeout: 600000     # 10 min
+  test_timeout: 600000      # 10 min
 
 # =============================================================================
-# Git 설정
+# Git Settings
 # =============================================================================
 git:
-  # 커밋 설정
+  # Commit settings
   commit:
-    auto_stage: true        # 자동 스테이징
-    message_prefix: ""      # 커밋 메시지 접두사
-    message_suffix: "\n\nCode-QA: auto-fixed"  # 커밋 메시지 접미사
+    auto_stage: true        # Auto staging
+    message_prefix: ""      # Commit message prefix
+    message_suffix: "\n\nCode-QA: auto-fixed"  # Commit message suffix
 
-  # Push 설정
+  # Push settings
   push:
-    force_with_lease: true  # amend 시 --force-with-lease 사용
-    create_pr: true         # PR 자동 생성 여부 (사용자 확인)
+    force_with_lease: true  # Use --force-with-lease on amend
+    create_pr: true         # Auto-create PR (with user confirmation)
 
 # =============================================================================
-# 로깅 설정
+# Logging Settings
 # =============================================================================
 logging:
   level: "INFO"             # DEBUG, INFO, WARN, ERROR
@@ -146,10 +148,10 @@ logging:
   include_agent_name: true
 
 # =============================================================================
-# 파일 필터 설정
+# File Filter Settings
 # =============================================================================
 filter:
-  # 포함할 파일 확장자
+  # File extensions to include
   include:
     - "*.py"
     - "*.js"
@@ -170,7 +172,7 @@ filter:
     - "*.scala"
     - "*.sh"
 
-  # 제외할 경로
+  # Paths to exclude
   exclude:
     - "node_modules/"
     - "venv/"

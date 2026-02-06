@@ -1,7 +1,7 @@
 ---
 description: Git Commit Expert
 mode: subagent
-model: devstral/Devstral-2-123B
+model: qwen-coder/Qwen3-Coder-Next-FP8
 color: "#E67E22"
 tools:
   "*": false
