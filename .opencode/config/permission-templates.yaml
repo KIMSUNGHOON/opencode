@@ -36,7 +36,9 @@ templates:
       "stat *": allow
       "du *": allow
       "tree *": allow
-      "realpath *": allow
+      "realpath *": allow    # macOS: requires coreutils (brew install coreutils)
+      "python3 -c *": allow  # Cross-platform fallback for realpath
+      "python -c *": allow   # Cross-platform fallback for realpath
       "dirname *": allow
       "basename *": allow
       # Block modification commands
