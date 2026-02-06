@@ -46,6 +46,7 @@ retry:
   regression:
     per_source_max: 3       # Max retries per source (quality, build, test)
     total_cap: 5            # Max total regressions across ALL sources
+    timeout_guard: 0.85     # Skip regression if elapsed > 85% of workflow timeout
 
   # Token parsing failure retry
   parse:

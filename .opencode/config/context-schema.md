@@ -16,6 +16,109 @@ The Orchestrator (code-qa) parses this JSON and passes relevant portions to down
 
 ## Schema Definitions
 
+### env-setup Output
+
+```json
+{
+  "env_state": {
+    "shell_type": "zsh",
+    "env_type": "conda",
+    "env_name": "ml-dev",
+    "env_path": "/home/user/miniconda3/envs/ml-dev",
+    "activate_cmd": "source ~/miniconda3/etc/profile.d/conda.sh && conda activate ml-dev",
+    "python_path": "/home/user/miniconda3/envs/ml-dev/bin/python",
+    "python_version": "3.11.5",
+    "cuda_version": "12.1"
+  }
+}
+```
+
+**Required fields:** `shell_type`, `env_type`, `activate_cmd`
+**Optional fields:** `env_name`, `env_path`, `python_path`, `python_version`, `cuda_version`
+
+---
+
+### workspace-analyzer Output
+
+```json
+{
+  "workspace": {
+    "project": {
+      "name": "myproject",
+      "type": "python",
+      "languages": ["python", "shell"],
+      "frameworks": ["fastapi", "sqlalchemy"]
+    },
+    "structure": {
+      "root": "/home/user/myproject",
+      "src_dir": "/home/user/myproject/src",
+      "test_dir": "/home/user/myproject/tests",
+      "total_files": 245,
+      "code_files": 180
+    },
+    "build_system": {
+      "type": "pip",
+      "config_file": "pyproject.toml",
+      "build_command": "pip install -e .",
+      "test_command": "pytest"
+    },
+    "analyzed_at": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+**Required fields:** `project.name`, `project.type`, `structure.root`
+**Optional fields:** All others (populated when detectable)
+
+---
+
+### git-input Output
+
+```json
+{
+  "git_input": {
+    "mode": "working",
+    "branch": "feature/add-auth",
+    "base_branch": "main",
+    "files": [
+      { "path": "/absolute/path/to/file.py", "status": "M" },
+      { "path": "/absolute/path/to/new_file.py", "status": "A" }
+    ],
+    "deleted_files": [
+      { "path": "/absolute/path/to/removed.py", "status": "D" }
+    ],
+    "total_files": 3,
+    "code_files": 2
+  }
+}
+```
+
+**Required fields:** `mode`, `files`
+**Optional fields:** `branch`, `base_branch`, `deleted_files`, `total_files`, `code_files`
+
+---
+
+### pre-checker Output
+
+```json
+{
+  "pre_check": {
+    "status": "SUCCESS",
+    "tools_run": [
+      { "tool": "ruff", "action": "format", "files_changed": 2 },
+      { "tool": "ruff", "action": "check --fix", "issues_fixed": 5 }
+    ],
+    "files_modified": ["/absolute/path/file1.py", "/absolute/path/file2.py"],
+    "total_fixes": 7
+  }
+}
+```
+
+**Required fields:** `status`
+**Optional fields:** `tools_run`, `files_modified`, `total_fixes`
+
+---
+
 ### code-reviewer Output
 
 ```json
@@ -188,6 +291,46 @@ The Orchestrator (code-qa) parses this JSON and passes relevant portions to down
 
 ---
 
+### git-committer Output
+
+```json
+{
+  "commit": {
+    "status": "SUCCESS",
+    "hash": "a1b2c3d",
+    "message": "fix: resolve SQL injection vulnerability",
+    "files_committed": ["/absolute/path/file1.py", "/absolute/path/file2.py"],
+    "branch": "feature/add-auth"
+  }
+}
+```
+
+**Required fields:** `status`
+**On SUCCESS:** `hash`, `message`, `files_committed`
+**On SKIPPED/NO_CHANGES:** only `status` required
+
+---
+
+### git-pusher Output
+
+```json
+{
+  "push": {
+    "status": "SUCCESS",
+    "remote": "origin",
+    "branch": "feature/add-auth",
+    "pr_url": "https://github.com/user/repo/pull/42",
+    "pr_created": true
+  }
+}
+```
+
+**Required fields:** `status`
+**On SUCCESS:** `remote`, `branch`
+**Optional fields:** `pr_url`, `pr_created`
+
+---
+
 ## Regression History Entry Schema
 
 Each entry in `regression_history`:
@@ -216,16 +359,20 @@ The Orchestrator maintains a `context_store` dict that accumulates all agent out
 
 ```json
 {
-  "env_state": { ... },
-  "file_list": { ... },
+  "env_state": { "env_state": { ... } },
+  "file_list": { "git_input": { ... } },
+  "pre_check_result": { "pre_check": { ... } },
   "review_result": { "review": { ... } },
   "fix_result": { "fix": { ... } },
   "quality_result": { "quality": { ... } },
   "build_result": { "build": { ... } },
   "test_result": { "test": { ... } },
-  "commit_result": { ... }
+  "commit_result": { "commit": { ... } },
+  "push_result": { "push": { ... } }
 }
 ```
+
+**Single Source of Truth:** Agent model assignments are defined in `workflow-settings.yaml` under `model.assignment`. The `model:` field in each agent's YAML frontmatter MUST match the assignment in `workflow-settings.yaml`. If they differ, `workflow-settings.yaml` is authoritative.
 
 When passing context to downstream agents, the Orchestrator includes relevant portions of this store in the prompt.
 

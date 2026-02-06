@@ -371,6 +371,7 @@ test_orchestrator() {
     log_section "8. Orchestrator Validation"
 
     MODE_FILE=".opencode/mode/code-qa.md"
+    CMD_FILE=".opencode/command/code-qa.md"
 
     # Check state management section
     if grep -q "## Workflow State Management" "$MODE_FILE"; then
@@ -419,6 +420,138 @@ test_orchestrator() {
         log_success "Explicit error codes used in cache handling"
     else
         log_fail "Explicit error codes missing from cache handling"
+    fi
+
+    # Check fallback/degraded mode state (M1)
+    if grep -q "degraded_mode" "$MODE_FILE"; then
+        log_success "Fallback degraded_mode state variable defined"
+    else
+        log_fail "Fallback degraded_mode state variable missing"
+    fi
+
+    # Check post-fix regression validation (M4)
+    if grep -q "Post-Fix Regression Validation" "$MODE_FILE"; then
+        log_success "Post-fix regression validation section exists"
+    else
+        log_fail "Post-fix regression validation section missing"
+    fi
+
+    # Check regression timeout guard (M7)
+    if grep -q "Regression Timeout" "$MODE_FILE"; then
+        log_success "Regression timeout handling exists"
+    else
+        log_fail "Regression timeout handling missing"
+    fi
+
+    # Check catch-all error handling for unrecognized results (M5)
+    if grep -q "Catch-all for unrecognized results" "$MODE_FILE"; then
+        log_success "Catch-all error handling exists"
+    else
+        log_fail "Catch-all error handling missing"
+    fi
+
+    # Check command/code-qa.md per-source retry counters (P0)
+    if [ -f "$CMD_FILE" ]; then
+        if grep -q "retry_counters" "$CMD_FILE"; then
+            log_success "cmd: per-source retry_counters defined"
+        else
+            log_fail "cmd: per-source retry_counters missing"
+        fi
+
+        if grep -q "context_store" "$CMD_FILE"; then
+            log_success "cmd: context_store defined"
+        else
+            log_fail "cmd: context_store missing"
+        fi
+
+        if grep -q "pre_check_result" "$CMD_FILE"; then
+            log_success "cmd: pre_check_result in context_store"
+        else
+            log_fail "cmd: pre_check_result missing from context_store"
+        fi
+
+        if grep -q "push_result" "$CMD_FILE"; then
+            log_success "cmd: push_result in context_store"
+        else
+            log_fail "cmd: push_result missing from context_store"
+        fi
+
+        # Check post-fix regression validation in command file
+        if grep -q "Post-Fix Regression Validation" "$CMD_FILE"; then
+            log_success "cmd: post-fix regression validation exists"
+        else
+            log_fail "cmd: post-fix regression validation missing"
+        fi
+
+        # Check regression timeout guard in command file
+        if grep -q "Regression Timeout" "$CMD_FILE"; then
+            log_success "cmd: regression timeout guard exists"
+        else
+            log_fail "cmd: regression timeout guard missing"
+        fi
+    else
+        log_fail "command/code-qa.md not found"
+    fi
+}
+
+# =============================================================================
+# 8b. Context Schema Completeness Tests
+# =============================================================================
+
+test_context_schema_completeness() {
+    log_section "8b. Context Schema Completeness"
+
+    SCHEMA_FILE=".opencode/config/context-schema.md"
+
+    if [ ! -f "$SCHEMA_FILE" ]; then
+        log_fail "context-schema.md missing"
+        return
+    fi
+
+    # All agents that should have schemas
+    SCHEMA_AGENTS=(
+        "env-setup" "workspace-analyzer" "git-input" "pre-checker"
+        "code-reviewer" "code-fixer" "quality-checker"
+        "build-tester" "function-tester" "git-committer" "git-pusher"
+    )
+
+    for agent in "${SCHEMA_AGENTS[@]}"; do
+        if grep -qi "$agent" "$SCHEMA_FILE"; then
+            log_success "schema: ${agent} output schema defined"
+        else
+            log_fail "schema: ${agent} output schema missing"
+        fi
+    done
+
+    # Check regression history schema
+    if grep -q "Regression History" "$SCHEMA_FILE"; then
+        log_success "schema: regression history schema defined"
+    else
+        log_fail "schema: regression history schema missing"
+    fi
+
+    # Check context store reference
+    if grep -q "context_store" "$SCHEMA_FILE" || grep -q "Context Store" "$SCHEMA_FILE"; then
+        log_success "schema: context store documented"
+    else
+        log_fail "schema: context store not documented"
+    fi
+
+    # Check single source of truth note
+    if grep -q "Single Source of Truth" "$SCHEMA_FILE" || grep -q "authoritative" "$SCHEMA_FILE"; then
+        log_success "schema: model assignment single-source-of-truth note exists"
+    else
+        log_fail "schema: model assignment single-source-of-truth note missing"
+    fi
+
+    # Check workflow-settings timeout_guard config
+    SETTINGS_FILE=".opencode/config/workflow-settings.yaml"
+    if [ -f "$SETTINGS_FILE" ]; then
+        if grep -q "timeout_guard" "$SETTINGS_FILE"; then
+            log_success "settings: regression timeout_guard configured"
+        else
+            log_fail "settings: regression timeout_guard missing"
+        fi
     fi
 }
 
@@ -537,7 +670,7 @@ print_summary() {
 main() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║           Code QA Workflow Test Suite v2                     ║"
+    echo "║           Code QA Workflow Test Suite v3                     ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 
@@ -555,6 +688,7 @@ main() {
     test_model_ids
     test_permission_templates
     test_orchestrator
+    test_context_schema_completeness
     test_documentation
     test_git_status
 

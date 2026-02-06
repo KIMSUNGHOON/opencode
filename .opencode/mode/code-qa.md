@@ -397,6 +397,28 @@ curl -s --max-time 5 http://localhost:8000/v1/models 2>/dev/null && echo "THINKI
 curl -s --max-time 5 http://localhost:8001/v1/models 2>/dev/null && echo "CODER_OK" || echo "CODER_FAIL"
 ```
 
+**Fallback state management:**
+```
+# Set after health check
+degraded_mode = null          # null = normal, "thinking_only", "coder_only"
+
+IF only Thinking server is UP:
+    degraded_mode = "coder_only"
+    # Override: use Thinking model for ALL agents (coder agents included)
+    # When constructing Task calls, note the model override in prompt:
+    #   "⚠️ Running in degraded mode: Thinking model only."
+
+IF only Coder server is UP:
+    degraded_mode = "thinking_only"
+    # Override: use Coder model for ALL agents (thinking agents included)
+    # When constructing Task calls, note the model override in prompt:
+    #   "⚠️ Running in degraded mode: Coder model only."
+    #   Reasoning depth may decrease.
+
+IF both servers are UP:
+    degraded_mode = null  # Normal dual-model operation
+```
+
 → On both OK or fallback confirmed, proceed to STEP 0
 
 ### STEP 0: Project Root Detection + Workspace Analysis (Automatic)
@@ -855,7 +877,16 @@ Task tool call:
     ```
 - description: "Lint/Format fix"
 
-**Store result:** Extract `PRE_CHECK_RESULT: SUCCESS` or `PRE_CHECK_RESULT: PARTIAL` from the pre-checker result and save to `pre_check_result`.
+**Store result:**
+1. Extract `PRE_CHECK_RESULT: SUCCESS` or `PRE_CHECK_RESULT: PARTIAL` from the pre-checker result
+2. Save to `pre_check_result`
+
+**⚠️ Catch-all for unrecognized results:**
+```
+IF Task result does NOT contain "PRE_CHECK_RESULT:":
+    → Output: "⚠️ WARNING [E004]: pre-checker did not return expected result token."
+    → Treat as PRE_CHECK_RESULT: PARTIAL (proceed with warning)
+```
 
 → On completion, go to STEP 4
 
@@ -966,6 +997,24 @@ Task tool call:
 **Agent behavior:** code-reviewer has ONLY the Read tool. It can only read files you list.
 
 **Store result:** Extract issue list after `ISSUE_LIST:` and save to `review_issues`
+
+**⚠️ Structured JSON extraction (preferred):**
+```
+1. Find the JSON block in the Task result (between ```json and ```)
+2. Parse and store in context_store.review_result
+3. If no JSON block found, construct from ISSUE_LIST text:
+   context_store.review_result = {
+       "review": { "summary": { "files": N, "issues": N }, "issues": [parsed issues] }
+   }
+```
+
+**⚠️ Catch-all for unrecognized results:**
+```
+IF Task result does NOT contain "ISSUE_LIST:" AND no JSON block found:
+    → Output: "⚠️ WARNING [E004]: code-reviewer did not return expected result format."
+    → Re-call code-reviewer (max 2 parse retries per E004 rules)
+    → After 2 failures: proceed with empty review_issues = []
+```
 
 → On completion, go to STEP 5
 
@@ -1358,6 +1407,50 @@ IF Task result contains "PUSH_RESULT: FAIL":
 | Build failure | Regress to STEP 5 (code-fixer) |
 | Test failure | Regress to STEP 5 (code-fixer) |
 | Over 3 regressions | Abort workflow, request manual review |
+
+---
+
+### Regression Timeout Handling
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  When a regression occurs during late-stage workflow, time remaining    │
+│  may be insufficient for another full fix-check cycle.                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Before starting a regression to STEP 5:                                │
+│                                                                          │
+│  1. Check elapsed workflow time against workflow timeout (1 hour)       │
+│                                                                          │
+│  IF elapsed_time > (workflow_timeout * 0.85):                           │
+│      → Output: "⚠️ WARNING: Workflow approaching timeout."             │
+│      → Output: "Regression skipped to preserve progress."              │
+│      → SKIP regression, proceed with current results                   │
+│      → Continue to next step (build/test/commit/summary)              │
+│                                                                          │
+│  2. If a single regression STEP 5→6→7→8 cycle has already taken       │
+│     more than 10 minutes, add a warning:                               │
+│      → Output: "⚠️ Previous regression took {N}min. {M} retries left."│
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Post-Fix Regression Validation
+
+```
+After code-fixer returns in a REGRESSION run (total_regressions > 0):
+
+1. Extract files_modified from current fix result
+2. Compare with regression_history[-1].files_modified (previous attempt)
+
+IF identical files_modified AND identical changes_applied descriptions:
+    → Output: "⚠️ WARNING: code-fixer applied same fix as previous attempt."
+    → Output: "This indicates the fix strategy is not changing. Stopping regression."
+    → Stop regression loop, proceed to next step with current quality
+    → Do NOT count this as a retry (it's a detection, not a failure)
+
+This prevents infinite loops where code-fixer keeps applying the same fix.
+```
 
 ---
 

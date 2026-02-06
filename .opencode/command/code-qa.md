@@ -117,12 +117,14 @@ regression_history = []      # Accumulated list of regression attempts
 context_store = {
     "env_state": null,          # From env-setup
     "file_list": null,          # From git-input/file-input
+    "pre_check_result": null,   # From pre-checker (SUCCESS/PARTIAL)
     "review_result": null,      # From code-reviewer (structured JSON)
     "fix_result": null,         # From code-fixer (structured JSON)
     "quality_result": null,     # From quality-checker (structured JSON)
     "build_result": null,       # From build-tester (structured JSON)
     "test_result": null,        # From function-tester (structured JSON)
-    "commit_result": null       # From git-committer
+    "commit_result": null,      # From git-committer
+    "push_result": null         # From git-pusher
 }
 ```
 
@@ -201,18 +203,47 @@ IF no JSON block found:
     → Parse from the text-format output (ISSUE_LIST, etc.)
     → Construct the JSON yourself from parsed data
     → Store in context_store
+
+EXTRACTION EXAMPLE (code-reviewer):
+    Agent output contains:
+        ISSUE_LIST:
+        [C001] /path/file.py:45 - SQL injection vulnerability
+        [H001] /path/file.py:78 - Null reference possible
+
+    Construct JSON:
+        context_store.review_result = {
+            "review": {
+                "summary": { "files": 1, "issues": 2, "by_severity": { "critical": 1, "high": 1 } },
+                "issues": [
+                    { "id": "C001", "severity": "critical", "file": "/path/file.py", "line": 45,
+                      "title": "SQL injection vulnerability", "suggestion": "" },
+                    { "id": "H001", "severity": "high", "file": "/path/file.py", "line": 78,
+                      "title": "Null reference possible", "suggestion": "" }
+                ]
+            }
+        }
+
+EXTRACTION FOR REGRESSION HISTORY:
+    When building regression_history entries, extract issues_or_errors from:
+    - quality-checker: context_store.quality_result.remaining_issues
+    - build-tester: context_store.build_result.errors
+    - function-tester: context_store.test_result.failed_tests
+    If structured JSON unavailable, parse from text output.
 ```
 
 ### What to Pass to Each Agent
 
 | Agent | Receives from context_store |
 |-------|---------------------------|
+| pre-checker | `file_list` |
 | code-reviewer | `env_state`, `file_list`, `workspace_cache` |
 | code-fixer | `review_result.issues`, `file_list`, `regression_history` |
 | quality-checker | `file_list`, `fix_result.files_modified` |
 | build-tester | `env_state`, `file_list` |
 | function-tester | `env_state`, `file_list` |
-| summary-reporter | **ALL** of `context_store` |
+| git-committer | `file_list`, `fix_result.files_modified` |
+| summary-reporter | **ALL** of `context_store` + `regression_history` |
+| git-pusher | `commit_result` |
 
 ### Regression Context (CRITICAL for code-fixer)
 
@@ -942,6 +973,29 @@ Every regression to STEP 5 MUST include:
 1. `regression_history` — full list of all previous attempts
 2. New trigger — the specific errors/issues that caused this regression
 3. Explicit instruction to try a DIFFERENT fix approach
+
+### Post-Fix Regression Validation
+
+After code-fixer returns during a regression (total_regressions > 0):
+```
+1. Extract files_modified and changes_applied from current fix result
+2. Compare with previous regression_history entry
+
+IF files_modified is identical AND changes_applied descriptions match previous attempt:
+    → Output: "⚠️ code-fixer applied identical fix as attempt #{N-1}. Breaking loop."
+    → Do NOT regress again (prevents infinite same-fix loop)
+    → Proceed to next step with current state
+```
+
+### Regression Timeout Guard
+
+Before starting any regression to STEP 5:
+```
+IF workflow has been running for > 85% of workflow timeout (51 min of 60 min):
+    → Output: "⚠️ Workflow nearing timeout. Skipping regression to preserve progress."
+    → Proceed with current results (do NOT regress)
+    → Continue to next step
+```
 
 ---
 
