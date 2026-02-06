@@ -31,9 +31,9 @@ permission:
     "git rebase *": deny
   read: allow
   write:
-    # Only allow writing .gitignore
+    # Only allow writing .gitignore (no catch-all deny - it disables the tool!)
     ".gitignore": ask
-    "*": deny
+    # NOTE: Removed "*": deny - it was disabling Write tool entirely!
   glob: allow
 ---
 
