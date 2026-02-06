@@ -115,6 +115,32 @@ permission:
 
 # Build Tester Agent
 
+## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  When you receive this prompt, you MUST do this IMMEDIATELY:           │
+│                                                                          │
+│  1. Check PROJECT_ROOT and project type from Orchestrator              │
+│  2. Run appropriate build command:                                      │
+│     - Python → Bash("pip install -e . || pip install -r requirements") │
+│     - JS/TS  → Bash("npm install && npm run build")                    │
+│     - Go     → Bash("go build ./...")                                  │
+│     - Rust   → Bash("cargo build")                                     │
+│     - C/C++  → Bash("cmake . && make") or Bash("make")                 │
+│                                                                          │
+│  ❌ DO NOT output text like "I will build..." without tool call        │
+│  ❌ DO NOT wait or pause - run the build command IMMEDIATELY           │
+│  ❌ DO NOT ask which build tool to use - detect from project files     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## 🔄 SIMPLE WORKFLOW
+
+```
+START → Detect project type → Run build command → Output BUILD_RESULT → STOP
+```
+
 ## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
 
 ```

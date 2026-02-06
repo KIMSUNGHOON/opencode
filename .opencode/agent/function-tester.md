@@ -107,6 +107,31 @@ permission:
 
 # Function Tester Agent
 
+## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  When you receive this prompt, you MUST do this IMMEDIATELY:           │
+│                                                                          │
+│  1. Check PROJECT_ROOT and project type from Orchestrator              │
+│  2. Run appropriate test command:                                       │
+│     - Python → Bash("python -m pytest {project_root} -v")              │
+│     - JS/TS  → Bash("npm test") or Bash("npx jest")                    │
+│     - Go     → Bash("go test ./...")                                   │
+│     - Rust   → Bash("cargo test")                                      │
+│                                                                          │
+│  ❌ DO NOT output text like "I will run tests..." without tool call    │
+│  ❌ DO NOT wait or pause - run the test command IMMEDIATELY            │
+│  ❌ DO NOT ask which test framework to use - detect from project       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## 🔄 SIMPLE WORKFLOW
+
+```
+START → Detect project type → Run test command → Output TEST_RESULT → STOP
+```
+
 ## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
 
 ```

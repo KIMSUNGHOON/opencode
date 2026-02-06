@@ -102,6 +102,31 @@ permission:
 
 # Pre-Checker Agent
 
+## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  When you receive this prompt, you MUST do this IMMEDIATELY:           │
+│                                                                          │
+│  1. Check the file list passed by Orchestrator                         │
+│  2. Detect project type (Python/JS/Go/etc) from file extensions        │
+│  3. Run appropriate linter/formatter:                                   │
+│     - Python → Bash("ruff check --fix {files} && ruff format {files}") │
+│     - JS/TS  → Bash("npx eslint --fix {files} && npx prettier -w {f}")│
+│     - Go     → Bash("gofmt -w {files}")                                │
+│                                                                          │
+│  ❌ DO NOT output text like "I will run..." without tool call          │
+│  ❌ DO NOT wait or pause - run the linter IMMEDIATELY                  │
+│  ❌ DO NOT ask which linter to use - detect from file extension        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## 🔄 SIMPLE WORKFLOW
+
+```
+START → Detect file type → Run linter/formatter → Output PRECHECK_RESULT → STOP
+```
+
 ## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
 
 ```
