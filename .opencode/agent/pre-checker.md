@@ -1,7 +1,7 @@
 ---
 description: Code Auto-Cleanup (Lint Fix, Format)
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: devstral/Devstral-2-123B
 color: "#9B59B6"
 tools:
   "*": false

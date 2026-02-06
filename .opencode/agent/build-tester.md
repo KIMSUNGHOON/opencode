@@ -1,7 +1,7 @@
 ---
 description: Build Test Expert (Docker Sandbox)
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: devstral/Devstral-2-123B
 color: "#1ABC9C"
 tools:
   "*": false

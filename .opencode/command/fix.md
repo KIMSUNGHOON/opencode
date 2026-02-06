@@ -1,55 +1,55 @@
 ---
-description: "Auto-fix code issues (standalone)"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+description: "코드 이슈 자동 수정 (독립 실행)"
+model: devstral/Devstral-2-123B
 subtask: true
 prompt: |
-  You are a code fix agent.
+  당신은 코드 수정 에이전트입니다.
 
-  ## Instructions
+  ## 지시사항
 
-  1. Call the code-fixer agent to fix code issues.
-  2. Fix specified issues or auto-detected issues.
+  1. code-fixer agent를 호출하여 코드 이슈를 수정합니다.
+  2. 지정된 이슈 또는 자동 감지된 이슈를 수정합니다.
 
-  ## Input Parsing
+  ## 입력 파싱
 
-  Parse $ARGUMENTS:
-  - Issue description included: fix that issue
-  - Only file specified: fix all detected issues in that file
-  - Not specified: error (issue or file required)
+  $ARGUMENTS를 파싱하세요:
+  - 이슈 설명이 포함됨: 해당 이슈 수정
+  - 파일만 지정됨: 해당 파일의 모든 감지된 이슈 수정
+  - 지정되지 않음: 에러 (이슈 또는 파일 필요)
 
-  ## Execution
+  ## 실행
 
-  Task tool call:
+  Task 도구 호출:
   - subagent_type: "code-fixer"
-  - prompt: "Fix the following issues: $ARGUMENTS"
-  - description: "Code fix"
+  - prompt: "다음 이슈를 수정하세요: $ARGUMENTS"
+  - description: "코드 수정"
 ---
 
-# /fix - Auto-fix Code Issues
+# /fix - 코드 이슈 자동 수정
 
-**Usage:**
+**사용법:**
 ```bash
-# Fix specific issue (with issue description)
-/fix "src/main.py:45 - SQL injection vulnerability"
+# 특정 이슈 수정 (이슈 설명 포함)
+/fix "src/main.py:45 - SQL injection 취약점"
 
-# Fix all detected issues in a file
+# 파일의 모든 감지된 이슈 수정
 /fix src/main.py
 
-# Fix based on review results (use after /review)
+# 리뷰 결과 기반 수정 (review 후 사용)
 /fix --from-review
 
-# Fix only specific type of issues
+# 특정 타입의 이슈만 수정
 /fix --type security src/
 ```
 
-**Fixable issue types:**
-- **security**: Security vulnerabilities (SQL Injection, XSS, etc.)
-- **bug**: Bugs (null reference, type errors, etc.)
-- **style**: Code style (formatting, naming conventions)
-- **performance**: Performance issues
+**수정 가능한 이슈 타입:**
+- **security**: 보안 취약점 (SQL Injection, XSS 등)
+- **bug**: 버그 (Null 참조, 타입 오류 등)
+- **style**: 코드 스타일 (포맷팅, 명명 규칙)
+- **performance**: 성능 이슈
 
-**Options:**
-- `--from-review`: Fix issues from previous /review results
-- `--type <type>`: Fix only specific type of issues
-- `--dry-run`: Preview only without making changes
-- `--no-backup`: Do not create backup files
+**옵션:**
+- `--from-review`: 이전 /review 결과의 이슈 수정
+- `--type <type>`: 특정 타입의 이슈만 수정
+- `--dry-run`: 수정하지 않고 미리보기만
+- `--no-backup`: 백업 파일 생성 안 함

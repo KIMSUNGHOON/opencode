@@ -1,66 +1,66 @@
 ---
-description: "Workspace analysis and cache generation"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+description: "워크스페이스 분석 및 캐시 생성"
+model: devstral/Devstral-2-123B
 subtask: true
 prompt: |
-  You are a workspace analysis orchestrator.
+  당신은 워크스페이스 분석 오케스트레이터입니다.
 
-  ## Goal
-  Analyze project structure, dependencies, and build system, then generate cache files.
+  ## 목표
+  프로젝트 구조, 의존성, 빌드 시스템을 분석하고 캐시 파일을 생성합니다.
 
-  ## Core Rules
-  1. Call the workspace-analyzer agent to perform analysis
-  2. Save analysis results to `.opencode/workspace-cache/analysis.json`
-  3. Output summary after analysis completes
+  ## 핵심 규칙
+  1. workspace-analyzer 에이전트를 호출하여 분석을 수행합니다
+  2. 분석 결과를 `.opencode/workspace-cache/analysis.json`에 저장합니다
+  3. 분석 완료 후 요약을 출력합니다
 
-  ## Execution Steps
+  ## 실행 단계
 
-  ### STEP 1: Check Cache Directory
-  First check if cache directory exists:
+  ### STEP 1: 캐시 디렉토리 확인
+  먼저 캐시 디렉토리가 존재하는지 확인합니다:
   ```bash
   mkdir -p .opencode/workspace-cache
   ```
 
-  ### STEP 2: Check Existing Cache (unless --force)
+  ### STEP 2: 기존 캐시 확인 (--force가 아닌 경우)
 
-  **Option Parsing:**
+  **옵션 파싱:**
   ```
-  IF $ARGUMENTS contains "--force":
-      → Ignore existing cache, proceed to STEP 3
+  IF $ARGUMENTS에 "--force" 포함:
+      → 기존 캐시 무시, STEP 3으로 진행
   ELSE:
-      → Check existing cache
+      → 기존 캐시 확인
   ```
 
-  **Cache Validity Check:**
+  **캐시 유효성 검사:**
   ```
-  IF .opencode/workspace-cache/analysis.json exists:
-      Read cache file and check analyzed_at
-      IF analyzed_at is within 24 hours:
-          Cache is up to date. Use --force to re-analyze.
-          → End workflow (cache valid)
+  IF .opencode/workspace-cache/analysis.json 존재:
+      캐시 파일을 읽어서 analyzed_at 확인
+      IF analyzed_at가 24시간 이내:
+          캐시가 최신입니다. 재분석이 필요하면 --force 옵션을 사용하세요.
+          → 워크플로우 종료 (캐시 유효)
       ELSE:
-          Cache is stale. Proceeding with re-analysis.
-          → Proceed to STEP 3
+          캐시가 오래되었습니다. 재분석을 진행합니다.
+          → STEP 3으로 진행
   ELSE:
-      No cache found. Starting analysis.
-      → Proceed to STEP 3
+      캐시가 없습니다. 분석을 시작합니다.
+      → STEP 3으로 진행
   ```
 
-  ### STEP 3: Workspace Analysis
-  Task tool call:
+  ### STEP 3: 워크스페이스 분석
+  Task 도구 호출:
   - subagent_type: "workspace-analyzer"
   - prompt: |
-      Analyze the current workspace.
+      현재 워크스페이스를 분석하세요.
 
-      ## Analysis Items
-      1. Detect project type (package.json, go.mod, Cargo.toml, etc.)
-      2. Collect file structure (source files, test files, config files)
-      3. Analyze dependencies (dependencies, devDependencies)
-      4. Detect build system (npm, cargo, go, make, etc.)
-      5. Collect environment info (runtime versions, Docker config)
-      6. Collect Git info (remote, branch)
+      ## 분석 항목
+      1. 프로젝트 타입 감지 (package.json, go.mod, Cargo.toml 등)
+      2. 파일 구조 수집 (소스 파일, 테스트 파일, 설정 파일)
+      3. 의존성 분석 (dependencies, devDependencies)
+      4. 빌드 시스템 감지 (npm, cargo, go, make 등)
+      5. 환경 정보 수집 (런타임 버전, Docker 설정)
+      6. Git 정보 수집 (remote, branch)
 
-      ## Excluded Directories
+      ## 제외 디렉토리
       - node_modules/
       - __pycache__/
       - .git/
@@ -69,45 +69,45 @@ prompt: |
       - build/, dist/
       - vendor/
 
-      ## Output
-      You MUST output analysis results as JSON after CACHE_DATA:.
-  - description: "Workspace analysis"
+      ## 출력
+      반드시 CACHE_DATA: 이후에 JSON 형식으로 분석 결과를 출력하세요.
+  - description: "워크스페이스 분석"
 
-  ### STEP 4: Save Cache
-  Extract JSON after CACHE_DATA: from Task result.
+  ### STEP 4: 캐시 저장
+  Task 결과에서 CACHE_DATA: 이후의 JSON을 추출합니다.
 
-  **JSON Extraction and Save:**
+  **JSON 추출 및 저장:**
   ```
-  1. Find "CACHE_DATA:" in Task result
-  2. Extract the JSON block after it
-  3. Save to .opencode/workspace-cache/analysis.json
-  ```
-
-  Use Write tool to save cache file:
-  ```
-  File path: .opencode/workspace-cache/analysis.json
-  Content: {extracted JSON}
+  1. Task 결과에서 "CACHE_DATA:" 찾기
+  2. 그 이후의 JSON 블록 추출
+  3. .opencode/workspace-cache/analysis.json에 저장
   ```
 
-  ### STEP 5: Output Results
+  Write 도구를 사용하여 캐시 파일 저장:
+  ```
+  파일 경로: .opencode/workspace-cache/analysis.json
+  내용: {추출한 JSON}
+  ```
 
-  Output in the following format after analysis completes:
+  ### STEP 5: 결과 출력
+
+  분석 완료 후 다음 형식으로 출력:
 
   ```
   ═══════════════════════════════════════════════════════════════
   WORKSPACE_ANALYSIS: COMPLETE
   ═══════════════════════════════════════════════════════════════
 
-  Analysis Summary
+  📊 분석 요약
   ┌──────────────────┬──────────────────┐
-  │ Project Type     │ {type}           │
-  │ Total Files      │ {count}          │
-  │ Source Files     │ {count}          │
-  │ Test Files       │ {count}          │
-  │ Dependencies     │ {count}          │
+  │ 프로젝트 타입     │ {type}           │
+  │ 총 파일 수       │ {count}          │
+  │ 소스 파일        │ {count}          │
+  │ 테스트 파일      │ {count}          │
+  │ 의존성           │ {count}          │
   └──────────────────┴──────────────────┘
 
-  Cache Saved
+  💾 캐시 저장됨
   → .opencode/workspace-cache/analysis.json
 
   ═══════════════════════════════════════════════════════════════
@@ -115,77 +115,77 @@ prompt: |
 
   ---
 
-  ## Error Handling
+  ## 오류 처리
 
-  **workspace-analyzer failure:**
+  **workspace-analyzer 실패 시:**
   ```
-  IF Task result contains "WORKSPACE_ANALYSIS_RESULT: FAILED":
-      → Output error message
-      → End workflow (failure)
+  IF Task 결과에 "WORKSPACE_ANALYSIS_RESULT: FAILED" 포함:
+      → 오류 메시지 출력
+      → 워크플로우 종료 (실패)
   ```
 
-  **JSON parsing failure:**
+  **JSON 파싱 실패 시:**
   ```
-  IF CACHE_DATA extraction fails:
-      → Output "Cache data parsing failed"
-      → End workflow (failure)
+  IF CACHE_DATA 추출 실패:
+      → "캐시 데이터 파싱 실패" 출력
+      → 워크플로우 종료 (실패)
   ```
 
   ---
 
-  ## Input Options
+  ## 입력 옵션
 
-  | Option | Description |
-  |--------|-------------|
-  | (none) | Skip if existing cache is valid, analyze if missing or stale |
-  | --force | Ignore existing cache and force re-analysis |
+  | 옵션 | 설명 |
+  |------|------|
+  | (없음) | 기존 캐시가 유효하면 스킵, 없거나 오래되면 분석 |
+  | --force | 기존 캐시 무시하고 강제 재분석 |
 
 ---
 
 # Workspace Analysis Command
 
-**Input**: $ARGUMENTS
+**입력**: $ARGUMENTS
 
-This command analyzes the current workspace and saves results to cache.
+이 명령어는 현재 워크스페이스를 분석하고 결과를 캐시에 저장합니다.
 
-## Usage Examples
+## 사용 예시
 
 ```bash
-# Default analysis (runs only if cache is missing or stale)
+# 기본 분석 (캐시가 없거나 오래된 경우만 실행)
 /analyze
 
-# Force re-analysis
+# 강제 재분석
 /analyze --force
 ```
 
-## Cache File Location
+## 캐시 파일 위치
 
-- `.opencode/workspace-cache/analysis.json` - Main analysis results
+- `.opencode/workspace-cache/analysis.json` - 메인 분석 결과
 
-## Analysis Items
+## 분석 항목
 
-1. **Project Type**: TypeScript, Python, Go, Rust, etc.
-2. **File Structure**: Directory structure, file listing
-3. **Dependencies**: Extracted from package.json, requirements.txt, etc.
-4. **Build System**: npm, cargo, go, make, etc.
-5. **Environment Info**: Runtime versions, Docker configuration
-6. **Git Info**: Remote URL, current branch
+1. **프로젝트 타입**: TypeScript, Python, Go, Rust 등
+2. **파일 구조**: 디렉토리 구조, 파일 목록
+3. **의존성**: package.json, requirements.txt 등에서 추출
+4. **빌드 시스템**: npm, cargo, go, make 등
+5. **환경 정보**: 런타임 버전, Docker 설정
+6. **Git 정보**: remote URL, 현재 브랜치
 
-## Relationship with Code-QA
+## Code-QA와의 관계
 
-`/code-qa` **automatically runs workspace-analyzer** in STEP 0 when cache is missing or expired.
-Therefore, in most cases you don't need to run `/analyze` separately.
+`/code-qa`는 기본적으로 STEP 0에서 캐시가 없거나 만료되면 **자동으로 workspace-analyzer를 실행**합니다.
+따라서 대부분의 경우 `/analyze`를 별도로 실행할 필요가 없습니다.
 
 ```bash
-# Typical usage (code-qa auto-analyzes internally)
-/code-qa                           # Auto-analyzes if no cache, then proceeds with QA
-/code-qa --files torch_aim/csrc    # Auto-analysis also applies in --files mode
-/code-qa --last                    # Auto-analysis also applies in last commit mode
+# 일반적인 사용 (code-qa가 내부에서 자동 분석)
+/code-qa                           # 캐시 없으면 자동 분석 후 QA 진행
+/code-qa --files torch_aim/csrc    # --files 모드에서도 자동 분석 적용
+/code-qa --last                    # 마지막 커밋 모드에서도 자동 분석 적용
 
-# Cases where /analyze is useful
-/analyze --force                   # Force refresh cache when project structure changed
-/analyze                           # View analysis results only (without QA)
+# /analyze가 유용한 경우
+/analyze --force                   # 프로젝트 구조가 변경되었을 때 캐시 강제 갱신
+/analyze                           # 분석 결과만 확인하고 싶을 때 (QA 없이)
 
-# Quick QA without cache
-/code-qa --skip-cache              # Skip analysis and start QA immediately
+# 캐시 없이 빠르게 QA만 하고 싶을 때
+/code-qa --skip-cache              # 분석 건너뛰고 바로 QA 시작
 ```

@@ -285,11 +285,15 @@ use_git_mode = true          # true if no --files, false otherwise
 env_result = ""              # Content after ENV_SETUP_RESULT: SUCCESS
 changed_files = []           # File list after FILE_LIST:
 review_issues = []           # Issue list after ISSUE_LIST:
-pre_check_result = ""        # PRE_CHECK_RESULT: SUCCESS/PARTIAL
 fix_result = ""              # Content after FIX_RESULT:
 build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
 test_result = ""             # TEST_RESULT: SUCCESS/FAIL/SKIPPED
 commit_result = ""           # Content after COMMIT_RESULT: SUCCESS
+
+# User input related state
+env_setup_confirmed = false  # env-setup completion status
+build_env_confirmed = false  # build-tester env confirmation status
+test_confirmed = false       # function-tester test confirmation status
 
 # Workspace cache
 workspace_cache = null       # Cache data (use if available)
@@ -305,9 +309,7 @@ Find and save the following patterns from each Agent's result:
 | workspace-analyzer | JSON after `CACHE_DATA:` | `workspace_cache` |
 | env-setup | Everything after `ENV_SETUP_RESULT:` | `env_result` |
 | git-input | Comma-separated files after `FILE_LIST:` | `changed_files` |
-| pre-checker | `SUCCESS` or `PARTIAL` after `PRE_CHECK_RESULT:` | `pre_check_result` |
 | code-reviewer | Newline-separated items after `ISSUE_LIST:` | `review_issues` |
-| code-fixer | Everything after `FIX_RESULT:` | `fix_result` |
 | quality-checker | Number from `QUALITY_SCORE: XX/100` | `quality_score` |
 | build-tester | Everything after `BUILD_RESULT:` | `build_result` |
 | function-tester | Everything after `TEST_RESULT:` | `test_result` |
@@ -334,7 +336,7 @@ The following Agents MUST receive user input before proceeding:
 
 | Agent | Required Input | Wait State |
 |-------|---------------|------------|
-| env-setup | Environment confirmation (Y/n) or selection when none detected (1-2 steps) | `WAITING_INPUT` |
+| env-setup | Shell selection (1-3), Environment type selection (1-4) | `WAITING_INPUT` |
 | git-input | When no Git repo: init/specify files/exit | `NO_GIT_REPO` |
 | build-tester | Environment confirmation ("confirm/y" or "reset/n") | `WAITING_INPUT` |
 | function-tester | Test execution ("run/y" or "skip/n") | `WAITING_INPUT` |
@@ -553,7 +555,7 @@ Task tool call:
     PROJECT_ROOT: {PROJECT_ROOT}
 
     Check Shell, environment, Python/CUDA versions.
-    Auto-detect current shell and active virtual environment. If an environment is already active, confirm with user (Y/n). Only prompt for selection when no environment is detected.
+    You MUST ask the user to select Shell type (zsh/bash/sh) and virtual environment type (conda/uv/venv).
 
     Note: .opencode/env-config.yaml file is optional. Detect from runtime directly.
 - description: "Environment setup check"
@@ -634,32 +636,6 @@ IF Task result contains "GIT_INPUT_RESULT: NO_GIT_REPO":
         → call file-input with the paths
     → If user inputs "exit" or "quit":
         → terminate workflow
-
-IF Task result contains "GIT_INPUT_RESULT: NO_CHANGES":
-    → Output "No changed files found. Working directory is clean."
-    → Terminate workflow (nothing to review)
-
-IF Task result contains "GIT_INPUT_RESULT: DELETED_ONLY":
-    → Output "Only deleted files found. No code to analyze."
-    → Terminate workflow (deleted files cannot be reviewed)
-
-IF Task result contains "GIT_INPUT_RESULT: NO_CODE_FILES":
-    → Output "No code files changed (only config/docs files). Skipping code review."
-    → Terminate workflow (no code to review)
-
-IF Task result contains "GIT_INPUT_RESULT: DETACHED_HEAD":
-    → Wait for user response (WAITING_FOR: USER_CHOICE)
-    → If user inputs branch name: call git-input again with "Create branch: {name}"
-    → If user inputs "qa-only" or "continue": proceed with changed_files, set use_git_mode = false (skip commit/push)
-    → If user inputs "exit": terminate workflow
-
-IF Task result contains "GIT_INPUT_RESULT: MERGE_CONFLICT":
-    → Output "Merge conflict detected. Please resolve conflicts before running Code QA."
-    → Terminate workflow (user must resolve conflicts manually)
-
-IF Task result contains "GIT_INPUT_RESULT: REBASE_IN_PROGRESS":
-    → Output "Rebase in progress. Please complete or abort rebase before running Code QA."
-    → Terminate workflow (user must complete/abort rebase manually)
 
 IF Task result contains "GIT_INPUT_RESULT: WAITING_INPUT" AND "WAITING_FOR: INIT_CONFIRMATION":
     → User is confirming initial commit
@@ -796,8 +772,6 @@ Task tool call:
     ```
 - description: "Lint/Format fix"
 
-**Store result:** Extract `PRE_CHECK_RESULT: SUCCESS` or `PRE_CHECK_RESULT: PARTIAL` from the pre-checker result and save to `pre_check_result`.
-
 → On completion, go to STEP 4
 
 ### STEP 4: Code Review
@@ -932,28 +906,12 @@ Task tool call:
     ```
 - description: "Code fix"
 
-**Store result:** Extract content after `FIX_RESULT:` and save to `fix_result`
-
 → On completion, go to STEP 6
 
 ### STEP 6: Quality Check
-
-**⚠️ Build prompt with FIX_RESULT context from STEP 5!**
-
 Task tool call:
 - subagent_type: "quality-checker"
-- prompt: **(Build with actual values!)**
-    ```
-    Previous fix results:
-    [actual content of fix_result from STEP 5, e.g., "FIX_RESULT: SUCCESS, ISSUES_FIXED: 3/3"]
-
-    Target files:
-    - [actual absolute paths from changed_files]
-
-    Run static analysis tools (ruff, mypy, radon, etc.) directly on the target files,
-    and calculate quality score based on results.
-    You MUST output score in QUALITY_SCORE: XX/100 format.
-    ```
+- prompt: "Run static analysis tools (ruff, mypy, radon, etc.) directly, and calculate quality score based on results. You MUST output score in QUALITY_SCORE: XX/100 format."
 - description: "Quality check"
 
 **Required action after Task completion:**
@@ -1009,22 +967,11 @@ IF Task result contains "BUILD_RESULT: SUCCESS":
     → Proceed to STEP 8
 
 IF Task result contains "BUILD_RESULT: FAIL":
-    IF retry_count < 3:
-        retry_count += 1
-        → Regress to STEP 5 (code-fixer) with build error details
-    ELSE:
-        → Abort workflow, output "Maximum retry count exceeded"
-
-IF Task result contains "BUILD_RESULT: FAIL_DEPS":
-    → Output dependency error info and suggested fix command
-    → Wait for user response:
-        → If user inputs "retry/y": retry build (install deps first)
-        → If user inputs "skip/n": skip build, proceed to STEP 8
+    → Regress to STEP 5 (max 3 times)
 ```
 
 → Success: go to STEP 8
-→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
-→ Dependency error: wait for user to install deps, then retry
+→ Failure: regress to STEP 5 (max 3 times)
 → Reset: regress to STEP 1
 
 ### STEP 8: Function Test (User Confirmation Required)
@@ -1062,18 +1009,14 @@ IF Task result contains "TEST_RESULT: SUCCESS":
     → Proceed to STEP 9
 
 IF Task result contains "TEST_RESULT: FAIL":
-    IF retry_count < 3:
-        retry_count += 1
-        → Regress to STEP 5 (code-fixer) with test failure details
-    ELSE:
-        → Abort workflow, output "Maximum retry count exceeded"
+    → Regress to STEP 5 (max 3 times)
 
 IF Task result contains "TEST_RESULT: SKIPPED" or "TEST_RESULT: NO_TESTS":
     → Proceed to STEP 9 (test skipped)
 ```
 
 → Success/Skip: go to STEP 9
-→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
+→ Failure: regress to STEP 5 (max 3 times)
 
 ### STEP 9: Git Commit (User Confirmation Required) - Git Mode Only
 
@@ -1105,100 +1048,39 @@ IF Task result contains "COMMIT_RESULT: SKIPPED" or "COMMIT_RESULT: NO_CHANGES":
     → Proceed to STEP 10 (commit skipped)
 ```
 
-**Store result:** Extract the full `COMMIT_RESULT: ...` line from the git-committer result and save to `commit_result`.
-
 → On completion, go to STEP 10
 
 ### STEP 10: Summary Report
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  🚨 CRITICAL: YOU MUST BUILD THE PROMPT WITH ACTUAL VALUES! 🚨           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  DO NOT pass the template below with {placeholder} strings!             │
-│  You must SUBSTITUTE each {placeholder} with the ACTUAL value you       │
-│  extracted and saved from previous Steps.                               │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**⚠️ Orchestrator MUST construct the prompt like this:**
-
-```python
-# Pseudo-code for how YOU (Orchestrator) must build the prompt:
-
-# 1. Gather all saved state variables
-env_info = env_result         # from STEP 1
-files = changed_files         # from STEP 2
-issues = review_issues        # from STEP 4
-fix_info = fix_result         # from STEP 5
-score = quality_score         # from STEP 6
-build_info = build_result     # from STEP 7
-test_info = test_result       # from STEP 8
-commit_info = commit_result   # from STEP 9
-
-# 2. Build the prompt with ACTUAL values (not placeholders!)
-prompt = f"""
-Analyze the following QA results and generate a comprehensive report.
-
-=== Environment Info ===
-{env_info}
-
-=== Changed Files ===
-{files}
-
-=== Code Review Results ===
-{issues}
-
-=== Fix Results ===
-{fix_info}
-
-=== Quality Score ===
-{score}/100
-
-=== Build Result ===
-{build_info}
-
-=== Test Result ===
-{test_info}
-
-=== Commit Info ===
-{commit_info}
-"""
-```
+**Orchestrator pre-work:**
+1. Include all result variables saved so far in prompt
+2. Replace placeholders with actual values
 
 Task tool call:
 - subagent_type: "summary-reporter"
-- prompt: **(YOU MUST BUILD THIS - see above!)**
-    ```
+- prompt: |
     Analyze the following QA results and generate a comprehensive report.
     You can use git log, git diff commands for additional information if needed.
 
     === Environment Info ===
-    [actual content of env_result from STEP 1]
+    {actual content of env_result variable}
 
     === Changed Files ===
-    [actual file list from changed_files from STEP 2]
+    {actual file list from changed_files variable}
 
     === Code Review Results ===
-    [actual issue list from review_issues from STEP 4]
-
-    === Fix Results ===
-    [actual content of fix_result from STEP 5]
+    {actual issue list from review_issues variable}
 
     === Quality Score ===
-    [actual quality_score number from STEP 6]/100
+    {quality_score}/100
 
     === Build Result ===
-    [actual content of build_result from STEP 7]
+    {actual content of build_result variable}
 
     === Test Result ===
-    [actual content of test_result from STEP 8]
+    {actual content of test_result variable}
 
     === Commit Info ===
-    [actual content of commit_result from STEP 9]
-    ```
+    {actual content of commit_result variable}
 - description: "Result report"
 
 **Agent behavior:** summary-reporter generates report from passed data. Uses Bash tool to check git log etc. for missing info.
@@ -1339,43 +1221,44 @@ TASK_RETRY_DELAY = 2000  # Retry interval (ms)
 
 ### Dual Model Strategy
 
-This workflow uses two specialized models on separate GPU nodes:
+This workflow uses two specialized models on a single H100 NVL x4 server:
 
-| Role | Model | Endpoint | Mode |
-|------|-------|----------|------|
-| **Orchestrator** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (reasoning) |
-| **code-reviewer** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (CoT analysis) |
-| **quality-checker** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (score evaluation) |
-| **summary-reporter** | Qwen3-Next-80B-A3B-Thinking-FP8 | :8000 | Thinking (report generation) |
-| **code-fixer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (SWE-Bench) |
-| **pre-checker** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (lint/format) |
-| **build-tester** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (build exec) |
-| **function-tester** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (test exec) |
-| **env-setup** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (env detect) |
-| **git-input** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git parse) |
-| **workspace-analyzer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (file scan) |
-| **git-committer** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git commit) |
-| **git-pusher** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (git push) |
-| **file-input** | Qwen3-Coder-Next-FP8 | :8001 | Non-thinking (file parse) |
+| Role | Model | GPU | Endpoint | Mode |
+|------|-------|-----|----------|------|
+| **Orchestrator** | Qwen3-Next-80B-A3B-Thinking-FP8 | 0,1 | :8000 | Thinking (reasoning) |
+| **code-reviewer** | Qwen3-Next-80B-A3B-Thinking-FP8 | 0,1 | :8000 | Thinking (CoT analysis) |
+| **quality-checker** | Qwen3-Next-80B-A3B-Thinking-FP8 | 0,1 | :8000 | Thinking (score evaluation) |
+| **summary-reporter** | Qwen3-Next-80B-A3B-Thinking-FP8 | 0,1 | :8000 | Thinking (report generation) |
+| **code-fixer** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (tool use) |
+| **pre-checker** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (lint/format) |
+| **build-tester** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (build exec) |
+| **function-tester** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (test exec) |
+| **env-setup** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (env detect) |
+| **git-input** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (git parse) |
+| **workspace-analyzer** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (file scan) |
+| **git-committer** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (git commit) |
+| **git-pusher** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (git push) |
+| **file-input** | Devstral-2-123B | 2,3 | :8001 | Agentic coding (file parse) |
 
 ### Dual Model Assignment Rationale
 
 ```
-Thinking Model (port 8000) - 4 agents:
-  Agents where reasoning is critical. CoT reasoning directly impacts quality.
-  - Orchestrator: Workflow state management, conditional branching, regression decisions
-  - code-reviewer: Deep analysis of security vulnerabilities and logical errors
-  - quality-checker: Comprehensive evaluation of static analysis results, score calculation
-  - summary-reporter: Comprehensive QA result analysis and report generation
+Thinking Model (H100 0-1, port 8000) - 4 agents:
+  추론이 핵심인 에이전트. CoT reasoning이 품질에 직접 영향.
+  - Orchestrator: 워크플로우 상태 관리, 조건 분기, 회귀 판단
+  - code-reviewer: 보안 취약점, 논리적 오류 심층 분석
+  - quality-checker: 정적 분석 결과 종합 평가, 점수 산정
+  - summary-reporter: 전체 QA 결과 종합 분석 리포트 생성
 
-Coder Model (port 8001) - 10 agents:
-  Agents focused on code generation/modification or tool execution.
-  Non-thinking mode for fast responses, leveraging SWE-Bench 70.6% performance.
-  - code-fixer: SWE-Bench style code fix/bug fix (core impact)
-  - pre-checker: Lint/Format tool execution
-  - build-tester / function-tester: Build/test command execution
-  - env-setup / git-input / workspace-analyzer: Environment/file exploration
-  - git-committer / git-pusher / file-input: Git/file utilities
+Coder Model (H100 2-3, port 8001) - 10 agents:
+  Devstral-2-123B: Mistral AI 에이전틱 코딩 모델.
+  256K context, 고급 도구 통합, multi-step SW 엔지니어링 지원.
+  --tool-call-parser mistral 사용.
+  - code-fixer: 코드 수정/버그 픽스 (핵심 임팩트)
+  - pre-checker: Lint/Format 도구 실행
+  - build-tester / function-tester: 빌드/테스트 명령 실행
+  - env-setup / git-input / workspace-analyzer: 환경/파일 탐색
+  - git-committer / git-pusher / file-input: Git/파일 유틸리티
 ```
 
 ### Context Transfer Between Models
@@ -1407,29 +1290,29 @@ IF Thinking server (port 8000) is unavailable:
   → Reasoning depth may decrease, but code operations work normally
 ```
 
-### Hardware Requirements (Option A: Separate Nodes)
+### Hardware Requirements (H100 NVL x4 Single Server)
 
 ```
-Node 1 (Thinking Model):
-  2x H100 NVL 96GB (Tensor Parallel)
+H100 NVL x4 96GB (Single Server):
+
+GPU 0-1 (Thinking Model - Qwen3-Next-Thinking):
   - Model weights (FP8): ~76GB
   - KV Cache (256K): ~50GB
   - Headroom: ~66GB
 
-Node 2 (Coder Model):
-  2x H100 NVL 96GB (Tensor Parallel)
-  - Model weights (FP8): ~76GB
+GPU 2-3 (Coder Model - Devstral-2-123B):
+  - Model weights (123B, FP16/BF16): ~246GB → need FP8 or 2xH100
   - KV Cache (256K): ~50GB
-  - Headroom: ~66GB
+  - Consider --gpu-memory-utilization 0.85
 
-Total: 4x H100 NVL 96GB
+Total: 4x H100 NVL 96GB (single server)
 ```
 
 ### Deployment Commands
 
 ```bash
-# Node 1: Thinking Model (SGLang, port 8000)
-python3 -m sglang.launch_server \
+# GPU 0-1: Thinking Model (SGLang, port 8000)
+CUDA_VISIBLE_DEVICES=0,1 python3 -m sglang.launch_server \
   --model Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
   --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
   --tp 2 \
@@ -1438,15 +1321,16 @@ python3 -m sglang.launch_server \
   --host 0.0.0.0 \
   --mem-fraction-static 0.85
 
-# Node 2: Coder Model (vLLM, port 8001)
-vllm serve Qwen/Qwen3-Coder-Next-FP8 \
-  --served-model-name Qwen3-Coder-Next-FP8 \
+# GPU 2-3: Coder Model (vLLM, port 8001)
+CUDA_VISIBLE_DEVICES=2,3 vllm serve mistralai/Devstral-2-123B-Instruct-2512 \
+  --served-model-name Devstral-2-123B \
   --tensor-parallel-size 2 \
   --max-model-len 262144 \
   --port 8001 \
   --host 0.0.0.0 \
   --enable-auto-tool-choice \
-  --tool-call-parser qwen3_coder
+  --tool-call-parser mistral \
+  --gpu-memory-utilization 0.85
 ```
 
 ---

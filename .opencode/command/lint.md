@@ -1,56 +1,56 @@
 ---
-description: "Lint/Format auto-fix (standalone)"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+description: "Lint/Format 자동 수정 (독립 실행)"
+model: devstral/Devstral-2-123B
 subtask: true
 prompt: |
-  You are an agent that runs Lint/Format tools.
+  당신은 Lint/Format 도구를 실행하는 에이전트입니다.
 
-  ## Instructions
+  ## 지시사항
 
-  1. Call the pre-checker agent to run Lint/Format.
-  2. Perform auto-fix on the specified files/paths.
+  1. pre-checker agent를 호출하여 Lint/Format을 실행합니다.
+  2. 입력된 파일/경로에 대해 자동 수정을 수행합니다.
 
-  ## Input Parsing
+  ## 입력 파싱
 
-  Parse $ARGUMENTS:
-  - File/path specified: run on that file
-  - Not specified: all code files in current directory
+  $ARGUMENTS를 파싱하세요:
+  - 파일/경로가 지정됨: 해당 파일에 대해 실행
+  - 지정되지 않음: 현재 디렉토리의 모든 코드 파일
 
-  ## Execution
+  ## 실행
 
-  Task tool call:
+  Task 도구 호출:
   - subagent_type: "pre-checker"
-  - prompt: "Run Lint/Format auto-fix on the following files/paths: $ARGUMENTS (if empty, use current directory)"
-  - description: "Lint/Format fix"
+  - prompt: "다음 파일/경로에 대해 Lint/Format 자동 수정을 실행하세요: $ARGUMENTS (비어있으면 현재 디렉토리)"
+  - description: "Lint/Format 수정"
 ---
 
-# /lint - Lint/Format Auto-fix
+# /lint - Lint/Format 자동 수정
 
-**Usage:**
+**사용법:**
 ```bash
-# All code files in current directory
+# 현재 디렉토리의 모든 코드 파일
 /lint
 
-# Specific file
+# 특정 파일
 /lint src/main.py
 
-# Specific directory
+# 특정 디렉토리
 /lint src/
 
-# Wildcard
+# 와일드카드
 /lint src/*.py
 
-# Multiple paths
+# 여러 경로
 /lint src/,lib/,tests/
 ```
 
-**Supported tools:**
+**지원 도구:**
 - Python: ruff, black, isort
 - JavaScript/TypeScript: eslint, prettier
 - Go: gofmt, goimports
 - Rust: rustfmt
-- Others: language-specific standard formatters
+- 기타: 언어별 표준 포매터
 
-**Options:**
-- `--check`: Check only without fixing (default: auto-fix)
-- `--no-sandbox`: Run directly on host without Docker
+**옵션:**
+- `--check`: 수정하지 않고 검사만 (기본: 자동 수정)
+- `--no-sandbox`: Docker 없이 호스트에서 직접 실행
