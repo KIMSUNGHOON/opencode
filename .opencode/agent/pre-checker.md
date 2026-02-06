@@ -61,6 +61,27 @@ permission:
 
 # Pre-Checker Agent
 
+## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  AFTER running lint/format commands and getting results:                │
+│                                                                          │
+│  1. Do NOT run the same commands again                                  │
+│  2. Do NOT run additional lint/format commands unnecessarily            │
+│  3. IMMEDIATELY output PRECHECK_RESULT token                            │
+│                                                                          │
+│  Example: If ruff check --fix returns "Fixed 3 errors"                  │
+│  → Output: PRECHECK_RESULT: SUCCESS                                     │
+│            LINT_FIXED: 3 issues                                          │
+│            FORMAT_APPLIED: yes                                           │
+│            FILES_MODIFIED: src/main.py, src/utils.py                     │
+│                                                                          │
+│  ⚠️ Run each linter/formatter ONCE per file, then output result!       │
+│  ⚠️ Do NOT keep running commands - output result and STOP!             │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
 
 ```

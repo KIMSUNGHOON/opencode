@@ -71,6 +71,33 @@ permission:
 
 # Function Tester Agent
 
+## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  AFTER running test commands and getting results:                       │
+│                                                                          │
+│  1. Do NOT run the same test command again                              │
+│  2. Do NOT retry endlessly if tests fail                                │
+│  3. IMMEDIATELY output TEST_RESULT token                                │
+│                                                                          │
+│  Example: If pytest returns "5 passed"                                  │
+│  → Output: TEST_RESULT: SUCCESS                                         │
+│            TESTS_PASSED: 5                                               │
+│            TESTS_FAILED: 0                                               │
+│            COVERAGE: 85%                                                 │
+│                                                                          │
+│  Example: If tests fail                                                 │
+│  → Output: TEST_RESULT: FAIL                                            │
+│            TESTS_PASSED: 3                                               │
+│            TESTS_FAILED: 2                                               │
+│            FAILED_TESTS: test_auth, test_api                             │
+│                                                                          │
+│  ⚠️ Run tests ONCE, then output result (pass or fail)!                 │
+│  ⚠️ Do NOT keep running commands - output result and STOP!             │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
 
 ```

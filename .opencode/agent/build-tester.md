@@ -92,6 +92,31 @@ permission:
 
 # Build Tester Agent
 
+## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  AFTER running build commands and getting results:                      │
+│                                                                          │
+│  1. Do NOT run the same build command again                             │
+│  2. Do NOT retry endlessly if build fails                               │
+│  3. IMMEDIATELY output BUILD_RESULT token                               │
+│                                                                          │
+│  Example: If npm run build returns success                              │
+│  → Output: BUILD_RESULT: SUCCESS                                        │
+│            BUILD_TOOL: npm                                               │
+│            BUILD_TIME: 12.5s                                             │
+│                                                                          │
+│  Example: If build fails                                                │
+│  → Output: BUILD_RESULT: FAIL                                           │
+│            ERROR: TypeScript compilation failed                          │
+│            ERRORS_FOUND: 5                                               │
+│                                                                          │
+│  ⚠️ Run build ONCE, then output result (success or failure)!           │
+│  ⚠️ Do NOT keep running commands - output result and STOP!             │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## 🚨 CRITICAL: NO CONVERSATIONAL STOPPAGE - EXECUTE TOOLS!
 
 ```
