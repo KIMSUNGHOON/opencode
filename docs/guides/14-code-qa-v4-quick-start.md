@@ -31,8 +31,9 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
   - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
-- **Regression Loop**: Automatic retry on quality threshold failure (max 3 times)
-- **Structured State Management**: Inter-agent data passing via result token parsing
+- **Regression Loop**: Per-source independent retry counters (quality/build/test: max 3 each, total cap: 5)
+- **Structured Context Passing**: Inter-agent JSON data exchange via `context_store` and `regression_history`
+- **User Input Timeout**: 5-minute timeout with safe default actions to prevent deadlock
 - **GitLab-CE Support**: Both GitHub and GitLab supported (gh/glab CLI)
 - **Authentication Error Handling**: SSH/HTTPS/GPG/CLI auth issue detection and guidance
 
@@ -536,7 +537,17 @@ ls .opencode/agent/
 
 env-setup, git-input, build-tester, function-tester, git-committer are waiting for user input.
 
-**Solution**: Provide the requested input:
+**Auto-timeout**: If no input is provided within **5 minutes**, the orchestrator takes a safe default action:
+
+| Agent | Default Action on Timeout |
+|-------|--------------------------|
+| env-setup | Auto-confirm detected environment |
+| build-tester | Auto-confirm current environment |
+| function-tester | Auto-skip tests |
+| git-committer | Auto-skip commit |
+| git-pusher | Auto-skip push |
+
+**Manual Solution**: Provide the requested input:
 - Shell selection: `1`, `2`, or `3`
 - Environment type: `1`, `2`, `3`, or `4`
 - Confirm: `y` or `confirm`
@@ -624,31 +635,47 @@ Each agent outputs tokens in the following format upon completion:
 
 ### Orchestrator State Variables
 
-State variables tracked by the orchestrator (mode/code-qa.md):
+State variables tracked by the orchestrator (command/code-qa.md):
 
 ```
-retry_count = 0              # Regression count (max 3)
-quality_score = 0            # Quality score
+# ━━━ Per-Source Retry Counters (prevents infinite loops) ━━━
+retry_counters = {
+    "quality": 0,       # Quality < 70 regressions (max 3)
+    "build": 0,         # Build failure regressions (max 3)
+    "test": 0           # Test failure regressions (max 3)
+}
+PER_SOURCE_MAX = 3
+TOTAL_REGRESSION_CAP = 5
+total_regressions = 0
 
-env_result = ""              # Environment setup result
-changed_files = []           # Changed file list
-review_issues = []           # Review issue list
-pre_check_result = ""        # Pre-check result (SUCCESS/PARTIAL)
-fix_result = ""              # Fix result
-build_result = ""            # Build result
-test_result = ""             # Test result
-commit_result = ""           # Commit result
-workspace_cache = null       # Workspace analysis cache
+# ━━━ Regression History (context for code-fixer) ━━━
+regression_history = []     # Array of previous fix attempt records
+
+# ━━━ Structured Context Store ━━━
+context_store = {
+    "env_state": null,          # Environment setup result (JSON)
+    "file_list": null,          # Changed file list
+    "review_result": null,      # Code review issues (structured JSON)
+    "fix_result": null,         # Code fix results (structured JSON)
+    "quality_result": null,     # Quality score + tool results (JSON)
+    "build_result": null,       # Build test results (structured JSON)
+    "test_result": null,        # Function test results (structured JSON)
+    "commit_result": null       # Git commit info
+}
 ```
 
-### Regression Conditions
+### Regression Conditions (Per-Source Independent)
 
-| Condition | Action |
-|-----------|--------|
-| `QUALITY_SCORE < 70` | Regress to STEP 5 (code-fixer) |
-| `BUILD_RESULT: FAIL` | Regress to STEP 5 (code-fixer) |
-| `TEST_RESULT: FAIL` | Regress to STEP 5 (code-fixer) |
-| `retry_count >= 3` | Stop workflow, request manual review |
+| Condition | Source | Action |
+|-----------|--------|--------|
+| `QUALITY_SCORE < 70` | `quality` | Increment `retry_counters.quality`, regress to STEP 5 |
+| `BUILD_RESULT: FAIL` | `build` | Increment `retry_counters.build`, regress to STEP 5 |
+| `TEST_RESULT: FAIL` | `test` | Increment `retry_counters.test`, regress to STEP 5 |
+| `retry_counters.{source} >= 3` | any | Stop retrying that source, fail workflow |
+| `total_regressions >= 5` | all | Stop workflow entirely, request manual review |
+
+Each regression records the attempt in `regression_history` and passes it to the code-fixer
+so it can choose a **different** fix strategy (see `context-schema.md` for JSON schemas).
 
 ---
 
@@ -683,6 +710,10 @@ workspace_cache = null       # Workspace analysis cache
     │   ├── quality.md                      /quality - Quality check
     │   ├── build.md                        /build - Build test
     │   └── test.md                         /test - Function test
+    ├── config/                             (Configuration)
+    │   ├── workflow-settings.yaml          Timeout, retry, quality, model settings
+    │   ├── context-schema.md               JSON schemas for structured context passing
+    │   └── permission-templates.yaml       Agent permission templates
     └── mode/
         └── code-qa.md                      QA orchestrator
 ```

@@ -22,8 +22,15 @@ timeout:
   # Overall workflow timeout
   workflow: 3600000         # 1 hour
 
-  # User input wait timeout (0 = unlimited)
-  user_input: 0
+  # User input wait timeout (milliseconds)
+  # Prevents deadlock when user doesn't respond to WAITING_INPUT prompts.
+  # After timeout, Orchestrator takes default action per agent:
+  #   env-setup     → auto-confirm detected environment
+  #   build-tester  → auto-confirm current environment
+  #   function-tester → auto-skip tests
+  #   git-committer → auto-skip commit
+  #   git-pusher    → auto-skip push
+  user_input: 300000          # 5 min (0 = unlimited, NOT recommended)
 
 # =============================================================================
 # Retry Settings
@@ -35,9 +42,10 @@ retry:
     delay_ms: 2000          # Retry interval (milliseconds)
     backoff_multiplier: 2   # Exponential backoff multiplier
 
-  # Regression loop retry (quality < 70 or build/test failure)
+  # Regression loop retry (P0: per-source independent counters)
   regression:
-    max_attempts: 3         # Maximum regression count
+    per_source_max: 3       # Max retries per source (quality, build, test)
+    total_cap: 5            # Max total regressions across ALL sources
 
   # Token parsing failure retry
   parse:

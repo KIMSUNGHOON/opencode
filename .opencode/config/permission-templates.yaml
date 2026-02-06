@@ -21,6 +21,29 @@ templates:
       "echo *": allow
 
   # ---------------------------------------------------------------------------
+  # File Discovery Permissions (used by workspace-analyzer, file-input)
+  # ---------------------------------------------------------------------------
+  file_discovery:
+    description: "File reading and discovery commands for workspace analysis"
+    bash:
+      "pwd": allow
+      "cat *": allow
+      "head *": allow
+      "tail *": allow
+      "find *": allow
+      "wc *": allow
+      "file *": allow
+      "stat *": allow
+      "du *": allow
+      "tree *": allow
+      "realpath *": allow
+      "dirname *": allow
+      "basename *": allow
+      # Block modification commands
+      "mv *": deny
+      "cp *": deny
+
+  # ---------------------------------------------------------------------------
   # Git Read-Only Permissions
   # ---------------------------------------------------------------------------
   git_read_only:
@@ -329,6 +352,7 @@ agent_permissions:
   workspace-analyzer:
     extends:
       - base_exploration
+      - file_discovery
       - env_detection
       - git_read_only
       - dangerous_commands_deny
@@ -430,6 +454,7 @@ agent_permissions:
   file-input:
     extends:
       - base_exploration
+      - file_discovery
       - dangerous_commands_deny
 
   git-pusher:

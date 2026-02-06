@@ -61,18 +61,24 @@ You generate a list of files to inspect based on user's input options.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  🚫 INFINITE LOOP PREVENTION 🚫                                         │
 │                                                                          │
-│  You are ONLY allowed to run git diff ONCE.                             │
+│  PHASE 1 — State Detection (ALLOWED: multiple commands)                 │
+│    ✅ git rev-parse --is-inside-work-tree  (check if Git repo)         │
+│    ✅ git symbolic-ref HEAD               (check detached HEAD)         │
+│    ✅ git ls-files -u                     (check merge conflicts)       │
+│    ✅ ls .git/rebase-merge .git/rebase-apply  (check rebase)           │
+│    ✅ git rev-parse --abbrev-ref HEAD     (get branch name)             │
+│    These are READ-ONLY status checks — run as many as needed.           │
 │                                                                          │
-│  STEP 1: Run git diff command (ONE TIME ONLY)                          │
-│  STEP 2: Parse the output                                               │
-│  STEP 3: Output GIT_INPUT_RESULT token immediately                     │
-│  STEP 4: STOP - DO NOT RUN ANY MORE COMMANDS                           │
+│  PHASE 2 — File Extraction (RESTRICTED: ONE git diff command only)     │
+│    ✅ Run git diff (with appropriate flags) ONCE                        │
+│    ❌ Do NOT run git diff a second time                                 │
+│    ❌ Do NOT run git diff with different flags to "retry"               │
 │                                                                          │
-│  If you have ALREADY run git diff in this conversation:                │
-│  → DO NOT run it again                                                  │
-│  → Output the result token NOW                                          │
+│  PHASE 3 — Output result token IMMEDIATELY after parsing               │
+│    ❌ Do NOT run any more git commands after git diff                   │
 │                                                                          │
-│  RUNNING THE SAME COMMAND TWICE = FAILURE                               │
+│  RUNNING git diff TWICE = FAILURE                                       │
+│  State detection commands (Phase 1) do NOT count toward this limit.    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,18 +97,25 @@ YOUR RESPONSE MUST NEVER BE:
 IF YOU OUTPUT TEXT WITHOUT TOOL CALL = SYSTEM HANGS = FAILURE
 ```
 
-## 🔄 EXACT WORKFLOW - ONE COMMAND ONLY
+## 🔄 EXACT WORKFLOW - TWO PHASES
 
 ```
-1. Bash("git diff HEAD~1 --name-status")  ← RUN THIS ONCE
-2. Parse output: M src/file.py, A src/new.py, etc.
-3. Output result token:
+PHASE 1 — State Detection (multiple commands OK):
+  1a. Bash("git rev-parse --is-inside-work-tree")  ← Is this a git repo?
+  1b. Bash("git symbolic-ref HEAD 2>/dev/null || echo DETACHED")  ← Detached HEAD?
+  1c. Bash("git ls-files -u 2>/dev/null | head -1")  ← Merge conflict?
+  → If special state detected → Output appropriate GIT_INPUT_RESULT and STOP
 
-   GIT_INPUT_RESULT: SUCCESS
-   FILES_FOUND: 2
-   FILE_LIST: src/file.py, src/new.py
+PHASE 2 — File Extraction (ONE git diff command only):
+  2. Bash("git diff HEAD~1 --name-status")  ← RUN THIS ONCE
+  3. Parse output: M src/file.py, A src/new.py, etc.
+  4. Output result token:
 
-4. STOP - NO MORE COMMANDS
+     GIT_INPUT_RESULT: SUCCESS
+     FILES_FOUND: 2
+     FILE_LIST: src/file.py, src/new.py
+
+  5. STOP - NO MORE COMMANDS
 ```
 
 ## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨
@@ -111,21 +124,27 @@ IF YOU OUTPUT TEXT WITHOUT TOOL CALL = SYSTEM HANGS = FAILURE
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  When you receive this prompt, you MUST do this IMMEDIATELY:           │
 │                                                                          │
-│  Run this command: Bash("git diff HEAD~1 --name-status")               │
+│  STEP 1: Run state detection (can run multiple commands):              │
+│    Bash("git rev-parse --is-inside-work-tree 2>/dev/null && \          │
+│          git symbolic-ref HEAD 2>/dev/null || echo DETACHED")          │
 │                                                                          │
-│  OR if specific commit/range is provided:                               │
-│  Run: Bash("git diff {commit_range} --name-status")                    │
+│  STEP 2: If repo is valid and no special state, run git diff ONCE:    │
+│    Bash("git diff --name-status")          ← default (working)        │
+│    Bash("git diff --staged --name-status") ← if --staged              │
+│    Bash("git diff HEAD~1 --name-status")   ← if --last                │
+│    Bash("git diff {range} --name-status")  ← if --range               │
 │                                                                          │
 │  ❌ DO NOT output text like "I will check..." without tool call        │
-│  ❌ DO NOT wait or pause - run git diff IMMEDIATELY                    │
-│  ❌ DO NOT ask questions - just run the git command                    │
+│  ❌ DO NOT wait or pause - run commands IMMEDIATELY                    │
+│  ❌ DO NOT ask questions - just run the git commands                   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🔄 SIMPLE WORKFLOW
 
 ```
-START → Run git diff command → Parse file list → Output GIT_INPUT_RESULT → STOP
+START → State detection → (special state? → output result → STOP)
+                        → (normal? → Run git diff ONCE → Parse file list → Output GIT_INPUT_RESULT → STOP)
 ```
 
 ## 🚨🚨🚨 CRITICAL: TERMINATION RULE 🚨🚨🚨
@@ -134,9 +153,12 @@ START → Run git diff command → Parse file list → Output GIT_INPUT_RESULT �
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  AFTER running git diff command and getting results:                     │
 │                                                                          │
-│  1. Do NOT run the same command again                                   │
-│  2. Do NOT run any more git commands                                    │
+│  1. Do NOT run git diff again (you already ran it once!)                │
+│  2. Do NOT run any more git commands after git diff                     │
 │  3. IMMEDIATELY output GIT_INPUT_RESULT token with FILE_LIST            │
+│                                                                          │
+│  Note: State detection commands (rev-parse, symbolic-ref, ls-files -u) │
+│  are allowed BEFORE git diff, not after.                                │
 │                                                                          │
 │  Example: If "git diff HEAD~1 --name-status" returns "M setup.py"       │
 │  → Output: GIT_INPUT_RESULT: SUCCESS                                    │

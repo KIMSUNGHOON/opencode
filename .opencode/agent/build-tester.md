@@ -724,6 +724,40 @@ MESSAGE: Dependencies not installed. Please install dependencies and retry.
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Structured JSON Output (MANDATORY)
+
+**After the BUILD_RESULT token, also output structured JSON:**
+
+**On success:**
+```json
+{
+  "build": {
+    "status": "SUCCESS",
+    "exit_code": 0,
+    "tool": "npm",
+    "duration": "12.5s"
+  }
+}
+```
+
+**On failure (CRITICAL for regression loop):**
+```json
+{
+  "build": {
+    "status": "FAIL",
+    "exit_code": 1,
+    "tool": "tsc",
+    "errors": [
+      { "file": "/absolute/path/calculator.ts", "line": 45, "message": "TS2345: Argument of type 'string' is not assignable to parameter of type 'number'" },
+      { "file": "/absolute/path/utils.ts", "line": 12, "message": "TS2304: Cannot find name 'Config'" }
+    ]
+  }
+}
+```
+
+**This JSON is MANDATORY on failure.** The Orchestrator uses `errors` for regression context.
+Without specific error details, the Code Fixer cannot know what to fix.
+
 ## Important Notes
 
 1. **Isolated Execution**: No host impact in Sandbox mode

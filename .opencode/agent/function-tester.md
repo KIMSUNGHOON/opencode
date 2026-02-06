@@ -587,6 +587,46 @@ MESSAGE: No tests to run.
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Structured JSON Output (MANDATORY)
+
+**After the TEST_RESULT token, also output structured JSON:**
+
+**On success:**
+```json
+{
+  "test": {
+    "status": "SUCCESS",
+    "total": 45,
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0,
+    "coverage": 87,
+    "failed_tests": []
+  }
+}
+```
+
+**On failure (CRITICAL for regression loop):**
+```json
+{
+  "test": {
+    "status": "FAIL",
+    "total": 45,
+    "passed": 42,
+    "failed": 3,
+    "skipped": 0,
+    "coverage": 82,
+    "failed_tests": [
+      { "name": "test_auth_login", "file": "/absolute/path/test_auth.py", "line": 23, "error": "AssertionError: expected 200 but got 401" },
+      { "name": "test_api_create", "file": "/absolute/path/test_api.py", "line": 55, "error": "TypeError: 'NoneType' object is not subscriptable" }
+    ]
+  }
+}
+```
+
+**This JSON is MANDATORY on failure.** The Orchestrator uses `failed_tests` for regression context.
+Without specific test failure details, the Code Fixer cannot know what to fix.
+
 ## Important Notes
 
 1. **Isolated Execution**: No host impact in Sandbox mode

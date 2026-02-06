@@ -273,6 +273,43 @@ If "ENOENT: no such file or directory" error occurs when reading or modifying fi
 3. **Modify Code** - Fix code with Edit/Write tools (use absolute paths)
 4. **Verify** - Perform basic verification after fixing
 
+## ⚠️ Regression Mode (CRITICAL - Read this if prompt contains "REGRESSION MODE")
+
+When the Orchestrator sends you back with "REGRESSION MODE", it means a PREVIOUS fix attempt
+did not resolve the problem. The prompt will contain:
+
+1. **Regression Trigger** — What went wrong (quality score, build error, or test failure)
+2. **Previous Attempts** — `regression_history` JSON showing what was already tried
+3. **Original Issues** — The code review issues
+
+### REQUIRED BEHAVIOR IN REGRESSION MODE:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ⛔ DO NOT apply the same fix that was already attempted!              │
+│                                                                          │
+│  1. Read regression_history to understand what was tried before         │
+│  2. Read the files to see their CURRENT state (with previous fixes)    │
+│  3. Analyze WHY the previous fix failed (from the regression trigger)  │
+│  4. Choose a DIFFERENT fix strategy:                                    │
+│     - If previous fix was a patch → try restructuring the code         │
+│     - If previous fix was local → check for root cause elsewhere       │
+│     - If type error → check interface/contract mismatch                │
+│     - If test failure → read the test to understand expected behavior  │
+│  5. Apply the new fix and verify with syntax check                     │
+│                                                                          │
+│  Output must include WHAT WAS DIFFERENT about this attempt:            │
+│  REGRESSION_STRATEGY: "description of new approach vs previous"        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Example Regression Scenario:
+```
+Previous attempt: Added null check for `data.get("key")`
+Regression trigger: Build failed - type error on line 78
+New approach: The null check returns "" but downstream expects int → change to return 0 with type cast
+```
+
 ## Fix Priority
 
 1. **Critical** - Fix immediately (security, data loss)
@@ -403,6 +440,24 @@ ISSUES_SKIPPED: {skipped issue count}
 ═══════════════════════════════════════════════════════════════
 ```
 
+**Immediately after the result token, output structured JSON:**
+```json
+{
+  "fix": {
+    "summary": { "total": 7, "fixed": 6, "skipped": 1, "failed": 0 },
+    "fixed_issues": ["C001", "H001", "H002", "M001", "M002", "M003"],
+    "skipped_issues": [{ "id": "L001", "reason": "Low priority, no functional impact" }],
+    "failed_issues": [],
+    "files_modified": ["/absolute/path/file1.py", "/absolute/path/file2.py"],
+    "changes_applied": [
+      { "issue_id": "C001", "file": "/path/file1.py", "line": 45, "description": "Changed to parameterized query" },
+      { "issue_id": "H001", "file": "/path/file2.py", "line": 78, "description": "Added null check" }
+    ]
+  }
+}
+```
+**This JSON is MANDATORY.** The Orchestrator uses it for regression tracking and context passing.
+
 **When no issues to fix:**
 ```
 ═══════════════════════════════════════════════════════════════
@@ -421,6 +476,11 @@ ISSUES_SKIPPED: {skipped count}
 FAILED_ISSUES:
 - [C001] {file}:{line} - {failure reason}
 ═══════════════════════════════════════════════════════════════
+```
+
+**In Regression Mode, also include:**
+```
+REGRESSION_STRATEGY: "Description of what was different this time vs previous attempt"
 ```
 
 ## Important Notes

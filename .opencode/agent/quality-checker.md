@@ -323,6 +323,35 @@ Summary:
 
 Without this format, the parent workflow cannot parse the score.
 
+**After the result token, also output structured JSON:**
+```json
+{
+  "quality": {
+    "score": 85,
+    "status": "PASS",
+    "by_severity": { "critical": 0, "high": 1, "medium": 3, "low": 2 },
+    "tool_results": [
+      { "tool": "ruff", "issues": 3, "available": true },
+      { "tool": "mypy", "issues": 1, "available": true },
+      { "tool": "radon", "issues": 0, "available": false }
+    ],
+    "remaining_issues": [
+      { "severity": "high", "tool": "mypy", "file": "/absolute/path.py", "line": 10, "message": "Incompatible type" },
+      { "severity": "medium", "tool": "ruff", "file": "/absolute/path.py", "line": 25, "message": "Unused import" }
+    ]
+  }
+}
+```
+
+**This JSON is MANDATORY.** The Orchestrator uses `remaining_issues` for regression context
+when the score is below threshold. Without it, the Code Fixer cannot know what to fix.
+
+**Rules for `remaining_issues`:**
+- Include ALL issues found by tools, not just a summary
+- Use absolute file paths
+- Include the exact tool output message
+- If score < 70 (FAIL), the `remaining_issues` list is CRITICAL for the regression loop
+
 ## Important Notes
 
 1. **Actual Execution Required**: Do not guess the score without running tools

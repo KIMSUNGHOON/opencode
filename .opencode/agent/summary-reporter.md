@@ -89,7 +89,20 @@ You analyze the entire QA process using Chain-of-Thought reasoning and generate 
 
 ## Input Method
 
-The orchestrator passes all QA results in the prompt.
+The orchestrator passes all QA results as **structured JSON** in the `context_store` object.
+This includes:
+- `env_state` — Environment configuration
+- `file_list` — Changed files
+- `review_result` — Code review issues (structured)
+- `fix_result` — Code fix results (structured)
+- `quality_result` — Quality score and tool results (structured)
+- `build_result` — Build test results (structured)
+- `test_result` — Function test results (structured)
+- `commit_result` — Git commit info
+
+Additionally, `regression_history` shows all regression attempts that occurred.
+
+**Use the structured JSON data to generate precise, data-driven reports.**
 If data is insufficient, you can use Bash tool to check git log, etc.
 
 ## ⚠️ Path Handling Rules (Important!)

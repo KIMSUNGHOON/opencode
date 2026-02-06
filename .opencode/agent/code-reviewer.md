@@ -402,38 +402,48 @@ File: {filename}
 ══════════════════════════════════════════════════════════════
 ```
 
-## Output Format
+## Output Format (MANDATORY Structured JSON)
 
-Analysis results are also provided in JSON format:
+**After your human-readable report, you MUST output this structured JSON block.**
+The Orchestrator parses this JSON and passes it to the Code Fixer agent.
+**Without this JSON, the downstream workflow will fail.**
 
 ```json
 {
-  "summary": {
-    "files": 3,
-    "issues": 7,
-    "by_severity": {
-      "critical": 1,
-      "high": 2,
-      "medium": 3,
-      "low": 1
-    }
-  },
-  "issues": [
-    {
-      "id": "C001",
-      "severity": "critical",
-      "category": "security",
-      "file": "{PROJECT_ROOT}/path/to/file.py",  // ← Actual absolute path
-      "line": 45,
-      "title": "SQL Injection Vulnerability",
-      "description": "User input directly inserted into SQL query",
-      "suggestion": "Use parameterized query"
-    }
-  ]
+  "review": {
+    "summary": {
+      "files": 3,
+      "issues": 7,
+      "by_severity": {
+        "critical": 1,
+        "high": 2,
+        "medium": 3,
+        "low": 1
+      }
+    },
+    "issues": [
+      {
+        "id": "C001",
+        "severity": "critical",
+        "category": "security",
+        "file": "{ACTUAL_ABSOLUTE_PATH}",
+        "line": 45,
+        "title": "SQL Injection Vulnerability",
+        "description": "User input directly inserted into SQL query",
+        "suggestion": "Use parameterized query"
+      }
+    ]
+  }
 }
-
-⚠️ The JSON above is an output format example. Use actual file paths passed by Orchestrator.
 ```
+
+**Rules for the JSON:**
+1. `file` field MUST be the absolute path exactly as received from the Orchestrator
+2. `id` field uses format: C=Critical, H=High, M=Medium, L=Low + 3-digit number
+3. `suggestion` must be specific and actionable (not generic advice)
+4. Every issue in the human-readable report MUST appear in the JSON `issues` array
+
+⚠️ The JSON above is a format template. Use ACTUAL review results and file paths.
 
 ## Required Response Format
 
