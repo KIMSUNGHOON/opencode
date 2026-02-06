@@ -275,16 +275,20 @@ Extract and remember the following tokens from each Agent's result:
 
 ```
 # Core state variables
-retry_count = 0              # Regression count (max 3)
 quality_score = 0            # Quality score
+changed_files = []           # File list from git-input or file-input
+review_issues = []           # Issues found by code-reviewer (structured JSON)
 
 # Input mode (determined by --files option)
 use_git_mode = true          # true if no --files, false otherwise
 
+# User input related states
+env_setup_confirmed = false  # env-setup completion status
+build_env_confirmed = false  # build-tester environment confirmation status
+test_confirmed = false       # function-tester test confirmation status
+
 # Agent result storage (token extraction)
 env_result = ""              # Content after ENV_SETUP_RESULT: SUCCESS
-changed_files = []           # File list after FILE_LIST:
-review_issues = []           # Issue list after ISSUE_LIST:
 pre_check_result = ""        # PRE_CHECK_RESULT: SUCCESS/PARTIAL
 fix_result = ""              # Content after FIX_RESULT:
 build_result = ""            # BUILD_RESULT: SUCCESS/FAIL
@@ -294,7 +298,48 @@ commit_result = ""           # Content after COMMIT_RESULT: SUCCESS
 # Workspace cache
 workspace_cache = null       # Cache data (use if available)
 skip_cache = false           # true if --skip-cache (skip cache AND auto-analysis entirely)
+
+# Git state flags
+is_detached_head = false     # Detached HEAD state
+skip_commit_push = false     # Skip commit/push steps
+
+# ━━━ P0: Per-Source Retry Counters (prevents infinite loops) ━━━
+retry_counters = {
+    "quality": 0,       # Quality < 70 regressions (max 3)
+    "build": 0,         # Build failure regressions (max 3)
+    "test": 0           # Test failure regressions (max 3)
+}
+PER_SOURCE_MAX = 3           # Max retries per regression source
+TOTAL_REGRESSION_CAP = 5     # Max total regressions across ALL sources
+total_regressions = 0        # Running total of all regressions
+
+# ━━━ P0: Regression History (context for code-fixer) ━━━
+regression_history = []      # Accumulated list of regression attempts
+# Each entry: {
+#   "attempt": N,
+#   "source": "quality|build|test",
+#   "issues_or_errors": [...],    # What triggered the regression
+#   "fix_result": "...",          # What code-fixer reported last time
+#   "files_modified": [...]       # Files code-fixer changed last time
+# }
+
+# ━━━ P0: Structured Context Store ━━━
+# Store structured JSON from each agent for downstream passing
+context_store = {
+    "env_state": null,          # From env-setup
+    "file_list": null,          # From git-input/file-input
+    "pre_check_result": null,   # From pre-checker (SUCCESS/PARTIAL)
+    "review_result": null,      # From code-reviewer (structured JSON)
+    "fix_result": null,         # From code-fixer (structured JSON)
+    "quality_result": null,     # From quality-checker (structured JSON)
+    "build_result": null,       # From build-tester (structured JSON)
+    "test_result": null,        # From function-tester (structured JSON)
+    "commit_result": null,      # From git-committer
+    "push_result": null         # From git-pusher
+}
 ```
+
+**Important: Store each Step's results in variables AND in `context_store`, then pass structured data to the next Step.**
 
 ### Result Token Parsing Rules
 
@@ -345,6 +390,100 @@ The following Agents MUST receive user input before proceeding:
 1. When Agent returns `WAITING_INPUT`, wait for user response
 2. After receiving user response, call the Agent again to continue
 3. Do NOT proceed automatically without user input
+
+**⚠️ User Input Timeout (P1: Deadlock Prevention):**
+
+User input timeout is **5 minutes** (300,000 ms). If user does not respond within timeout,
+the Orchestrator takes a safe default action:
+
+| Agent | Timeout Default Action |
+|-------|----------------------|
+| env-setup | Auto-confirm detected environment (proceed as-is) |
+| git-input (NO_GIT_REPO) | End workflow with message "Timed out waiting for user choice" |
+| git-input (DETACHED_HEAD) | Auto-select "qa-only" (skip commit/push) |
+| build-tester | Auto-confirm current environment and proceed |
+| function-tester | Auto-skip tests |
+| git-committer | Auto-skip commit |
+| git-pusher | Auto-skip push |
+
+```
+IF user does not respond within 5 minutes:
+    → Output: "⚠️ User input timeout (5 min). Taking default action: {action}."
+    → Execute the default action from the table above
+    → Continue workflow
+```
+
+---
+
+## Structured Context Passing Rules (P0 Critical)
+
+**Every agent outputs TWO things: human-readable report AND structured JSON.**
+The Orchestrator MUST extract the JSON and store it in `context_store`, then pass relevant context to downstream agents.
+
+### How to Extract Structured JSON from Agent Output
+
+Each agent outputs a JSON block after its result token. Extract it like this:
+```
+1. Find the result token (e.g., "CODE_REVIEW_RESULT: COMPLETE")
+2. Find the JSON block that follows (between ```json and ```)
+3. Parse it and store in context_store
+
+IF no JSON block found:
+    → Parse from the text-format output (ISSUE_LIST, etc.)
+    → Construct the JSON yourself from parsed data
+    → Store in context_store
+
+EXTRACTION EXAMPLE (code-reviewer):
+    Agent output contains:
+        ISSUE_LIST:
+        [C001] /path/file.py:45 - SQL injection vulnerability
+        [H001] /path/file.py:78 - Null reference possible
+
+    Construct JSON:
+        context_store.review_result = {
+            "review": {
+                "summary": { "files": 1, "issues": 2, "by_severity": { "critical": 1, "high": 1 } },
+                "issues": [
+                    { "id": "C001", "severity": "critical", "file": "/path/file.py", "line": 45,
+                      "title": "SQL injection vulnerability", "suggestion": "" },
+                    { "id": "H001", "severity": "high", "file": "/path/file.py", "line": 78,
+                      "title": "Null reference possible", "suggestion": "" }
+                ]
+            }
+        }
+
+EXTRACTION FOR REGRESSION HISTORY:
+    When building regression_history entries, extract issues_or_errors from:
+    - quality-checker: context_store.quality_result.remaining_issues
+    - build-tester: context_store.build_result.errors
+    - function-tester: context_store.test_result.failed_tests
+    If structured JSON unavailable, parse from text output.
+```
+
+### What to Pass to Each Agent
+
+| Agent | Receives from context_store |
+|-------|---------------------------|
+| pre-checker | `file_list` |
+| code-reviewer | `env_state`, `file_list`, `workspace_cache` |
+| code-fixer | `review_result.issues`, `file_list`, `regression_history` |
+| quality-checker | `file_list`, `fix_result.files_modified` |
+| build-tester | `env_state`, `file_list` |
+| function-tester | `env_state`, `file_list` |
+| git-committer | `file_list`, `fix_result.files_modified` |
+| summary-reporter | **ALL** of `context_store` + `regression_history` |
+| git-pusher | `commit_result` |
+
+### Regression Context (CRITICAL for code-fixer)
+
+When regressing to STEP 5 (code-fixer), you MUST include:
+```
+1. The NEW issues/errors that triggered the regression
+2. The FULL regression_history (all previous attempts)
+3. Explicit instruction: "Do NOT repeat these previously attempted fixes"
+```
+
+This prevents code-fixer from applying the same fix repeatedly.
 
 ---
 
@@ -731,7 +870,10 @@ IF Task result contains "GIT_INPUT_RESULT: NO_CODE_FILES":
 IF Task result contains "GIT_INPUT_RESULT: DETACHED_HEAD":
     → Wait for user response (WAITING_FOR: USER_CHOICE)
     → If user inputs branch name: call git-input again with "Create branch: {name}"
-    → If user inputs "qa-only" or "continue": proceed with changed_files, set use_git_mode = false (skip commit/push)
+    → If user inputs "qa-only" or "continue":
+        → is_detached_head = true
+        → skip_commit_push = true
+        → Proceed to STEP 2.5 (file validation) with changed_files
     → If user inputs "exit": terminate workflow
 
 IF Task result contains "GIT_INPUT_RESULT: MERGE_CONFLICT":
@@ -1024,23 +1166,76 @@ IF Task result does NOT contain "ISSUE_LIST:" AND no JSON block found:
 
 Task tool call:
 - subagent_type: "code-fixer"
-- prompt: **(Build with actual values!)**
-    ```
-    Fix the following issues discovered in code review:
-
-    [ISSUE_LIST from STEP 4 - copy the actual issues here]
-    - [C001] /actual/path/file.py:45 - SQL injection vulnerability
-    - [H001] /actual/path/file.py:78 - Null reference possible
-    ...
-
-    Target files:
-    - [actual absolute path 1]
-    - [actual absolute path 2]
-    ...
-    ```
+- prompt: Construct prompt based on whether this is a first run or regression
 - description: "Code fix"
 
-**Store result:** Extract content after `FIX_RESULT:` and save to `fix_result`
+**Prompt construction (CRITICAL - different for first run vs regression):**
+
+```
+IF regression_history.length == 0 (first run):
+    prompt =
+    """
+    ## Issues to Fix (from Code Review)
+    {context_store.review_result as JSON, or review_issues as text}
+
+    ## Target Files
+    {changed_files list - absolute paths}
+
+    Fix the above issues. After fixing, output your result with structured JSON:
+    ```json
+    {
+      "fix": {
+        "summary": { "total": N, "fixed": N, "skipped": N, "failed": N },
+        "fixed_issues": ["C001", "H001"],
+        "skipped_issues": [{ "id": "L001", "reason": "Low priority" }],
+        "failed_issues": [{ "id": "...", "reason": "..." }],
+        "files_modified": ["/absolute/path.py"],
+        "changes_applied": [
+          { "issue_id": "C001", "file": "/path.py", "line": 45, "description": "Changed to parameterized query" }
+        ]
+      }
+    }
+    ```
+    """
+
+ELSE (regression - CRITICAL CONTEXT):
+    prompt =
+    """
+    ## ⚠️ REGRESSION MODE - This is attempt #{total_regressions + 1}
+
+    ## Regression Trigger
+    Source: {last regression source: "quality"|"build"|"test"}
+    New errors/issues that triggered this regression:
+    {The specific errors from quality-checker/build-tester/function-tester output}
+
+    ## ⛔ PREVIOUS ATTEMPTS - DO NOT REPEAT THESE FIXES
+    The following fixes were already attempted and DID NOT resolve the problem:
+    {JSON.stringify(regression_history, indent=2)}
+
+    ## STRATEGY REQUIREMENT
+    Since previous fix attempts failed, you MUST try a DIFFERENT approach:
+    1. Read the files again to see current state (including previous fix attempts)
+    2. Analyze WHY the previous fix did not work
+    3. Apply a DIFFERENT fix strategy
+    4. If the same issue keeps recurring, consider:
+       - The root cause may be elsewhere
+       - The fix may need to be more comprehensive
+       - The issue may require a different approach entirely
+
+    ## Original Issues (from Code Review)
+    {context_store.review_result as JSON, or review_issues as text}
+
+    ## Target Files
+    {changed_files list - absolute paths}
+
+    Fix the issues using a NEW approach. Output structured JSON as above.
+    """
+```
+
+**After Task completes:**
+1. Extract structured JSON from code-fixer output
+2. Store in `context_store.fix_result`
+3. This data will be used for regression_history if a later step triggers regression
 
 → On completion, go to STEP 6
 
@@ -1071,16 +1266,35 @@ Task tool call:
 
 ```
 IF score >= 70 OR contains "STATUS: PASS":
-    → Call STEP 7 (build-tester)
+    → Proceed to STEP 7 (build-tester)
+
 ELSE IF score < 70 OR contains "STATUS: FAIL":
-    IF retry_count < 3:
-        retry_count += 1
-        → Regress to STEP 5 (code-fixer)
-    ELSE:
-        → Abort workflow, output "Maximum retry count exceeded" message
+    # ━━━ P0: Per-source retry check ━━━
+    IF retry_counters.quality < PER_SOURCE_MAX AND total_regressions < TOTAL_REGRESSION_CAP:
+        retry_counters.quality += 1
+        total_regressions += 1
+
+        # Record regression in history
+        regression_history.append({
+            "attempt": total_regressions,
+            "source": "quality",
+            "issues_or_errors": context_store.quality_result.remaining_issues
+                                 OR [parsed quality issues from text output],
+            "fix_result": context_store.fix_result,
+            "files_modified": context_store.fix_result.files_modified OR []
+        })
+
+        → Output: "⚠️ Quality regression #{retry_counters.quality}/3 (total: {total_regressions}/{TOTAL_REGRESSION_CAP})"
+        → Regress to STEP 5 (code-fixer) WITH regression context
+
+    ELSE IF retry_counters.quality >= PER_SOURCE_MAX:
+        → Stop workflow, output "Quality retry limit reached ({PER_SOURCE_MAX}). Manual review needed."
+
+    ELSE IF total_regressions >= TOTAL_REGRESSION_CAP:
+        → Stop workflow, output "Total regression cap reached ({TOTAL_REGRESSION_CAP}). Manual review needed."
 ```
 
-**If score not found:** Call quality-checker again.
+**If score not found:** Call quality-checker again (max 2 parse retries).
 
 ### STEP 7: Build Test (User Confirmation Required)
 
@@ -1114,14 +1328,35 @@ IF Task result contains "BUILD_RESULT: WAITING_INPUT":
     → If user inputs "reset/n": regress to STEP 1 (env-setup)
 
 IF Task result contains "BUILD_RESULT: SUCCESS":
+    → Store result in context_store.build_result
     → Proceed to STEP 8
 
 IF Task result contains "BUILD_RESULT: FAIL":
-    IF retry_count < 3:
-        retry_count += 1
-        → Regress to STEP 5 (code-fixer) with build error details
-    ELSE:
-        → Abort workflow, output "Maximum retry count exceeded"
+    → Extract error details from output (structured JSON if available)
+    → Store in context_store.build_result
+
+    # ━━━ P0: Per-source retry check ━━━
+    IF retry_counters.build < PER_SOURCE_MAX AND total_regressions < TOTAL_REGRESSION_CAP:
+        retry_counters.build += 1
+        total_regressions += 1
+
+        # Record regression in history
+        regression_history.append({
+            "attempt": total_regressions,
+            "source": "build",
+            "issues_or_errors": [build error messages extracted from output],
+            "fix_result": context_store.fix_result,
+            "files_modified": context_store.fix_result.files_modified OR []
+        })
+
+        → Output: "⚠️ Build regression #{retry_counters.build}/3 (total: {total_regressions}/{TOTAL_REGRESSION_CAP})"
+        → Regress to STEP 5 (code-fixer) WITH regression context
+
+    ELSE IF retry_counters.build >= PER_SOURCE_MAX:
+        → Stop workflow, output "Build retry limit reached ({PER_SOURCE_MAX}). Manual fix needed."
+
+    ELSE IF total_regressions >= TOTAL_REGRESSION_CAP:
+        → Stop workflow, output "Total regression cap reached ({TOTAL_REGRESSION_CAP}). Manual review needed."
 
 IF Task result contains "BUILD_RESULT: FAIL_DEPS":
     → Output dependency error info and suggested fix command
@@ -1131,8 +1366,8 @@ IF Task result contains "BUILD_RESULT: FAIL_DEPS":
 ```
 
 → Success: go to STEP 8
-→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
-→ Dependency error: wait for user to install deps, then retry
+→ Failure: regress to STEP 5 (with per-source limit)
+→ Dependency error: wait for user to install deps, then retry (FAIL_DEPS does NOT count toward regression counters)
 → Reset: regress to STEP 1
 
 ### STEP 8: Function Test (User Confirmation Required)
@@ -1167,21 +1402,43 @@ IF Task result contains "TEST_RESULT: WAITING_INPUT":
     → If user inputs "skip/n": skip test
 
 IF Task result contains "TEST_RESULT: SUCCESS":
+    → Store result in context_store.test_result
     → Proceed to STEP 9
 
 IF Task result contains "TEST_RESULT: FAIL":
-    IF retry_count < 3:
-        retry_count += 1
-        → Regress to STEP 5 (code-fixer) with test failure details
-    ELSE:
-        → Abort workflow, output "Maximum retry count exceeded"
+    → Extract failed test details from output (structured JSON if available)
+    → Store in context_store.test_result
+
+    # ━━━ P0: Per-source retry check ━━━
+    IF retry_counters.test < PER_SOURCE_MAX AND total_regressions < TOTAL_REGRESSION_CAP:
+        retry_counters.test += 1
+        total_regressions += 1
+
+        # Record regression in history
+        regression_history.append({
+            "attempt": total_regressions,
+            "source": "test",
+            "issues_or_errors": [failed test names and error messages from output],
+            "fix_result": context_store.fix_result,
+            "files_modified": context_store.fix_result.files_modified OR []
+        })
+
+        → Output: "⚠️ Test regression #{retry_counters.test}/3 (total: {total_regressions}/{TOTAL_REGRESSION_CAP})"
+        → Regress to STEP 5 (code-fixer) WITH regression context
+
+    ELSE IF retry_counters.test >= PER_SOURCE_MAX:
+        → Stop workflow, output "Test retry limit reached ({PER_SOURCE_MAX}). Manual fix needed."
+
+    ELSE IF total_regressions >= TOTAL_REGRESSION_CAP:
+        → Stop workflow, output "Total regression cap reached ({TOTAL_REGRESSION_CAP}). Manual review needed."
 
 IF Task result contains "TEST_RESULT: SKIPPED" or "TEST_RESULT: NO_TESTS":
-    → Proceed to STEP 9 (test skipped)
+    → Store result in context_store.test_result
+    → Proceed to STEP 9 (tests skipped)
 ```
 
 → Success/Skip: go to STEP 9
-→ Failure: regress to STEP 5 (max 3 times, uses shared retry_count)
+→ Failure: regress to STEP 5 (with per-source limit)
 
 ### STEP 9: Git Commit (User Confirmation Required) - Git Mode Only
 
@@ -1190,6 +1447,14 @@ IF Task result contains "TEST_RESULT: SKIPPED" or "TEST_RESULT: NO_TESTS":
 IF use_git_mode == false:
     → Skip STEP 9
     → Go directly to STEP 10 (Summary Report)
+```
+
+**⚠️ Detached HEAD mode:**
+```
+IF skip_commit_push == true:
+    → Skip STEP 9
+    → Go directly to STEP 10 (Summary Report)
+    → Output message: "ℹ️ Skipping commit due to Detached HEAD state."
 ```
 
 **Git Mode:**
@@ -1231,48 +1496,31 @@ IF Task result contains "COMMIT_RESULT: SKIPPED" or "COMMIT_RESULT: NO_CHANGES":
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**⚠️ Orchestrator MUST construct the prompt like this:**
+**⚠️ Orchestrator MUST pass ALL context_store data to summary-reporter:**
 
 ```python
 # Pseudo-code for how YOU (Orchestrator) must build the prompt:
 
-# 1. Gather all saved state variables
-env_info = env_result         # from STEP 1
-files = changed_files         # from STEP 2
-issues = review_issues        # from STEP 4
-fix_info = fix_result         # from STEP 5
-score = quality_score         # from STEP 6
-build_info = build_result     # from STEP 7
-test_info = test_result       # from STEP 8
-commit_info = commit_result   # from STEP 9
-
-# 2. Build the prompt with ACTUAL values (not placeholders!)
 prompt = f"""
-Analyze the following QA results and generate a comprehensive report.
+Generate a comprehensive QA summary report from the following structured data.
 
-=== Environment Info ===
-{env_info}
+## Full QA Context
+```json
+{JSON.stringify(context_store, indent=2)}
+```
 
-=== Changed Files ===
-{files}
+## Regression History
+Total regressions: {total_regressions}
+Retry counters: quality={retry_counters.quality}, build={retry_counters.build}, test={retry_counters.test}
+```json
+{JSON.stringify(regression_history, indent=2)}
+```
 
-=== Code Review Results ===
-{issues}
+## Changed Files
+{changed_files list}
 
-=== Fix Results ===
-{fix_info}
-
-=== Quality Score ===
-{score}/100
-
-=== Build Result ===
-{build_info}
-
-=== Test Result ===
-{test_info}
-
-=== Commit Info ===
-{commit_info}
+Use the structured data above to generate an accurate, data-driven report.
+Do NOT use placeholder values - use the actual data provided.
 """
 ```
 
@@ -1280,32 +1528,21 @@ Task tool call:
 - subagent_type: "summary-reporter"
 - prompt: **(YOU MUST BUILD THIS - see above!)**
     ```
-    Analyze the following QA results and generate a comprehensive report.
-    You can use git log, git diff commands for additional information if needed.
+    Generate a comprehensive QA summary report from the following structured data.
 
-    === Environment Info ===
-    [actual content of env_result from STEP 1]
+    ## Full QA Context
+    [actual JSON.stringify of context_store - include ALL 10 slots with actual values]
 
-    === Changed Files ===
-    [actual file list from changed_files from STEP 2]
+    ## Regression History
+    Total regressions: [actual total_regressions number]
+    Retry counters: quality=[N], build=[N], test=[N]
+    [actual JSON.stringify of regression_history array]
 
-    === Code Review Results ===
-    [actual issue list from review_issues from STEP 4]
+    ## Changed Files
+    [actual file list from changed_files]
 
-    === Fix Results ===
-    [actual content of fix_result from STEP 5]
-
-    === Quality Score ===
-    [actual quality_score number from STEP 6]/100
-
-    === Build Result ===
-    [actual content of build_result from STEP 7]
-
-    === Test Result ===
-    [actual content of test_result from STEP 8]
-
-    === Commit Info ===
-    [actual content of commit_result from STEP 9]
+    Use the structured data above to generate an accurate, data-driven report.
+    Do NOT use placeholder values - use the actual data provided.
     ```
 - description: "Result report"
 
@@ -1320,6 +1557,14 @@ Task tool call:
 IF use_git_mode == false:
     → Skip STEP 11
     → Terminate workflow (complete with Summary Report)
+```
+
+**⚠️ Detached HEAD mode:**
+```
+IF skip_commit_push == true:
+    → Skip STEP 11
+    → Terminate workflow
+    → Output message: "ℹ️ Skipping push due to Detached HEAD state."
 ```
 
 **⚠️ IMPORTANT: Check for unpushed commits before ending!**
@@ -1399,14 +1644,38 @@ IF Task result contains "PUSH_RESULT: FAIL":
 
 ---
 
-## Regression Rules
+## Regression Rules (P0: Per-Source Independent Counters)
 
-| Condition | Action |
-|-----------|--------|
-| Quality < 70 | Regress to STEP 5 (code-fixer) |
-| Build failure | Regress to STEP 5 (code-fixer) |
-| Test failure | Regress to STEP 5 (code-fixer) |
-| Over 3 regressions | Abort workflow, request manual review |
+### Counter System
+```
+Per-source limit:  PER_SOURCE_MAX = 3 (each source independently)
+Total cap:         TOTAL_REGRESSION_CAP = 5 (all sources combined)
+
+Example scenario:
+  quality regression #1 → total=1 → OK, regress
+  quality regression #2 → total=2 → OK, regress
+  build regression #1   → total=3 → OK, regress
+  test regression #1    → total=4 → OK, regress
+  quality regression #3 → total=5 → OK, regress (quality maxed at 3)
+  build regression #2   → total=6 → BLOCKED by total cap (5)
+```
+
+### Decision Table
+
+| Source | Condition | Counter Check | Action |
+|--------|-----------|--------------|--------|
+| Quality | score < 70 | quality < 3 AND total < 5 | Regress to STEP 5 with context |
+| Build | BUILD_FAIL | build < 3 AND total < 5 | Regress to STEP 5 with context |
+| Test | TEST_FAIL | test < 3 AND total < 5 | Regress to STEP 5 with context |
+| Any | per-source maxed | source >= 3 | Stop: "{source} retry limit reached" |
+| Any | total cap hit | total >= 5 | Stop: "Total regression cap reached" |
+
+### Regression Context (MUST pass to code-fixer)
+
+Every regression to STEP 5 MUST include:
+1. `regression_history` — full list of all previous attempts
+2. New trigger — the specific errors/issues that caused this regression
+3. Explicit instruction to try a DIFFERENT fix approach
 
 ---
 
@@ -1468,13 +1737,17 @@ timeout:
     build-tester: 600000    # 10 minutes
     function-tester: 600000 # 10 minutes
   workflow: 3600000         # 1 hour
+  user_input: 300000        # 5 min (deadlock prevention)
 
 retry:
   task:
     max_attempts: 3
     delay_ms: 2000
+    backoff_multiplier: 2
   regression:
-    max_attempts: 3
+    per_source_max: 3       # Max retries per source (quality, build, test)
+    total_cap: 5            # Max total regressions across ALL sources
+    timeout_guard: 0.85     # Skip regression if elapsed > 85% of workflow timeout
 
 quality:
   threshold: 70
@@ -1483,10 +1756,12 @@ quality:
 **Default values when config file doesn't exist:**
 
 ```
-MAX_RETRY = 3
+PER_SOURCE_MAX = 3       # Max retries per regression source
+TOTAL_REGRESSION_CAP = 5 # Max total regressions across all sources
 QUALITY_THRESHOLD = 70
 TASK_RETRY = 3           # Task call retry count
 TASK_RETRY_DELAY = 2000  # Retry interval (ms)
+USER_INPUT_TIMEOUT = 300000  # 5 min
 ```
 
 ### Dual Model Strategy
@@ -1700,8 +1975,8 @@ IF error type == TOOL_DENIED:
 #### build-tester / function-tester errors
 ```
 IF error type == BUILD_ERROR OR TEST_ERROR:
-    IF retry_count < 3:
-        → Regress to code-fixer
+    IF retry_counters.{source} < PER_SOURCE_MAX AND total_regressions < TOTAL_REGRESSION_CAP:
+        → Regress to code-fixer (with per-source counter increment)
     ELSE:
         → Abort workflow
         → Request manual fix
@@ -1740,7 +2015,7 @@ Output log in following format on Task failure:
 ═══════════════════════════════════════════════════════════════
 Error Code: {error_code}
 Error Type: {error_type}
-Attempt: {retry_count}/{max_retry}
+Attempt: {retry_counters.source}/{PER_SOURCE_MAX} (total: {total_regressions}/{TOTAL_REGRESSION_CAP})
 Error Message: {error_message}
 
 Recovery Action: {recovery_action}
