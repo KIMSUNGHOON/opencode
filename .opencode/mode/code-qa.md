@@ -381,6 +381,7 @@ The following Agents MUST receive user input before proceeding:
 |-------|---------------|------------|
 | env-setup | Environment confirmation (Y/n) or selection when none detected (1-2 steps) | `WAITING_INPUT` |
 | git-input | When no Git repo: init/specify files/exit | `NO_GIT_REPO` |
+| git-input | When Detached HEAD: create branch/continue/exit | `DETACHED_HEAD` |
 | build-tester | Environment confirmation ("confirm/y" or "reset/n") | `WAITING_INPUT` |
 | function-tester | Test execution ("run/y" or "skip/n") | `WAITING_INPUT` |
 | git-committer | Commit confirmation ("confirm/y" or "cancel/n") | `WAITING_INPUT` |
@@ -896,7 +897,7 @@ IF Task result contains "GIT_INPUT_RESULT: ABORTED":
 IF Task result contains "GIT_INPUT_RESULT: SUCCESS":
     → Extract FILE_LIST from result
     → Store in changed_files variable
-    → Proceed to STEP 3 (stay in Git mode!)
+    → Proceed to STEP 2.5 (file validation, stay in Git mode!)
 ```
 
 #### Option B: Direct File Mode (use_git_mode == false, --files option)
@@ -989,7 +990,7 @@ Task tool call:
 IF Task result contains "FILE_INPUT_RESULT: SUCCESS":
     → Extract FILE_LIST from result
     → Store in changed_files variable
-    → Proceed to STEP 3
+    → Proceed to STEP 2.5 (file validation)
 
 IF Task result contains "FILE_INPUT_RESULT: NO_FILES":
     → Output "No code files found in specified paths"
@@ -1002,7 +1003,47 @@ IF Task result contains "FILE_INPUT_RESULT: INVALID_PATH":
 
 **Store result:** Extract file list from Task result and save to `changed_files`
 
-→ On completion, go to STEP 3
+→ On completion, go to STEP 2.5 (file validation)
+
+### STEP 2.5: File List Validation
+
+**This step applies to BOTH Option A (git-input) and Option B (file-input).**
+
+After `changed_files` is populated, validate and filter before proceeding:
+
+```
+# Check for no changed files
+IF changed_files.length == 0:
+    → Output message: "ℹ️ No changed files. Ending workflow."
+    → End workflow (success, no QA needed)
+
+# Filter deleted files
+IF changed_files contains deleted files (D):
+    → Exclude deleted files from analysis
+    → Output message: "ℹ️ {N} deleted files excluded from analysis."
+    → Remove deleted files from changed_files
+
+# No files to analyze (all deleted)
+IF changed_files.length == 0 after filtering:
+    → Output message: "ℹ️ No files to analyze. (Only deleted files)"
+    → Skip to STEP 9 (Git Commit)
+
+# Large file count warning
+IF changed_files.length > 100:
+    → Output warning: "⚠️ {N} files changed. Analysis may take a long time."
+    → Recommend filtering to source files only (exclude test, config files)
+
+# Binary file filtering
+Auto-exclude binary extension files:
+- .exe, .dll, .so, .dylib, .bin
+- .zip, .tar, .gz, .rar, .7z
+- .png, .jpg, .jpeg, .gif, .ico, .svg, .webp
+- .pdf, .doc, .docx, .xls, .xlsx
+- .woff, .woff2, .ttf, .eot
+- .mp3, .mp4, .wav, .avi
+```
+
+→ On completion, proceed to STEP 3
 
 ### STEP 3: Pre-Check
 
@@ -1082,20 +1123,73 @@ Changed files:
 
 Task tool call:
 - subagent_type: "code-reviewer"
-- prompt: **(YOU MUST BUILD THIS - see above!)**
-    ```
-    PROJECT_ROOT: [actual project root from STEP 0]
+- prompt: **(YOU MUST BUILD THIS - see construction below!)**
+- description: "Code review"
 
-    Analyze code and find issues in the files listed below.
-    Use Read tool to read each file's content and analyze.
+**Prompt construction (Important!):**
 
-    Changed files:
+```
+IF workspace_cache != null:
+    prompt =
+    """
+    ## Project Context (from workspace cache)
+    - Project Type: {workspace_cache.project.type}
+    - Languages: {workspace_cache.project.languages}
+    - Frameworks: {workspace_cache.project.frameworks}
+    - Build System: {workspace_cache.build_system.type}
+    - Test Command: {workspace_cache.build_system.test_command}
+
+    ## Changed files to analyze:
     - [actual absolute path 1 from STEP 2]
     - [actual absolute path 2 from STEP 2]
-    - [actual absolute path 3 from STEP 2]
     (... list ALL files from STEP 2 FILE_LIST)
+
+    Analyze the code in the above files and find issues.
+    Use Read tool to read each file's content and analyze.
+
+    ## REQUIRED: Structured Output
+    After your human-readable report, you MUST output a JSON block:
+    ```json
+    {
+      "review": {
+        "summary": { "files": N, "issues": N, "by_severity": {"critical": N, "high": N, "medium": N, "low": N} },
+        "issues": [
+          { "id": "C001", "severity": "critical", "category": "security", "file": "/absolute/path.py", "line": 45, "title": "Issue Title", "description": "What is wrong", "suggestion": "How to fix" }
+        ]
+      }
+    }
     ```
-- description: "Code review"
+    This JSON is MANDATORY. It will be passed to the Code Fixer agent.
+    """
+
+ELSE:
+    prompt =
+    """
+    PROJECT_ROOT: [actual project root from STEP 0]
+
+    ## Changed files to analyze:
+    - [actual absolute path 1 from STEP 2]
+    - [actual absolute path 2 from STEP 2]
+    (... list ALL files from STEP 2 FILE_LIST)
+
+    Analyze the code in the above files and find issues.
+    Use Read tool to read each file's content and analyze.
+
+    ## REQUIRED: Structured Output
+    After your human-readable report, you MUST output a JSON block:
+    ```json
+    {
+      "review": {
+        "summary": { "files": N, "issues": N, "by_severity": {"critical": N, "high": N, "medium": N, "low": N} },
+        "issues": [
+          { "id": "C001", "severity": "critical", "category": "security", "file": "/absolute/path.py", "line": 45, "title": "Issue Title", "description": "What is wrong", "suggestion": "How to fix" }
+        ]
+      }
+    }
+    ```
+    This JSON is MANDATORY. It will be passed to the Code Fixer agent.
+    """
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1245,24 +1339,44 @@ ELSE (regression - CRITICAL CONTEXT):
 
 Task tool call:
 - subagent_type: "quality-checker"
-- prompt: **(Build with actual values!)**
-    ```
-    Previous fix results:
-    [actual content of fix_result from STEP 5, e.g., "FIX_RESULT: SUCCESS, ISSUES_FIXED: 3/3"]
-
-    Target files:
-    - [actual absolute paths from changed_files]
-
-    Run static analysis tools (ruff, mypy, radon, etc.) directly on the target files,
-    and calculate quality score based on results.
-    You MUST output score in QUALITY_SCORE: XX/100 format.
-    ```
+- prompt: Construct prompt including changed files context
 - description: "Quality check"
+
+**Prompt construction:**
+```
+prompt =
+"""
+Run static analysis tools on the following files and calculate quality score.
+Must output score in QUALITY_SCORE: XX/100 format.
+
+## Files to Check
+- [actual absolute paths from changed_files]
+
+## Files Modified by Code Fixer (if any)
+{context_store.fix_result.files_modified or "same as above"}
+
+After your human-readable report, also output structured JSON:
+```json
+{
+  "quality": {
+    "score": 85,
+    "status": "PASS",
+    "by_severity": { "critical": 0, "high": 1, "medium": 3, "low": 2 },
+    "tool_results": [{ "tool": "ruff", "issues": 3 }, { "tool": "mypy", "issues": 1 }],
+    "remaining_issues": [
+      { "severity": "high", "tool": "mypy", "file": "/path.py", "line": 10, "message": "..." }
+    ]
+  }
+}
+```
+"""
+```
 
 **Required action after Task completion:**
 1. Find `QUALITY_SCORE: XX/100` in Task result
 2. Extract score as number (e.g., "QUALITY_SCORE: 85/100" → 85)
-3. **Immediately call next Task** according to conditions below:
+3. Extract structured JSON and store in `context_store.quality_result`
+4. **Immediately call next Task** according to conditions below:
 
 ```
 IF score >= 70 OR contains "STATUS: PASS":
