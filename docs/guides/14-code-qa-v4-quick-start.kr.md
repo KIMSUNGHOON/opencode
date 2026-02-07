@@ -40,7 +40,7 @@ Code QA v4는 13개의 전문 Agent로 구성된 자동화된 코드 품질 검�
   - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
 - **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
-- **회귀 루프**: 품질 기준 미달 시 자동 재시도 (최대 3회)
+- **회귀 루프**: 소스별 독립 재시도 (quality/build/test 각 최대 3회, 총 5회 제한)
 - **구조화된 상태 관리**: 결과 토큰 파싱을 통한 Agent간 데이터 전달
 - **GitLab-CE 지원**: GitHub 및 GitLab 모두 지원 (gh/glab CLI)
 - **인증 오류 처리**: SSH/HTTPS/GPG/CLI 인증 문제 감지 및 안내
@@ -633,7 +633,7 @@ Phase 6: Function Test (사용자 확인)│
     └──→ 실패 시 ───────────────────┘
                         ↓
                    Code Fixer로 회귀
-                   (최대 3회)
+                   (소스별 최대 3회, 총 5회)
     ↓
 Phase 7: Git Commit (사용자 확인 필수)
     │    └─ 커밋 정보 미리보기
@@ -674,7 +674,7 @@ Phase 6: Function Test (사용자 확인)│
     └──→ 실패 시 ───────────────────┘
                         ↓
                    Code Fixer로 회귀
-                   (최대 3회)
+                   (소스별 최대 3회, 총 5회)
     ↓
 Phase 8: Summary Report  ← Git 단계 건너뜀
     ↓
@@ -797,9 +797,20 @@ ls .opencode/agent/
 
 ### 8.5 WAITING_INPUT 상태에서 멈춤
 
-env-setup, git-input, build-tester, function-tester, git-committer에서 사용자 입력을 기다리는 상태입니다.
+env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 사용자 입력을 기다리는 상태입니다.
 
-**해결**: 요청된 입력을 제공하세요:
+**자동 타임아웃**: **5분** 내에 입력이 없으면 오케스트레이터가 안전한 기본 동작을 수행합니다:
+
+| Agent | 타임아웃 시 기본 동작 |
+|-------|---------------------|
+| env-setup | 감지된 환경 자동 확인 |
+| git-input | 자동 중단 (워크플로우 종료) |
+| build-tester | 현재 환경 자동 확인 |
+| function-tester | 테스트 자동 스킵 |
+| git-committer | 커밋 자동 스킵 |
+| git-pusher | Push 자동 스킵 |
+
+**수동 해결**: 요청된 입력을 제공하세요:
 - Shell 선택: `1`, `2`, 또는 `3`
 - 환경 타입: `1`, `2`, `3`, 또는 `4`
 - 확인: `y` 또는 `확인`
@@ -1092,8 +1103,19 @@ WARNING: 소스 파일이 없는 빈 프로젝트입니다.
 오케스트레이터(mode/code-qa.md)가 추적하는 상태 변수:
 
 ```
-retry_count = 0              # 회귀 횟수 (최대 3)
+# ━━━ Per-Source Retry Counters (소스별 독립 카운터) ━━━
+retry_counters = {
+    "quality": 0,       # Quality < 70 회귀 (최대 3)
+    "build": 0,         # Build 실패 회귀 (최대 3)
+    "test": 0           # Test 실패 회귀 (최대 3)
+}
+PER_SOURCE_MAX = 3
+TOTAL_REGRESSION_CAP = 5
+total_regressions = 0
 quality_score = 0            # 품질 점수
+
+# ━━━ Regression History ━━━
+regression_history = []      # 누적 회귀 이력 배열
 
 # 캐시 관련
 workspace_cache = null       # 워크스페이스 캐시 데이터
@@ -1103,26 +1125,30 @@ auto_analyze = false         # --with-analysis면 true
 # 모드 관련
 use_git_mode = true          # --files 사용 시 false
 
-# 상태 변수
-env_result = ""              # 환경 설정 결과
-changed_files = []           # 변경 파일 목록 (삭제된 파일 제외)
-deleted_files = []           # 삭제된 파일 목록 (분석 제외)
-review_issues = []           # 리뷰 이슈 목록
-pre_check_result = ""        # Pre-check 결과 (SUCCESS/PARTIAL)
-fix_result = ""              # 수정 결과
-build_result = ""            # 빌드 결과
-test_result = ""             # 테스트 결과
-commit_result = ""           # 커밋 결과
+# ━━━ Structured Context Store ━━━
+context_store = {
+    "env_state": null,          # 환경 설정 결과 (JSON)
+    "file_list": null,          # 변경 파일 목록
+    "pre_check_result": null,   # Pre-check 결과 (JSON)
+    "review_result": null,      # 코드 리뷰 이슈 (JSON)
+    "fix_result": null,         # 코드 수정 결과 (JSON)
+    "quality_result": null,     # 품질 점수 + 도구 결과 (JSON)
+    "build_result": null,       # 빌드 테스트 결과 (JSON)
+    "test_result": null,        # 기능 테스트 결과 (JSON)
+    "commit_result": null,      # Git 커밋 정보 (JSON)
+    "push_result": null         # Git push/PR 정보 (JSON)
+}
 ```
 
-### 회귀 조건
+### 회귀 조건 (소스별 독립 카운터)
 
-| 조건 | 동작 |
-|------|------|
-| `QUALITY_SCORE < 70` | STEP 5 (code-fixer)로 회귀 |
-| `BUILD_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
-| `TEST_RESULT: FAIL` | STEP 5 (code-fixer)로 회귀 |
-| `retry_count >= 3` | 워크플로우 중단, 수동 검토 요청 |
+| 조건 | 소스 | 동작 |
+|------|------|------|
+| `QUALITY_SCORE < 70` | `quality` | `retry_counters.quality` 증가, STEP 5 (code-fixer)로 회귀 |
+| `BUILD_RESULT: FAIL` | `build` | `retry_counters.build` 증가, STEP 5 (code-fixer)로 회귀 |
+| `TEST_RESULT: FAIL` | `test` | `retry_counters.test` 증가, STEP 5 (code-fixer)로 회귀 |
+| `retry_counters.{source} >= 3` | any | 해당 소스 회귀 중단 |
+| `total_regressions >= 5` | all | 워크플로우 중단, 수동 검토 요청 |
 
 ---
 
@@ -1158,6 +1184,10 @@ commit_result = ""           # 커밋 결과
     │   ├── quality.md                      ✅ /quality - 품질 검사
     │   ├── build.md                        ✅ /build - 빌드 테스트
     │   └── test.md                         ✅ /test - 기능 테스트
+    ├── config/                             (설정 파일)
+    │   ├── workflow-settings.yaml          ✅ 타임아웃, 재시도, 품질, 모델 설정
+    │   ├── context-schema.md               ✅ 구조화된 컨텍스트 JSON 스키마
+    │   └── permission-templates.yaml       ✅ Agent 권한 템플릿
     ├── mode/
     │   └── code-qa.md                      ✅ QA 오케스트레이터
     └── workspace-cache/                    (캐시 디렉토리 - 자동 생성)

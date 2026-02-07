@@ -46,7 +46,7 @@ sequenceDiagram
         QA->>QA: Quality Check
 
         alt 점수 < 70%
-            loop 최대 3회
+            loop 소스별 최대 3회 (총 5회 제한)
                 QA->>QA: Code Fix 재실행
                 QA->>QA: Quality Check
             end

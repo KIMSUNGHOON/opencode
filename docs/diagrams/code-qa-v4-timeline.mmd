@@ -27,7 +27,7 @@ flowchart TB
         CF["<b>code-fixer</b><br/>이슈 수정"]
         QC["<b>quality-checker</b><br/>품질 점수 ≥ 70%"]
         PC --> CR --> CF --> QC
-        QC -.->|"< 70%<br/>(최대 3회)"| CF
+        QC -.->|"< 70%<br/>(소스별 최대 3회,<br/>총 5회 제한)"| CF
     end
 
     subgraph TEST["🧪 TEST PHASE (Docker Sandbox)"]

@@ -163,7 +163,7 @@ flowchart TB
     end
 
     QUALITY --> Q_CHECK{"≥70%?"}
-    Q_CHECK -->|No| RETRY_Q{"Regress <3x?"}
+    Q_CHECK -->|No| RETRY_Q{"Per-source <3x?\nTotal <5x?"}
     RETRY_Q -->|Yes| CODE_FIX
     RETRY_Q -->|No| HUMAN["User Intervention"]
     HUMAN --> BUILD_TEST
@@ -357,17 +357,17 @@ sequenceDiagram
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
 │  │  Regression Triggers                                                             │   │
 │  │                                                                                  │   │
-│  │  1. Quality Check < 70%                                                          │   │
-│  │     └─ Regress to @code-fixer (max 3x)                                           │   │
-│  │     └─ Request user intervention after 3x                                        │   │
-│  │                                                                                  │   │
-│  │  2. Build Failed                                                                 │   │
+│  │  1. Quality Check < 70%  (source: quality, max 3 per-source)                     │   │
 │  │     └─ Regress to @code-fixer                                                    │   │
-│  │     └─ Pass build error log                                                      │   │
+│  │     └─ Increment retry_counters.quality                                          │   │
 │  │                                                                                  │   │
-│  │  3. Test Failed                                                                  │   │
+│  │  2. Build Failed  (source: build, max 3 per-source)                              │   │
 │  │     └─ Regress to @code-fixer                                                    │   │
-│  │     └─ Pass failed test cases                                                    │   │
+│  │     └─ Pass build error log + increment retry_counters.build                     │   │
+│  │                                                                                  │   │
+│  │  3. Test Failed  (source: test, max 3 per-source)                                │   │
+│  │     └─ Regress to @code-fixer                                                    │   │
+│  │     └─ Pass failed test cases + increment retry_counters.test                    │   │
 │  │                                                                                  │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
@@ -384,7 +384,9 @@ sequenceDiagram
 │  │                                                                                  │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
-│  MAX_RETRY = 3                                                                          │
+│  Per-Source Retry Counters:                                                             │
+│    PER_SOURCE_MAX = 3  (quality, build, test each max 3)                                │
+│    TOTAL_REGRESSION_CAP = 5  (across all sources combined)                              │
 │  QUALITY_THRESHOLD = 70                                                                 │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
@@ -397,9 +399,11 @@ sequenceDiagram
 ```
 project-root/
 ├── .opencode/
-│   ├── agent/
+│   ├── agent/                     # 13 Agents
 │   │   ├── env-setup.md           # Phase -1: Environment setup
+│   │   ├── workspace-analyzer.md  # Phase 0B: Workspace analysis (cache)
 │   │   ├── git-input.md           # Phase 0: Git input
+│   │   ├── file-input.md          # Non-Git: File input parser
 │   │   ├── pre-checker.md         # Phase 1: Auto-fix
 │   │   ├── code-reviewer.md       # Phase 2: Code review
 │   │   ├── code-fixer.md          # Phase 3: Issue fixing
@@ -413,8 +417,16 @@ project-root/
 │   ├── command/
 │   │   └── code-qa.md             # /code-qa command
 │   │
+│   ├── config/                    # Configuration files
+│   │   ├── workflow-settings.yaml # Timeout, retry, quality, model settings
+│   │   ├── context-schema.md      # JSON schemas for structured context
+│   │   └── permission-templates.yaml # Agent permission templates
+│   │
 │   ├── docker/
 │   │   └── Dockerfile.sandbox     # Docker Sandbox image
+│   │
+│   ├── mode/
+│   │   └── code-qa.md             # QA orchestrator mode
 │   │
 │   └── env-config.yaml            # Environment config file
 │
@@ -492,8 +504,12 @@ project-root/
 | File | Location | Purpose |
 |------|----------|---------|
 | `env-config.yaml` | `.opencode/` | Shell, environment, requirements, Sandbox settings |
+| `workflow-settings.yaml` | `.opencode/config/` | Timeout, retry, quality, model settings |
+| `context-schema.md` | `.opencode/config/` | JSON schemas for structured context passing |
+| `permission-templates.yaml` | `.opencode/config/` | Agent permission templates |
 | `Dockerfile.sandbox` | `.opencode/docker/` | Sandbox image definition |
 | `code-qa.md` | `.opencode/command/` | /code-qa command definition |
+| `code-qa.md` | `.opencode/mode/` | QA orchestrator mode |
 
 ---
 

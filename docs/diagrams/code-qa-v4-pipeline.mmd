@@ -49,7 +49,7 @@ flowchart TB
     end
 
     QUALITY --> Q_CHECK{"점수 ≥ 70?"}
-    Q_CHECK -->|"❌ No"| RETRY_Q{"회귀 < 3회?"}
+    Q_CHECK -->|"❌ No"| RETRY_Q{"소스별 회귀\n< 3회?"}
     RETRY_Q -->|"Yes"| CODE_FIX
     RETRY_Q -->|"No"| HUMAN_INTERVENE["⚠️ 사용자 개입 필요"]
     HUMAN_INTERVENE --> BUILD_TEST

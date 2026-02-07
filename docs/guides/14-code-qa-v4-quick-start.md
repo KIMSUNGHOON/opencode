@@ -542,6 +542,7 @@ env-setup, git-input, build-tester, function-tester, git-committer are waiting f
 | Agent | Default Action on Timeout |
 |-------|--------------------------|
 | env-setup | Auto-confirm detected environment |
+| git-input | Auto-abort (exit workflow gracefully) |
 | build-tester | Auto-confirm current environment |
 | function-tester | Auto-skip tests |
 | git-committer | Auto-skip commit |
@@ -655,12 +656,14 @@ regression_history = []     # Array of previous fix attempt records
 context_store = {
     "env_state": null,          # Environment setup result (JSON)
     "file_list": null,          # Changed file list
+    "pre_check_result": null,   # Pre-check lint/format results (JSON)
     "review_result": null,      # Code review issues (structured JSON)
     "fix_result": null,         # Code fix results (structured JSON)
     "quality_result": null,     # Quality score + tool results (JSON)
     "build_result": null,       # Build test results (structured JSON)
     "test_result": null,        # Function test results (structured JSON)
-    "commit_result": null       # Git commit info
+    "commit_result": null,      # Git commit info (structured JSON)
+    "push_result": null         # Git push/PR info (structured JSON)
 }
 ```
 

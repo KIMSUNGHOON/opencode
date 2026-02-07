@@ -459,11 +459,13 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │                                                                                      │
 │  Orchestrator State에 누적:                                                           │
 │  ┌────────────────────────────────────────────────────────┐                          │
-│  │  retry_count = 1                                       │                          │
-│  │  previous_issues = [C001, H001]   ← 1차 리뷰 이슈      │                          │
-│  │  previous_fixes = [C001 fixed]    ← 1차 수정 결과       │                          │
-│  │  remaining_issues = [H001]        ← 미해결 이슈         │                          │
-│  │  quality_history = [55, ?]        ← 점수 변화 추적       │                          │
+│  │  retry_counters = {                                    │                          │
+│  │    "quality": 1,  # per-source (max 3)                 │                          │
+│  │    "build": 0,    # per-source (max 3)                 │                          │
+│  │    "test": 0      # per-source (max 3)                 │                          │
+│  │  }                                                     │                          │
+│  │  total_regressions = 1  # TOTAL_CAP = 5                │                          │
+│  │  regression_history = [...]  ← 누적 회귀 이력           │                          │
 │  │  error_context = "build failed: ..."  ← 에러 로그 요약  │                          │
 │  └────────────────────────────────────────────────────────┘                          │
 │                                                                                      │
@@ -479,7 +481,8 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  │  회귀 1회차: 프롬프트 +3K 토큰 (이전 이슈 + 에러 요약)   │                          │
 │  │  회귀 2회차: 프롬프트 +5K 토큰 (누적 이력)               │                          │
 │  │  회귀 3회차: 프롬프트 +7K 토큰 (전체 이력)               │                          │
-│  │  → 최대 회귀 3회이므로 Context 증가량 제한적             │                          │
+│  │  → PER_SOURCE_MAX=3, TOTAL_CAP=5 이므로 증가량 제한적   │                          │
+│  │  → timeout_guard: 85% 초과 시 회귀 스킵                 │                          │
 │  └────────────────────────────────────────────────────────┘                          │
 │                                                                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
@@ -525,7 +528,7 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  │   GPU Node 1: H100 NVL 96GB x4                          │                        │
 │  │                                                          │                        │
 │  │   GPU 0,1: Thinking Model (SGLang :8000, TP=2)          │                        │
-│  │   GPU 2,3: Coder Model    (SGLang :8001, TP=2)          │                        │
+│  │   GPU 2,3: Coder Model    (vLLM :8001, TP=2)            │                        │
 │  └──────────────────────────────────────────────────────────┘                        │
 │                                                                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
@@ -543,14 +546,14 @@ python3 -m sglang.launch_server \
   --host 0.0.0.0 \
   --mem-fraction-static 0.85
 
-# Coder Model (Port 8001)
-python3 -m sglang.launch_server \
+# Coder Model (Port 8001) — vLLM
+python3 -m vllm.entrypoints.openai.api_server \
   --model Qwen/Qwen3-Coder-Next-FP8 \
-  --tp 2 \
-  --context-length 262144 \
+  --served-model-name Qwen3-Coder-Next-FP8 \
+  --tensor-parallel-size 2 \
+  --max-model-len 262144 \
   --port 8001 \
-  --host 0.0.0.0 \
-  --mem-fraction-static 0.85
+  --host 0.0.0.0
 ```
 
 ### 6.3 OpenCode 설정 변경안
@@ -711,7 +714,7 @@ model: qwen-coder/Qwen3-Coder-Next-FP8
 - [x] workflow-settings.yaml에 듀얼 모델 설정 추가
 - [x] Fallback 설정 추가
 
-### Phase 3: 통합 테스트
+### Phase 3: 통합 테스트 (In Progress)
 - [ ] 각 에이전트별 단독 테스트 (Coder 모델)
 - [ ] 전체 워크플로우 E2E 테스트
 - [ ] 회귀 루프 테스트 (Context 전달 검증)

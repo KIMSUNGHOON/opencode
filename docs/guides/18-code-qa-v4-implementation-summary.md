@@ -416,7 +416,88 @@ Result tokens provide:
 
 ---
 
-## 10. Related Documentation
+## 10. Per-Source Regression Counters
+
+### 10.1 Overview
+
+The regression system uses **per-source independent counters** instead of a single global retry counter:
+
+```
+retry_counters = {
+    "quality": 0,       # Quality < 70 regressions (max 3 per-source)
+    "build": 0,         # Build failure regressions (max 3 per-source)
+    "test": 0           # Test failure regressions (max 3 per-source)
+}
+PER_SOURCE_MAX = 3
+TOTAL_REGRESSION_CAP = 5
+total_regressions = 0
+```
+
+### 10.2 Behavior
+
+| Condition | Source | Action |
+|-----------|--------|--------|
+| `QUALITY_SCORE < 70` | `quality` | Increment `retry_counters.quality`, regress to code-fixer |
+| `BUILD_RESULT: FAIL` | `build` | Increment `retry_counters.build`, regress to code-fixer |
+| `TEST_RESULT: FAIL` | `test` | Increment `retry_counters.test`, regress to code-fixer |
+| `retry_counters.{source} >= 3` | any | Stop retrying that source |
+| `total_regressions >= 5` | all | Stop workflow, request manual review |
+
+### 10.3 Safety Guards
+
+- **Timeout Guard**: Skip regression if elapsed > 85% of workflow timeout
+- **Duplicate Fix Detection**: Track `regression_history` to detect repeated identical fixes
+- **Context Accumulation**: Each regression passes previous attempt history to code-fixer
+
+---
+
+## 11. Structured JSON Output
+
+All agents output both human-readable reports AND structured JSON for the orchestrator's `context_store`:
+
+### 11.1 Context Store Schema
+
+```
+context_store = {
+    "env_state": null,          # Environment setup (JSON)
+    "file_list": null,          # Changed file list
+    "pre_check_result": null,   # Pre-check results (JSON)
+    "review_result": null,      # Code review issues (JSON)
+    "fix_result": null,         # Code fix results (JSON)
+    "quality_result": null,     # Quality score + tool results (JSON)
+    "build_result": null,       # Build test results (JSON)
+    "test_result": null,        # Function test results (JSON)
+    "commit_result": null,      # Git commit info (JSON)
+    "push_result": null         # Git push/PR info (JSON)
+}
+```
+
+### 11.2 Key Agent JSON Schemas
+
+- **git-committer**: `{ "commit": { "status", "hash", "message", "files_committed", "branch" } }`
+- **git-pusher**: `{ "push": { "status", "remote", "branch", "pr_url", "pr_created" } }`
+- **quality-checker**: `{ "quality": { "score", "issues_by_severity", "tool_results" } }`
+- **build-tester**: `{ "build": { "status", "command", "exit_code", "error_summary" } }`
+- **function-tester**: `{ "test": { "status", "total", "passed", "failed", "skipped" } }`
+
+Full schemas defined in `.opencode/config/context-schema.md`.
+
+---
+
+## 12. STEP 2.5: File List Validation
+
+After STEP 2 (git-input/file-input), the orchestrator performs file list validation:
+
+1. **Binary File Filtering**: Exclude non-code files (.png, .jpg, .pdf, etc.)
+2. **Deleted File Exclusion**: Remove files with status `D` from analysis list
+3. **Large Count Warning**: Warn if >100 files changed, suggest `--staged` or `--files`
+4. **Empty List Check**: If no valid files remain after filtering, exit gracefully
+
+This step prevents the pipeline from processing files that cannot be meaningfully analyzed.
+
+---
+
+## 13. Related Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -426,6 +507,8 @@ Result tokens provide:
 | `15-workspace-analysis-workflow.md` | Workspace analysis details |
 | `16-workflow-case-review.md` | Case review and edge cases |
 | `20-dual-model-strategy-report.md` | Dual model strategy report |
+| `.opencode/config/workflow-settings.yaml` | Authoritative config (timeouts, retry, model assignments) |
+| `.opencode/config/context-schema.md` | JSON schemas for structured context passing |
 
 ---
 
@@ -436,3 +519,4 @@ Result tokens provide:
 | 1.0 | 2025-02-04 | Initial implementation summary |
 | 1.1 | 2025-02-04 | env-setup streamlining (4 steps → 1-2 steps) |
 | 1.2 | 2026-02-05 | Complete result token list, fix step diagram, add all 13 agents |
+| 1.3 | 2026-02-06 | Add per-source regression counters, structured JSON output, STEP 2.5 file validation, config file references |
