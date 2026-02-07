@@ -849,7 +849,7 @@ IF Task result contains "GIT_INPUT_RESULT: NO_GIT_REPO":
     → If user inputs "git init" or "initialize":
         → Call git-input again with prompt: "User selected git init. Perform full initialization: git init → add → commit, then return SUCCESS with FILE_LIST."
         → git-input will perform init and return SUCCESS
-        → On SUCCESS: continue to STEP 3 in Git mode (DO NOT switch to non-Git!)
+        → On SUCCESS: continue to STEP 2.5 in Git mode (DO NOT switch to non-Git!)
     → If user inputs file path:
         → change use_git_mode = false
         → call file-input with the paths
@@ -889,7 +889,7 @@ IF Task result contains "GIT_INPUT_RESULT: WAITING_INPUT" AND "WAITING_FOR: INIT
     → User is confirming initial commit
     → Wait for user response (commit/y, .gitignore, abort)
     → Call git-input again with user's choice
-    → After SUCCESS: continue to STEP 3 in Git mode
+    → After SUCCESS: continue to STEP 2.5 in Git mode
 
 IF Task result contains "GIT_INPUT_RESULT: ABORTED":
     → Terminate workflow
@@ -1093,7 +1093,7 @@ IF Task result does NOT contain "PRE_CHECK_RESULT:":
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**⚠️ Orchestrator MUST construct the prompt like this:**
+**⚠️ Orchestrator MUST construct the prompt dynamically (see construction below).**
 
 ```python
 # Pseudo-code for how YOU (Orchestrator) must build the prompt:
@@ -1108,17 +1108,9 @@ file_list_from_step2 = "src/app.py, src/utils.py, tests/test_app.py"
 files = file_list_from_step2.split(", ")
 absolute_paths = [f"{project_root}/{f}" for f in files]
 
-# 4. Build the prompt with ACTUAL paths
-prompt = f"""
-PROJECT_ROOT: {project_root}
-
-Analyze code and find issues in the files listed below.
-
-Changed files:
-- {absolute_paths[0]}
-- {absolute_paths[1]}
-- {absolute_paths[2]}
-"""
+# 4. Build prompt using the Prompt Construction rules below
+#    Include workspace_cache context if available
+#    Include structured JSON output requirement
 ```
 
 Task tool call:
@@ -1126,7 +1118,7 @@ Task tool call:
 - prompt: **(YOU MUST BUILD THIS - see construction below!)**
 - description: "Code review"
 
-**Prompt construction (Important!):**
+**Prompt construction (Important! Includes workspace_cache + structured JSON):**
 
 ```
 IF workspace_cache != null:

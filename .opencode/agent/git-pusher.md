@@ -546,6 +546,33 @@ MESSAGE: {detailed error message}
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Structured JSON Output
+
+After the result token, also output a structured JSON block for the Orchestrator:
+
+**On SUCCESS:**
+```json
+{
+  "push": {
+    "status": "SUCCESS",
+    "remote": "origin",
+    "branch": "feature/add-auth",
+    "pr_url": "https://github.com/user/repo/pull/42",
+    "pr_created": true
+  }
+}
+```
+
+**On SKIPPED/NO_UNPUSHED_COMMITS:**
+```json
+{
+  "push": {
+    "status": "SKIPPED",
+    "message": "User skipped push."
+  }
+}
+```
+
 ## Important Notes
 
 1. **User Confirmation Required**: All remote operations require user confirmation

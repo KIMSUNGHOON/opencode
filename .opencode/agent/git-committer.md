@@ -394,6 +394,33 @@ MESSAGE: No changes to commit.
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Structured JSON Output
+
+After the result token, also output a structured JSON block for the Orchestrator:
+
+**On SUCCESS:**
+```json
+{
+  "commit": {
+    "status": "SUCCESS",
+    "hash": "a1b2c3d",
+    "message": "fix: resolve SQL injection vulnerability",
+    "files_committed": ["/absolute/path/file1.py", "/absolute/path/file2.py"],
+    "branch": "feature/add-auth"
+  }
+}
+```
+
+**On SKIPPED/NO_CHANGES:**
+```json
+{
+  "commit": {
+    "status": "SKIPPED",
+    "message": "User cancelled the commit."
+  }
+}
+```
+
 ## Important Notes
 
 1. **Skip if No Changes**: Do not commit if no changes exist
