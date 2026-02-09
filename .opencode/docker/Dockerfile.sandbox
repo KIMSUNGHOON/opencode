@@ -1,0 +1,108 @@
+# =============================================================================
+# OpenCode QA Sandbox - Python/CUDA Universal Template
+# =============================================================================
+#
+# Usage:
+#   docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
+#   docker run --gpus all -v $(pwd):/workspace qa-sandbox <command>
+#
+# CA Certificate Setup:
+#   Before building, copy the host's CA certificates to .opencode/docker/certs/:
+#   cp /usr/local/share/ca-certificates/*.crt .opencode/docker/certs/
+#   cp /usr/local/share/ca-certificates/*.pem .opencode/docker/certs/
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Base Image: NVIDIA CUDA + Python
+# -----------------------------------------------------------------------------
+ARG CUDA_VERSION=13.0.0
+ARG PYTHON_VERSION=3.12
+
+# Ubuntu 22.04 with CUDA 13.0.0
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn9-runtime-ubuntu22.04
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Python version
+ARG PYTHON_VERSION
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+
+# Workspace
+WORKDIR /workspace
+
+# -----------------------------------------------------------------------------
+# CA Certificates (copied from host)
+# -----------------------------------------------------------------------------
+# Copy host CA certificates into Docker
+# Place certificates in .opencode/docker/certs/ directory before building
+COPY .opencode/docker/certs/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true
+COPY .opencode/docker/certs/*.pem /usr/local/share/ca-certificates/ 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# System Dependencies + Python 3.12 (deadsnakes PPA)
+# -----------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    gnupg \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    # Python 3.12 from deadsnakes
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python${PYTHON_VERSION}-venv \
+    python${PYTHON_VERSION}-distutils \
+    # Build tools
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    # Utilities
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    # Update CA certificates
+    && update-ca-certificates \
+    # Python symlinks
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python \
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
+
+# Install pip for Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYTHON_VERSION}
+
+# -----------------------------------------------------------------------------
+# Python Package Manager (upgrade)
+# -----------------------------------------------------------------------------
+RUN python -m pip install --upgrade setuptools wheel
+
+# -----------------------------------------------------------------------------
+# Project Dependencies (if requirements.txt exists)
+# -----------------------------------------------------------------------------
+# This section installs project dependencies during build.
+# Only requirements.txt is copied first to leverage cache layers.
+
+COPY requirements*.txt ./
+RUN if [ -f requirements.txt ]; then \
+        pip install -r requirements.txt; \
+    fi && \
+    if [ -f requirements-dev.txt ]; then \
+        pip install -r requirements-dev.txt; \
+    fi
+
+# -----------------------------------------------------------------------------
+# Source Code (copied last for cache efficiency)
+# -----------------------------------------------------------------------------
+# In practice, volume mounts are used at runtime, so this step is optional.
+# COPY . .
+
+# -----------------------------------------------------------------------------
+# Default Command
+# -----------------------------------------------------------------------------
+CMD ["python", "--version"]

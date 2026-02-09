@@ -1,16 +1,92 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // "enterprise": {
-  //   "url": "https://enterprise.dev.opencode.ai",
-  // },
+
+  // =============================================================================
+  // Dual Model Provider Configuration
+  // =============================================================================
+  // Option A: Separate 2 GPU node configuration
+  //   - Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
+  //   - Node 2 (port 8001): Qwen3-Coder-Next (vLLM)       -> Code/utility agents
+  //
+  // Model Assignment:
+  //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
+  //     - Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
+  //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
+  //     - env-setup, git-input, workspace-analyzer, pre-checker, code-fixer,
+  //       build-tester, function-tester, git-committer, git-pusher, file-input
+  // =============================================================================
+
   "provider": {
-    "opencode": {
-      "options": {},
+    // -------------------------------------------------------------------------
+    // Provider 1: Thinking Model (SGLang, port 8000)
+    // -------------------------------------------------------------------------
+    "qwen": {
+      "name": "Qwen3-Next-Thinking (Reasoning)",
+      "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8000/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8000/v1"
+      },
+      "models": {
+        "Qwen3-Next-80B-A3B-Thinking-FP8": {
+          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
+          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
+          "tool_call": true,
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144,
+            "output": 16384
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          }
+        }
+      }
     },
-  },
-  "mcp": {},
-  "tools": {
-    "github-triage": false,
-    "github-pr-search": false,
-  },
+
+    // -------------------------------------------------------------------------
+    // Provider 2: Coder Model (vLLM, port 8001)
+    // -------------------------------------------------------------------------
+    "qwen-coder": {
+      "name": "Qwen3-Coder-Next (Code)",
+      "npm": "@ai-sdk/openai-compatible",
+      "api": "http://localhost:8001/v1",
+      "env": [],
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://localhost:8001/v1"
+      },
+      "models": {
+        "Qwen3-Coder-Next-FP8": {
+          "name": "Qwen3-Coder-Next-FP8",
+          "id": "Qwen3-Coder-Next-FP8",
+          "tool_call": true,
+          "temperature": true,
+          "reasoning": false,
+          "attachment": false,
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144,
+            "output": 16384
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          }
+        }
+      }
+    }
+  }
 }

@@ -1,0 +1,466 @@
+# Code QA Permission Templates
+# Common Bash permission templates for use by Agents.
+#
+# Usage:
+# Reference in Agent files with "extends: template_name" format
+# e.g., extends: read_only_git
+
+# =============================================================================
+# Base Templates (shared across all Agents)
+# =============================================================================
+templates:
+
+  # ---------------------------------------------------------------------------
+  # Base Exploration Permissions (used by most Agents)
+  # ---------------------------------------------------------------------------
+  base_exploration:
+    description: "Base file/directory exploration permissions"
+    bash:
+      "ls *": allow
+      "which *": allow
+      "echo *": allow
+
+  # ---------------------------------------------------------------------------
+  # File Discovery Permissions (used by workspace-analyzer, file-input)
+  # ---------------------------------------------------------------------------
+  file_discovery:
+    description: "File reading and discovery commands for workspace analysis"
+    bash:
+      "pwd": allow
+      "cat *": allow
+      "head *": allow
+      "tail *": allow
+      "find *": allow
+      "wc *": allow
+      "file *": allow
+      "stat *": allow
+      "du *": allow
+      "tree *": allow
+      "realpath *": allow    # macOS: requires coreutils (brew install coreutils)
+      "python3 -c *": allow  # Cross-platform fallback for realpath
+      "python -c *": allow   # Cross-platform fallback for realpath
+      "dirname *": allow
+      "basename *": allow
+      # Block modification commands
+      "mv *": deny
+      "cp *": deny
+
+  # ---------------------------------------------------------------------------
+  # Git Read-Only Permissions
+  # ---------------------------------------------------------------------------
+  git_read_only:
+    description: "Allow Git status/history queries only"
+    bash:
+      "git status *": allow
+      "git diff *": allow
+      "git log *": allow
+      "git show *": allow
+      "git branch *": allow
+      "git rev-parse *": allow
+      # Blocked
+      "git push *": deny
+      "git reset *": deny
+      "git checkout *": deny
+      "git merge *": deny
+      "git rebase *": deny
+
+  # ---------------------------------------------------------------------------
+  # Git Commit Permissions (for git-committer)
+  # ---------------------------------------------------------------------------
+  git_commit:
+    description: "Allow Git add/commit, block push"
+    extends: git_read_only
+    bash:
+      "git add *": allow
+      "git commit *": allow
+      "git commit --amend *": ask
+
+  # ---------------------------------------------------------------------------
+  # Git Push Permissions (for git-pusher)
+  # ---------------------------------------------------------------------------
+  git_push:
+    description: "Allow Git push and GitHub CLI"
+    extends: git_read_only
+    bash:
+      "git remote *": allow
+      "git push *": ask
+      "git push --force-with-lease *": ask
+      "gh pr create *": ask
+      "gh pr view *": allow
+      "gh pr list *": allow
+      "gh auth status *": allow
+      # Blocked
+      "git push --force *": deny
+
+  # ---------------------------------------------------------------------------
+  # Python Lint/Format Permissions (for pre-checker)
+  # ---------------------------------------------------------------------------
+  python_lint_format:
+    description: "Run Python Lint/Format tools"
+    bash:
+      "ruff check * --fix": allow
+      "ruff format *": allow
+      "black *": allow
+      "isort *": allow
+      "pylint *": allow
+      "flake8 *": allow
+      "mypy *": allow
+
+  # ---------------------------------------------------------------------------
+  # JavaScript/TypeScript Lint/Format Permissions
+  # ---------------------------------------------------------------------------
+  js_lint_format:
+    description: "Run JS/TS Lint/Format tools"
+    bash:
+      "eslint * --fix": allow
+      "prettier * --write": allow
+      "npx eslint * --fix": allow
+      "npx prettier * --write": allow
+      "tsc --noEmit *": allow
+      "npx tsc *": allow
+
+  # ---------------------------------------------------------------------------
+  # C/C++ Tool Permissions
+  # ---------------------------------------------------------------------------
+  cpp_tools:
+    description: "C/C++ build and static analysis"
+    bash:
+      "clang-format *": allow
+      "clang-tidy *": allow
+      "cppcheck *": allow
+      "cmake *": allow
+      "make *": allow
+      "ninja *": allow
+      "gcc *": allow
+      "g++ *": allow
+      "clang *": allow
+      "clang++ *": allow
+
+  # ---------------------------------------------------------------------------
+  # Java Tool Permissions
+  # ---------------------------------------------------------------------------
+  java_tools:
+    description: "Java build and static analysis"
+    bash:
+      "mvn *": allow
+      "gradle *": allow
+      "./gradlew *": allow
+      "javac *": allow
+      "checkstyle *": allow
+      "pmd *": allow
+      "spotbugs *": allow
+      "google-java-format *": allow
+
+  # ---------------------------------------------------------------------------
+  # Go Tool Permissions
+  # ---------------------------------------------------------------------------
+  go_tools:
+    description: "Go build, test, and static analysis"
+    bash:
+      "go build *": allow
+      "go test *": allow
+      "go vet *": allow
+      "go mod *": allow
+      "gofmt *": allow
+      "goimports *": allow
+      "staticcheck *": allow
+      "golint *": allow
+      "golangci-lint *": allow
+
+  # ---------------------------------------------------------------------------
+  # Rust Tool Permissions
+  # ---------------------------------------------------------------------------
+  rust_tools:
+    description: "Rust build, test, and static analysis"
+    bash:
+      "cargo build *": allow
+      "cargo test *": allow
+      "cargo check *": allow
+      "cargo clippy *": allow
+      "cargo fmt *": allow
+      "rustfmt *": allow
+
+  # ---------------------------------------------------------------------------
+  # Ruby Tool Permissions
+  # ---------------------------------------------------------------------------
+  ruby_tools:
+    description: "Ruby build, test, and static analysis"
+    bash:
+      "bundle install *": allow
+      "bundle exec rspec *": allow
+      "rspec *": allow
+      "rake *": allow
+      "rubocop *": allow
+      "gem build *": allow
+
+  # ---------------------------------------------------------------------------
+  # PHP Tool Permissions
+  # ---------------------------------------------------------------------------
+  php_tools:
+    description: "PHP build, test, and static analysis"
+    bash:
+      "composer install *": allow
+      "composer build *": allow
+      "phpunit *": allow
+      "./vendor/bin/phpunit *": allow
+      "phpcs *": allow
+      "phpcbf *": allow
+      "phpstan *": allow
+      "psalm *": allow
+      "php-cs-fixer *": allow
+
+  # ---------------------------------------------------------------------------
+  # Swift Tool Permissions
+  # ---------------------------------------------------------------------------
+  swift_tools:
+    description: "Swift build, test, and static analysis"
+    bash:
+      "swift build *": allow
+      "swift test *": allow
+      "swiftformat *": allow
+      "swiftlint *": allow
+      "xcodebuild *": allow
+
+  # ---------------------------------------------------------------------------
+  # Kotlin Tool Permissions
+  # ---------------------------------------------------------------------------
+  kotlin_tools:
+    description: "Kotlin build, test, and static analysis"
+    bash:
+      "kotlinc *": allow
+      "ktlint *": allow
+      "detekt *": allow
+
+  # ---------------------------------------------------------------------------
+  # Python Test Permissions
+  # ---------------------------------------------------------------------------
+  python_test:
+    description: "Run Python test frameworks"
+    bash:
+      "python -m pytest *": allow
+      "pytest *": allow
+      "python -m unittest *": allow
+      "nose2 *": allow
+      "coverage *": allow
+
+  # ---------------------------------------------------------------------------
+  # Node.js Test Permissions
+  # ---------------------------------------------------------------------------
+  node_test:
+    description: "Run Node.js test frameworks"
+    bash:
+      "npm test *": allow
+      "npm run test *": allow
+      "npx jest *": allow
+      "npx mocha *": allow
+      "yarn test *": allow
+      "pnpm test *": allow
+      "nyc *": allow
+
+  # ---------------------------------------------------------------------------
+  # Docker Permissions
+  # ---------------------------------------------------------------------------
+  docker_sandbox:
+    description: "Docker Sandbox build/run"
+    bash:
+      "docker build *": allow
+      "docker run *": allow
+      "docker images *": allow
+      "docker ps *": allow
+      # Blocked
+      "docker rm *": deny
+      "docker rmi *": deny
+
+  # ---------------------------------------------------------------------------
+  # Environment Detection Permissions (for env-setup)
+  # ---------------------------------------------------------------------------
+  env_detection:
+    description: "Shell and runtime environment detection"
+    bash:
+      "echo $SHELL": allow
+      "echo $0": allow
+      "echo $CONDA_DEFAULT_ENV": allow
+      "echo $VIRTUAL_ENV": allow
+      "echo $PATH": allow
+      "*sh --version": allow
+      "python --version": allow
+      "python3 --version": allow
+      "python -c *": allow
+      "python3 -c *": allow
+      "node --version": allow
+      "go version": allow
+      "rustc --version": allow
+      "cargo --version": allow
+      "java --version": allow
+      "javac --version": allow
+      "gcc --version": allow
+      "g++ --version": allow
+      "clang --version": allow
+      "nvidia-smi *": allow
+      "nvcc --version": allow
+
+  # ---------------------------------------------------------------------------
+  # Conda Environment Management Permissions
+  # ---------------------------------------------------------------------------
+  conda_env:
+    description: "Conda environment query and activation"
+    bash:
+      "conda --version": allow
+      "conda info *": allow
+      "conda env list": allow
+      "conda list *": allow
+      "conda run *": allow
+      "source */conda.sh": allow
+      "source */profile.d/conda.sh": allow
+      "conda activate *": ask
+      # Blocked
+      "conda remove *": deny
+
+  # ---------------------------------------------------------------------------
+  # Common Dangerous Command Blocking (applied to all Agents)
+  # ---------------------------------------------------------------------------
+  dangerous_commands_deny:
+    description: "Block dangerous commands"
+    bash:
+      "rm -rf *": deny
+      "rm -r *": deny
+      "rm *": deny
+      "git push --force *": deny
+      "git reset --hard *": deny
+      "git clean -f *": deny
+      "chmod 777 *": deny
+      "curl * | sh": deny
+      "curl * | bash": deny
+      "wget * | sh": deny
+      "wget * | bash": deny
+      "> /dev/*": deny
+      "dd if=*": deny
+      "mkfs *": deny
+      "fdisk *": deny
+      ":(){:|:&};:": deny
+
+# =============================================================================
+# Per-Agent Permission Composition
+# =============================================================================
+agent_permissions:
+
+  env-setup:
+    extends:
+      - base_exploration
+      - env_detection
+      - conda_env
+      - dangerous_commands_deny
+
+  workspace-analyzer:
+    extends:
+      - base_exploration
+      - file_discovery
+      - env_detection
+      - git_read_only
+      - dangerous_commands_deny
+
+  git-input:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  pre-checker:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  code-reviewer:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  code-fixer:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_test
+      - node_test
+      - dangerous_commands_deny
+
+  quality-checker:
+    extends:
+      - base_exploration
+      - git_read_only
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  build-tester:
+    extends:
+      - base_exploration
+      - env_detection
+      - docker_sandbox
+      - python_lint_format
+      - js_lint_format
+      - cpp_tools
+      - java_tools
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - kotlin_tools
+      - dangerous_commands_deny
+
+  function-tester:
+    extends:
+      - base_exploration
+      - docker_sandbox
+      - python_test
+      - node_test
+      - go_tools
+      - rust_tools
+      - ruby_tools
+      - php_tools
+      - swift_tools
+      - dangerous_commands_deny
+
+  git-committer:
+    extends:
+      - base_exploration
+      - git_commit
+      - dangerous_commands_deny
+
+  summary-reporter:
+    extends:
+      - base_exploration
+      - git_read_only
+      - dangerous_commands_deny
+
+  file-input:
+    extends:
+      - base_exploration
+      - file_discovery
+      - dangerous_commands_deny
+
+  git-pusher:
+    extends:
+      - base_exploration
+      - git_push
+      - dangerous_commands_deny
