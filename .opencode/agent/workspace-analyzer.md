@@ -15,7 +15,27 @@ permission:
   edit: deny
   glob: allow
   grep: allow
-  bash: allow  # read-only commands: ls, find, cat, etc.
+  bash:
+    # Read-only discovery commands only
+    "ls *": allow
+    "find *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "du *": allow
+    "file *": allow
+    "tree *": allow
+    "echo *": allow
+    "pwd": allow
+    "which *": allow
+    "git remote *": allow
+    "git branch *": allow
+    "git rev-parse *": allow
+    # Block dangerous commands
+    "rm *": deny
+    "git push *": deny
+    "git reset *": deny
 ---
 
 # Workspace Analyzer Agent

@@ -129,6 +129,8 @@ The system prompt `<env>` tag may already contain shell and active environment i
 
 Your first action MUST be running this exact Bash script. Do not use Read/Glob first.
 
+Note: This script uses bash syntax. On systems where `/bin/sh` is dash/ash, the Bash tool should still invoke bash directly. The `#!/bin/bash` shebang ensures compatibility.
+
 ```bash
 #!/bin/bash
 echo "=== ENVIRONMENT DETECTION ==="

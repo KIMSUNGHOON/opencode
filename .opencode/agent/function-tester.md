@@ -125,6 +125,11 @@ Use the ENV_STATE passed by the Orchestrator (ACTIVATE_CMD, PYTHON_PATH, ENV_TYP
 {ACTIVATE_CMD} && python -m pytest tests/ -v
 ```
 
+**If ENV_STATE is missing or incomplete** (e.g., env-setup step failed/timed out):
+- If ACTIVATE_CMD is empty or missing → skip the prefix, run test commands directly
+- If PYTHON_PATH is missing → use system `python` or `python3`
+- Do NOT skip tests just because ENV_STATE is incomplete — fall back to system defaults
+
 ## STEP 1: Test Detection and User Confirmation (Required)
 
 Run this detection command immediately on receiving the prompt:

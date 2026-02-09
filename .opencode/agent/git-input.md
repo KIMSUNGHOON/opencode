@@ -44,9 +44,11 @@ permission:
     "rm *": deny
   read: allow
   write:
-    # Only allow writing .gitignore (no catch-all deny - it disables the tool!)
+    # Only allow writing .gitignore during git init flow
+    # All other writes are blocked. The "*": deny pattern was removed because
+    # it disabled the Write tool entirely (OpenCode bug). Instead, the agent
+    # prompt explicitly restricts usage to .gitignore only.
     ".gitignore": ask
-    # NOTE: Removed "*": deny - it was disabling Write tool entirely!
   glob: allow
 ---
 

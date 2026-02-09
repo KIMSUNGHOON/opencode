@@ -36,8 +36,8 @@ Code QA v4는 13개의 전문 Agent로 구성된 자동화된 코드 품질 검�
 ### 1.2 주요 특징
 
 - **듀얼 모델 전략**:
-  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
-  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — code-reviewer, quality-checker, summary-reporter
+  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **사용자 확인 단계**: env-setup, git-input, build-tester, function-tester, git-committer, git-pusher에서 필수 확인
 - **Docker Sandbox**: 격리된 Build/Test 환경 (CUDA 13.0, Python 3.12)
 - **회귀 루프**: 소스별 독립 재시도 (quality/build/test 각 최대 3회, 총 5회 제한)
@@ -50,15 +50,15 @@ Code QA v4는 13개의 전문 Agent로 구성된 자동화된 코드 품질 검�
 | 항목 | Thinking Model | Coder Model |
 |------|---------------|-------------|
 | **모델** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
-| **서빙 엔진** | SGLang | vLLM |
+| **서빙 엔진** | SGLang | SGLang |
 | **포트** | 8000 | 8001 |
 | **Context Window** | 256K | 256K |
-| **Output Limit** | 16K | 16K |
+| **Output Limit** | 32K | 65K (`OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536` 필요) |
 | **Reasoning** | ✅ (thinking mode) | ❌ |
 | **Tool Calling** | ✅ | ✅ |
 | **VRAM 요구량** | ~76GB (FP8) | ~40GB (FP8) |
 | **권장 GPU** | 2x H100 NVL 96GB | 1x H100 NVL 96GB |
-| **담당 Agent** | Orchestrator, code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
+| **담당 Agent** | code-reviewer, quality-checker, summary-reporter | Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
 ### 1.4 공식 샘플링 파라미터
 
@@ -96,8 +96,8 @@ python --version
 # SGLang 설치 (Thinking Model 서빙)
 pip install sglang[all]
 
-# vLLM 설치 (Coder Model 서빙)
-pip install vllm
+# SGLang은 두 모델 모두 사용
+# pip install sglang[all]  (위에서 이미 설치)
 
 # Docker (Sandbox 사용 시)
 docker --version
@@ -132,15 +132,16 @@ python -m sglang.launch_server \
     --host 0.0.0.0
 ```
 
-**Coder Model — vLLM (포트 8001):**
+**Coder Model — SGLang (포트 8001):**
 
 ```bash
-# vLLM으로 Qwen3-Coder-Next-FP8 서빙
-python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-Coder-Next-FP8 \
+# SGLang으로 Qwen3-Coder-Next-FP8 서빙
+python -m sglang.launch_server \
+    --model-path Qwen/Qwen3-Coder-Next-FP8 \
     --served-model-name Qwen3-Coder-Next-FP8 \
-    --tensor-parallel-size 2 \
-    --max-model-len 262144 \
+    --tp 2 \
+    --context-length 262144 \
+    --tool-call-parser qwen3_coder \
     --port 8001 \
     --host 0.0.0.0
 ```
@@ -186,7 +187,7 @@ rm -rf /tmp/opencode-setup
 ```bash
 # ~/.bashrc 또는 ~/.zshrc에 추가
 export QWEN_THINKING_URL="http://localhost:8000/v1"   # Thinking Model (SGLang)
-export QWEN_CODER_URL="http://localhost:8001/v1"      # Coder Model (vLLM)
+export QWEN_CODER_URL="http://localhost:8001/v1"      # Coder Model (SGLang)
 ```
 
 ---
@@ -1198,7 +1199,7 @@ context_store = {
 
 ```bash
 QWEN_THINKING_URL="http://localhost:8000/v1"   ✅ Thinking Model (SGLang)
-QWEN_CODER_URL="http://localhost:8001/v1"      ✅ Coder Model (vLLM)
+QWEN_CODER_URL="http://localhost:8001/v1"      ✅ Coder Model (SGLang)
 ```
 
 ### 커맨드 요약

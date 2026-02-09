@@ -372,7 +372,9 @@ The Orchestrator maintains a `context_store` dict that accumulates all agent out
 }
 ```
 
-**Single Source of Truth:** Agent model assignments are defined in `workflow-settings.yaml` under `model.assignment`. The `model:` field in each agent's YAML frontmatter MUST match the assignment in `workflow-settings.yaml`. If they differ, `workflow-settings.yaml` is authoritative.
+**Single Source of Truth:** Agent model assignments are defined in `workflow-settings.yaml` under `model.assignment`. The `model:` field in each agent's YAML frontmatter MUST match the assignment in `workflow-settings.yaml`. If they differ, `workflow-settings.yaml` is authoritative for documentation/validation purposes.
+
+**Note:** At runtime, OpenCode reads the `model:` field from each agent's YAML frontmatter directly — it does NOT read `workflow-settings.yaml`. Therefore, both files must be kept in sync. The test script (`test-workflow.sh`) validates this consistency.
 
 When passing context to downstream agents, the Orchestrator includes relevant portions of this store in the prompt.
 

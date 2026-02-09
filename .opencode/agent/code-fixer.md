@@ -247,3 +247,4 @@ REGRESSION_STRATEGY: "Description of what was different this time vs previous at
 2. Preserve existing code style.
 3. Be careful not to break existing tests.
 4. Skip and report if fix method is uncertain.
+5. **Package installation**: If a fix requires a new dependency, check requirements.txt/package.json first. Do NOT install packages that conflict with existing versions.

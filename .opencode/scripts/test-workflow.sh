@@ -591,7 +591,61 @@ test_documentation() {
 }
 
 # =============================================================================
-# 10. Git Status Tests
+# 10. Workspace Cache & ENV_STATE Tests
+# =============================================================================
+
+test_workspace_cache() {
+    log_section "10. Workspace Cache & ENV_STATE Validation"
+
+    # Check workspace-cache directory exists or can be created
+    if [ -d ".opencode/workspace-cache" ]; then
+        log_success "workspace-cache directory exists"
+    else
+        # Try creating it (orchestrator does mkdir -p)
+        mkdir -p .opencode/workspace-cache 2>/dev/null
+        if [ -d ".opencode/workspace-cache" ]; then
+            log_success "workspace-cache directory created successfully"
+            rmdir .opencode/workspace-cache 2>/dev/null
+        else
+            log_fail "workspace-cache directory cannot be created"
+        fi
+    fi
+
+    # Check .opencode/ is in filter.exclude
+    if grep -q '".opencode/"' ".opencode/config/workflow-settings.yaml" 2>/dev/null || \
+       grep -q "\.opencode/" ".opencode/config/workflow-settings.yaml" 2>/dev/null; then
+        log_success ".opencode/ in filter.exclude (cache is ephemeral)"
+    else
+        log_fail ".opencode/ not in filter.exclude"
+    fi
+
+    # Validate ENV_STATE fields in build-tester
+    if grep -q "ENV_STATE is missing or incomplete" ".opencode/agent/build-tester.md" 2>/dev/null; then
+        log_success "build-tester: ENV_STATE fallback documented"
+    else
+        log_fail "build-tester: ENV_STATE fallback missing"
+    fi
+
+    # Validate ENV_STATE fields in function-tester
+    if grep -q "ENV_STATE is missing or incomplete" ".opencode/agent/function-tester.md" 2>/dev/null; then
+        log_success "function-tester: ENV_STATE fallback documented"
+    else
+        log_fail "function-tester: ENV_STATE fallback missing"
+    fi
+
+    # Validate regression counter config in workflow-settings
+    SETTINGS_FILE=".opencode/config/workflow-settings.yaml"
+    if [ -f "$SETTINGS_FILE" ]; then
+        if grep -q "per_source_max:" "$SETTINGS_FILE" && grep -q "total_cap:" "$SETTINGS_FILE"; then
+            log_success "Regression counters configured (per_source_max + total_cap)"
+        else
+            log_fail "Regression counter config incomplete"
+        fi
+    fi
+}
+
+# =============================================================================
+# 11. Git Status Tests
 # =============================================================================
 
 test_git_status() {
@@ -673,6 +727,7 @@ main() {
     test_orchestrator
     test_context_schema_completeness
     test_documentation
+    test_workspace_cache
     test_git_status
 
     # Print results

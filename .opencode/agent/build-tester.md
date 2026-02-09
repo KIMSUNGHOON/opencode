@@ -140,6 +140,11 @@ Always prefix build commands with the actual ACTIVATE_CMD from the Orchestrator:
 {ACTIVATE_CMD} && {BUILD_CMD}
 ```
 
+**If ENV_STATE is missing or incomplete** (e.g., env-setup step failed/timed out):
+- If ACTIVATE_CMD is empty or missing → skip the prefix, run BUILD_CMD directly
+- If PYTHON_PATH is missing → use system `python` or `python3`
+- Do NOT fail the build just because ENV_STATE is incomplete — fall back to system defaults
+
 ## BUILD_CMD Resolution
 
 The build command is determined by priority:
