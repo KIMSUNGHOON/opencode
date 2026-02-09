@@ -2,11 +2,10 @@
   "$schema": "https://opencode.ai/config.json",
 
   // =============================================================================
-  // Dual Model Provider Configuration
+  // Dual Model Provider Configuration (Both SGLang)
   // =============================================================================
-  // Option A: Separate 2 GPU node configuration
-  //   - Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
-  //   - Node 2 (port 8001): Qwen3-Coder-Next (vLLM)       -> Code/utility agents
+  // Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
+  // Node 2 (port 8001): Qwen3-Coder-Next (SGLang)     -> Code/utility agents
   //
   // Model Assignment:
   //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
@@ -54,7 +53,14 @@
           },
           "limit": {
             "context": 262144,
-            "output": 16384
+            "output": 32768
+          },
+          // Sampling params: override SDK defaults via providerOptions → request body
+          // README: temperature 0.6, top_p 0.95, top_k 20
+          "options": {
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20
           },
           "cost": {
             "input": 0,
@@ -65,7 +71,7 @@
     },
 
     // -------------------------------------------------------------------------
-    // Provider 2: Coder Model (vLLM, port 8001)
+    // Provider 2: Coder Model (SGLang, port 8001)
     // -------------------------------------------------------------------------
     "qwen-coder": {
       "name": "Qwen3-Coder-Next (Code)",
@@ -90,7 +96,14 @@
           },
           "limit": {
             "context": 262144,
-            "output": 16384
+            "output": 65536
+          },
+          // Sampling params: override SDK defaults via providerOptions → request body
+          // README: temperature 1.0, top_p 0.95, top_k 40
+          "options": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 40
           },
           "cost": {
             "input": 0,
