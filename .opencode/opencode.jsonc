@@ -16,6 +16,17 @@
   //       build-tester, function-tester, git-committer, git-pusher, file-input
   // =============================================================================
 
+  // =============================================================================
+  // Context Window Management
+  // =============================================================================
+  // auto: automatically compact (summarize) conversation when context is full
+  // prune: remove old tool outputs to free context space
+  // Both default to true if omitted. Explicitly enabling for clarity.
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
+
   "provider": {
     // -------------------------------------------------------------------------
     // Provider 1: Thinking Model (SGLang, port 8000)
