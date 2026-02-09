@@ -33,7 +33,9 @@ permission:
     "docker ps *": allow
     # Python build
     "python -m build *": allow
+    "python setup.py *": allow
     "pip install * -e .": allow
+    "pip install .": allow
     "pip install *": allow
     "poetry build *": allow
     "poetry install *": allow
@@ -135,8 +137,25 @@ Use the ENV_STATE provided by the Orchestrator (ACTIVATE_CMD, PYTHON_PATH, ENV_T
 Always prefix build commands with the actual ACTIVATE_CMD from the Orchestrator:
 
 ```bash
-{ACTIVATE_CMD} && pip install -e .
+{ACTIVATE_CMD} && {BUILD_CMD}
 ```
+
+## BUILD_CMD Resolution
+
+The build command is determined by priority:
+
+1. **Explicit BUILD_CMD** (highest): If the prompt includes `BUILD_CMD: <command>`, use that command exactly.
+2. **Project config** (`.opencode/build-config.yaml`): If `build_command` key exists, use its value.
+3. **Auto-detect** (lowest): Fall back to the STEP 2 table based on detected project type.
+
+Examples of valid BUILD_CMD values:
+- `pip install -e .` (editable install, default for Python)
+- `pip install .` (standard install)
+- `python setup.py build` (legacy setuptools)
+- `python -m build` (PEP 517 build)
+- `poetry install` (Poetry projects)
+- `uv pip install -e .` (uv package manager)
+- Any custom command the user provides via `--cmd`
 
 ## STEP 0: Environment Check + User Confirmation (Required)
 
@@ -181,9 +200,18 @@ docker build -t qa-sandbox -f .opencode/docker/Dockerfile.sandbox .
 
 Sandbox prefix: `docker run --rm -v $(pwd):/workspace -w /workspace qa-sandbox` (add `--gpus all` for GPU projects).
 
-| Language   | Build Command (host)                              |
+| Language   | Default Build Command (host)                      |
 |------------|---------------------------------------------------|
-| Python     | `pip install -e . && python -m build`             |
+| Python     | `{BUILD_CMD} && python -m build`                  |
+
+Python BUILD_CMD defaults (when no explicit BUILD_CMD is provided):
+- `pyproject.toml` with `[tool.poetry]` → `poetry install`
+- `pyproject.toml` with `[tool.pdm]` → `pdm install`
+- `setup.py` only (no pyproject.toml) → `pip install -e .`
+- `pyproject.toml` (generic) → `pip install -e .`
+- If user provides BUILD_CMD → use it as-is, skip auto-detection
+
+Other languages (no BUILD_CMD override needed unless user specifies):
 | Node.js    | `npm install && npm run build`                    |
 | Go         | `go build ./...`                                  |
 | Rust       | `cargo build`                                     |
