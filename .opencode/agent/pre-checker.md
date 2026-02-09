@@ -185,6 +185,37 @@ ISSUES_FIXED: {count}
 WARNING: {failed tool} execution failed, skipping.
 ```
 
+## Structured JSON Output (Mandatory)
+
+After the result token, output this JSON for the Orchestrator:
+
+```json
+{
+  "pre_check": {
+    "status": "SUCCESS",
+    "tools_run": [
+      {"tool": "ruff", "action": "check --fix", "issues_fixed": 5},
+      {"tool": "ruff", "action": "format", "files_changed": 2}
+    ],
+    "files_modified": ["/absolute/path/file1.py"],
+    "total_fixes": 7
+  }
+}
+```
+
+On failure/partial:
+```json
+{
+  "pre_check": {
+    "status": "PARTIAL",
+    "tools_run": [{"tool": "ruff", "action": "check --fix", "issues_fixed": 3}],
+    "files_modified": ["/absolute/path/file1.py"],
+    "total_fixes": 3,
+    "errors": ["eslint not found"]
+  }
+}
+```
+
 ## Notes
 
 1. Auto-Fix Only — cannot manually modify code (no Edit tool).

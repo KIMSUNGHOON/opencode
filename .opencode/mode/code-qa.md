@@ -137,9 +137,9 @@ regression_history = []
 # Each entry: { attempt, source, issues_or_errors, fix_result, files_modified }
 
 context_store = {
-    env_state, file_list, pre_check_result, review_result,
-    fix_result, quality_result, build_result, test_result,
-    commit_result, push_result
+    workspace_cache, env_state, file_list, pre_check_result,
+    review_result, fix_result, quality_result, build_result,
+    test_result, commit_result, push_result
 }   # All initially null
 ```
 
@@ -161,6 +161,7 @@ Store each Step's results in variables AND in `context_store`, then pass to next
 | build-tester | After `BUILD_RESULT:` | build_result |
 | function-tester | After `TEST_RESULT:` | test_result |
 | git-committer | After `COMMIT_RESULT:` | commit_result |
+| git-pusher | After `PUSH_RESULT:` | push_result |
 
 ## Agents Requiring User Input
 
@@ -200,9 +201,9 @@ Extract JSON from agent output, store in `context_store`, pass to downstream age
 | quality-checker | file_list, fix_result.files_modified |
 | build-tester | env_state, file_list |
 | function-tester | env_state, file_list |
-| git-committer | file_list, fix_result.files_modified |
+| git-committer | file_list, fix_result.files_modified (agent uses git status/diff directly, context is for reference) |
 | summary-reporter | ALL of context_store + regression_history |
-| git-pusher | commit_result |
+| git-pusher | commit_result (agent uses git log directly, context is for reference) |
 
 ### Regression Context for code-fixer
 When regressing to STEP 5, MUST include:
