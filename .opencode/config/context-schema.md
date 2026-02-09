@@ -98,6 +98,28 @@ The Orchestrator (code-qa) parses this JSON and passes relevant portions to down
 
 ---
 
+### file-input Output
+
+Alternative to git-input for direct file mode (`--files`). Uses same `file_list` storage slot.
+
+```json
+{
+  "file_input": {
+    "mode": "direct",
+    "files": [
+      { "path": "/absolute/path/to/file.py", "status": "F" }
+    ],
+    "total_files": 1,
+    "code_files": 1
+  }
+}
+```
+
+**Required fields:** `mode`, `files`
+**Note:** `status` is always `"F"` (file) for direct input since there is no git status.
+
+---
+
 ### pre-checker Output
 
 ```json
@@ -359,6 +381,7 @@ The Orchestrator maintains a `context_store` dict that accumulates all agent out
 
 ```json
 {
+  "workspace_cache": { "workspace": { ... } },
   "env_state": { "env_state": { ... } },
   "file_list": { "git_input": { ... } },
   "pre_check_result": { "pre_check": { ... } },
