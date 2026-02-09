@@ -1,6 +1,6 @@
 ---
 description: git commit and push
-model: opencode/kimi-k2.5
+model: opencode/glm-4.6
 subtask: true
 ---
 
@@ -23,15 +23,3 @@ do not do generic messages like "improved agent experience" be very specific
 about what user facing changes were made
 
 if there are conflicts DO NOT FIX THEM. notify me and I will fix them
-
-## GIT DIFF
-
-!`git diff`
-
-## GIT DIFF --cached
-
-!`git diff --cached`
-
-## GIT STATUS --short
-
-!`git status --short`
