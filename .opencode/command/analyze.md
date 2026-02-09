@@ -65,6 +65,9 @@ prompt: |
       - __pycache__/
       - .git/
       - .venv/, venv/, env/
+      - .mypy_cache/, .ruff_cache/, .pytest_cache/
+      - .tox/, .nox/
+      - .opencode/
       - target/ (Rust)
       - build/, dist/
       - vendor/

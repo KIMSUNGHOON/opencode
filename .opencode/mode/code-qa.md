@@ -239,7 +239,12 @@ Also check for `.opencode/build-config.yaml`. If it exists and contains `build_c
 
 **Phase B: Workspace Cache** (skip if --skip-cache)
 
-Read `.opencode/workspace-cache/analysis.json`:
+First, ensure the cache directory exists:
+```bash
+mkdir -p .opencode/workspace-cache
+```
+
+Then read `.opencode/workspace-cache/analysis.json`:
 - Valid cache (< 24h): use it, proceed to STEP 1
 - Stale/missing/corrupt: run workspace-analyzer
 

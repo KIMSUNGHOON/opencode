@@ -48,7 +48,7 @@ Check for manifest files using Glob:
 
 Find source files by extension using Glob patterns (`**/*.ts`, `**/*.py`, etc.).
 
-**Excluded directories:** node_modules/, __pycache__/, .git/, .venv/, venv/, target/, build/, dist/, .next/, vendor/, .cache/
+**Excluded directories:** node_modules/, __pycache__/, .git/, .venv/, venv/, target/, build/, dist/, .next/, vendor/, .cache/, .mypy_cache/, .ruff_cache/, .pytest_cache/, .tox/, .nox/, .opencode/
 
 ### STEP 3: Dependency Analysis
 
