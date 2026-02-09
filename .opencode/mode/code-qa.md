@@ -141,44 +141,32 @@ Do not output JSON as text - invoke the system-provided tool directly.
 
 ### How to Use Task Tool
 
-**ALL THREE parameters are REQUIRED (never omit any!):**
-- `subagent_type`: agent name (string, required - e.g., "env-setup", "code-reviewer")
-- `prompt`: instructions to pass to agent (string, required)
-- `description`: short task label (string, required - NEVER omit or pass null!)
+Task is invoked through the system function-call API.
+Do NOT output its parameters as text, JSON, or XML.
 
-**Correct Task call example:**
-```
-Task(
-  subagent_type: "env-setup",
-  prompt: "Detect current environment...",
-  description: "Environment setup check"
-)
-```
+Every Task call requires ALL THREE string parameters:
 
-**Another correct example:**
-```
-Task(
-  subagent_type: "workspace-analyzer",
-  prompt: "Analyze current workspace...",
-  description: "Workspace analysis"
-)
-```
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| subagent_type | string (required) | Agent name, e.g. "env-setup", "code-reviewer" |
+| prompt | string (required) | Instructions to pass to the agent |
+| description | string (required) | Short label, e.g. "Environment setup check" |
+
+If any parameter is missing or null, you get: "expected string, received undefined"
 
 ### NEVER do:
 
-1. Output JSON as text (X)
-2. Output in `{"name": "tool", ...}` format (X)
-3. Say "I will call the tool..." and stop (X)
+1. Output the function call as text, JSON, or XML (X)
+2. Write out the tool signature or parameters in your response (X)
+3. Say "I will call the tool..." and stop without actually calling (X)
 4. Run `task` command in bash (X)
-5. Omit `description` parameter (X) - causes "expected string, received undefined" error
-6. Pass null/undefined for any Task parameter (X)
+5. Pass null/undefined for any parameter (X)
 
 ### ALWAYS do:
 
-1. Invoke tool with actual function call (O)
-2. Pass ALL THREE parameters as non-empty strings (O)
+1. Invoke the Task tool directly through the system function-call API (O)
+2. Provide all three parameters as non-empty strings (O)
 3. Proceed to next step after receiving tool result (O)
-4. Execute all tool calls through system API (O)
 
 ### CRITICAL: Error Recovery Rules
 
