@@ -61,43 +61,27 @@ prompt: |
 
   ## Important: How to Call Agents
 
-  **Task is NOT a bash command!**
-  Task is a tool/function you can use.
+  Task is a tool/function you invoke through the system API.
+  It is NOT a bash command. Do NOT output its parameters as text.
 
-  To call an agent, invoke the Task tool as a function call.
+  Every Task call requires ALL THREE string parameters:
+  | Parameter | Type | Description |
+  |-----------|------|-------------|
+  | subagent_type | string (required) | Agent name, e.g. "env-setup" |
+  | prompt | string (required) | Instructions to pass to the agent |
+  | description | string (required) | Short label, e.g. "Environment setup check" |
 
-  **ALL THREE parameters are REQUIRED (never omit any!):**
-  - subagent_type: agent name (string, required)
-  - prompt: instructions (string, required)
-  - description: short task label (string, required - NEVER omit or pass null!)
-
-  **Correct Task call example:**
-  ```
-  Task(
-    subagent_type: "env-setup",
-    prompt: "Detect current environment...",
-    description: "Environment setup check"
-  )
-  ```
-
-  **Another correct example:**
-  ```
-  Task(
-    subagent_type: "workspace-analyzer",
-    prompt: "Analyze current workspace...",
-    description: "Workspace analysis"
-  )
-  ```
+  If any parameter is missing or null, you get: "expected string, received undefined"
 
   **Never do:**
   - Run `task` command in bash (X)
-  - Shell commands like `$ task env-setup` (X)
-  - Pass `null` or `undefined` values (X) - every parameter must be a real string
-  - Omit description parameter (X) - this causes "invalid_type: expected string, received undefined"
-  - Output tool call as text/JSON/XML (X)
+  - Output the tool call parameters as text, JSON, or XML (X)
+  - Write out the function signature in your response (X)
+  - Pass null/undefined for any parameter (X)
 
   **Do:**
-  - Call Task tool as function call with ALL THREE parameters as strings (O)
+  - Invoke the Task tool directly through the system function-call API (O)
+  - Provide all three parameters as non-empty strings (O)
 
   ## CRITICAL: Error Recovery Rules
 
