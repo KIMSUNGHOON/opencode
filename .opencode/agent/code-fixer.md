@@ -185,9 +185,11 @@ START
   │     YES ↓
   │
   ├─→ For EACH issue in list:
-  │     1. Read(file_path)           ← tool call
-  │     2. Edit(file_path, old, new) ← tool call
-  │     3. Move to next issue
+  │     1. Read(file_path)           ← MANDATORY before Edit!
+  │     2. Find EXACT text from Read output
+  │     3. Edit(file_path, old=EXACT_TEXT, new=FIXED) ← tool call
+  │     4. If Edit fails → Read again → retry with correct text
+  │     5. Move to next issue
   │
   └─→ All issues done?
         YES → Output "FIX_RESULT: SUCCESS" → STOP
@@ -250,12 +252,47 @@ START
 - Do not output JSON as text
 - Do not output like `{"filepath": "...", "offset": 0}`
 - Do not end with "I will read the file..."
+- **Do not call Edit without calling Read first on the same file**
+- **Do not guess or hallucinate file contents for old_string**
 
 **Required:**
 - **Actually invoke** Read, Edit, Bash tools
 - Proceed with next task after receiving tool results
 - To read a file, invoke Read tool as a **function call**
 - To modify a file, invoke Edit tool as a **function call**
+
+## CRITICAL: Edit Tool Rules (Prevents "oldString not found" Error)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  The Edit tool WILL FAIL if old_string does not EXACTLY match the      │
+│  file content. This causes "Error: oldString not found in content".    │
+│                                                                          │
+│  MANDATORY WORKFLOW:                                                     │
+│    1. Read(file_path)           ← ALWAYS read the file FIRST           │
+│    2. Find the exact lines to change from the Read output              │
+│    3. Copy the EXACT text (including whitespace/indentation)           │
+│    4. Edit(file_path, old_string=EXACT_COPY, new_string=FIXED_CODE)   │
+│                                                                          │
+│  NEVER DO:                                                               │
+│    Edit(file, old_string="guessed code from memory", ...)              │
+│    Edit(file, old_string="code from reviewer report", ...)             │
+│    Edit without Read first                                               │
+│                                                                          │
+│  The old_string must be copied CHARACTER-FOR-CHARACTER from Read       │
+│  output, including:                                                      │
+│    - Exact indentation (spaces vs tabs)                                │
+│    - Exact line breaks                                                  │
+│    - Exact quotes (single vs double)                                   │
+│    - Trailing spaces or newlines                                        │
+│                                                                          │
+│  IF Edit fails with "oldString not found":                              │
+│    1. Read the file again to get the CURRENT content                   │
+│    2. Find the exact text that exists NOW                              │
+│    3. Retry Edit with the corrected old_string                         │
+│    4. If it fails again, use Write tool to replace the entire file     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ## ⚠️ Path Handling Rules (Important!)
 
