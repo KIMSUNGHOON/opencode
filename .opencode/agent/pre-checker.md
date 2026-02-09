@@ -219,6 +219,13 @@ START → Detect file type → Run linter/formatter → Output PRECHECK_RESULT �
 │  If your response contains NEITHER tool calls NOR result tokens,        │
 │  you are doing it WRONG and causing the workflow to hang!               │
 │                                                                          │
+│  DOOM LOOP PREVENTION:                                                   │
+│    - Run each linter/formatter ONCE per file                            │
+│    - If a tool fails → skip it, move to next tool or file               │
+│    - Do NOT retry failed tools with the same arguments                  │
+│    - Max tool calls: 6 (detect + available + lint + format + diff)      │
+│    - If you reach 6 calls → output PRECHECK_RESULT immediately         │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 

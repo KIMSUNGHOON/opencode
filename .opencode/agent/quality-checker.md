@@ -118,6 +118,14 @@ permission:
 │  If your response contains NEITHER tool calls NOR result tokens,        │
 │  you are doing it WRONG and causing the workflow to hang!               │
 │                                                                          │
+│  DOOM LOOP PREVENTION:                                                   │
+│    - Run each quality tool ONCE per invocation                          │
+│    - If a tool fails → skip it, move to next tool                       │
+│    - Do NOT retry failed tools                                           │
+│    - After running all available tools → calculate score and output     │
+│    - Max tool calls: 8 (project detect + lint + type + complexity)      │
+│    - If you reach 8 calls → output QUALITY_SCORE with available data   │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 

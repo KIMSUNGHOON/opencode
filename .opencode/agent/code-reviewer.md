@@ -53,6 +53,12 @@ You analyze code and discover issues using Chain-of-Thought reasoning.
 │  If your response contains NEITHER tool calls NOR result tokens,        │
 │  you are doing it WRONG and causing the workflow to hang!               │
 │                                                                          │
+│  DOOM LOOP PREVENTION:                                                   │
+│    - If Read fails for a file → skip that file, do NOT retry            │
+│    - After reading all files → output REVIEW_RESULT immediately         │
+│    - NEVER re-read a file you already read successfully                 │
+│    - Max tool calls: 2 × number_of_files (Read each + 1 retry max)    │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
