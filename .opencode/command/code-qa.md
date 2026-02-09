@@ -66,20 +66,66 @@ prompt: |
 
   To call an agent, invoke the Task tool as a function call.
 
-  **Use only required parameters:**
-  - subagent_type: agent name (required)
-  - prompt: instructions (required)
-  - description: task description (required)
+  **ALL THREE parameters are REQUIRED (never omit any!):**
+  - subagent_type: agent name (string, required)
+  - prompt: instructions (string, required)
+  - description: short task label (string, required - NEVER omit or pass null!)
+
+  **Correct Task call example:**
+  ```
+  Task(
+    subagent_type: "env-setup",
+    prompt: "Detect current environment...",
+    description: "Environment setup check"
+  )
+  ```
+
+  **Another correct example:**
+  ```
+  Task(
+    subagent_type: "workspace-analyzer",
+    prompt: "Analyze current workspace...",
+    description: "Workspace analysis"
+  )
+  ```
 
   **Never do:**
   - Run `task` command in bash (X)
   - Shell commands like `$ task env-setup` (X)
-  - Pass `null` values (X) - omit optional fields
-  - Include null values like `session_id: null` (X)
+  - Pass `null` or `undefined` values (X) - every parameter must be a real string
+  - Omit description parameter (X) - this causes "invalid_type: expected string, received undefined"
   - Output tool call as text/JSON/XML (X)
 
   **Do:**
-  - Call Task tool as function call (O)
+  - Call Task tool as function call with ALL THREE parameters as strings (O)
+
+  ## CRITICAL: Error Recovery Rules
+
+  When a Task call fails (error, aborted, or invalid arguments):
+
+  ```
+  IF Task call fails with "invalid arguments" or schema validation error:
+      → The description or prompt parameter was likely null/undefined
+      → Retry the Task call with ALL THREE parameters as non-empty strings
+      → Only retry ONCE for schema errors
+
+  IF Task call fails with agent execution error:
+      → Log the error
+      → Store error in context_store for the current step
+      → SKIP the failed step and continue to the NEXT step
+      → Output: "STEP {N} failed: {brief error}. Continuing workflow."
+
+  IF Task call times out or is aborted:
+      → Do NOT retry the same call
+      → Store timeout in context_store
+      → SKIP the step and continue to the NEXT step
+      → Output: "STEP {N} timed out. Continuing workflow."
+
+  NEVER:
+      → Hang or stop after an error (except final workflow-stopping conditions)
+      → Retry the same failed Task call more than once
+      → Output the error and wait for user input (except WAITING_INPUT states)
+  ```
 ---
 
 # Code QA Workflow v4

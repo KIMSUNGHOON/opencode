@@ -127,9 +127,16 @@ FORBIDDEN:
   ❌ Mixing tool calls with FIX_RESULT in the same response
 
 IF A TOOL CALL FAILS OR IS REJECTED:
-  → Do NOT retry the same failed tool call
-  → Output FIX_RESULT: FAIL with the error information
-  → STOP immediately - do not loop!
+  → You may retry with DIFFERENT arguments ONCE (e.g., re-Read then Edit)
+  → If the retry also fails → Output FIX_RESULT: PARTIAL and move on
+  → NEVER retry the exact same tool call with the same arguments
+  → After 2 consecutive failures on the same file → SKIP that file
+
+DOOM LOOP PREVENTION (CRITICAL):
+  → Track: MAX 2 Edit attempts per issue
+  → If Edit fails twice for the same issue → skip it, report as failed
+  → If you have made 10+ tool calls without fixing any issue → STOP
+  → Output FIX_RESULT: PARTIAL with what was fixed so far
 ```
 
 ## 🚨🚨🚨 MANDATORY FIRST ACTION - DO THIS IMMEDIATELY 🚨🚨🚨

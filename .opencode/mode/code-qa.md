@@ -141,10 +141,28 @@ Do not output JSON as text - invoke the system-provided tool directly.
 
 ### How to Use Task Tool
 
-Required parameters for Task tool:
-- `subagent_type`: agent name (e.g., "env-setup", "code-reviewer")
-- `prompt`: instructions to pass to agent
-- `description`: task description (3-5 words)
+**ALL THREE parameters are REQUIRED (never omit any!):**
+- `subagent_type`: agent name (string, required - e.g., "env-setup", "code-reviewer")
+- `prompt`: instructions to pass to agent (string, required)
+- `description`: short task label (string, required - NEVER omit or pass null!)
+
+**Correct Task call example:**
+```
+Task(
+  subagent_type: "env-setup",
+  prompt: "Detect current environment...",
+  description: "Environment setup check"
+)
+```
+
+**Another correct example:**
+```
+Task(
+  subagent_type: "workspace-analyzer",
+  prompt: "Analyze current workspace...",
+  description: "Workspace analysis"
+)
+```
 
 ### NEVER do:
 
@@ -152,12 +170,43 @@ Required parameters for Task tool:
 2. Output in `{"name": "tool", ...}` format (X)
 3. Say "I will call the tool..." and stop (X)
 4. Run `task` command in bash (X)
+5. Omit `description` parameter (X) - causes "expected string, received undefined" error
+6. Pass null/undefined for any Task parameter (X)
 
 ### ALWAYS do:
 
 1. Invoke tool with actual function call (O)
-2. Proceed to next step after receiving tool result (O)
-3. Execute all tool calls through system API (O)
+2. Pass ALL THREE parameters as non-empty strings (O)
+3. Proceed to next step after receiving tool result (O)
+4. Execute all tool calls through system API (O)
+
+### CRITICAL: Error Recovery Rules
+
+When a Task call fails (error, aborted, or invalid arguments):
+
+```
+IF Task call fails with "invalid arguments" or schema validation error:
+    → The description or prompt was likely null/undefined
+    → Retry the Task call with ALL THREE parameters as non-empty strings
+    → Only retry ONCE for schema errors
+
+IF Task call fails with agent execution error:
+    → Log the error
+    → Store error in context_store for the current step
+    → SKIP the failed step and continue to the NEXT step
+    → Output: "STEP {N} failed: {brief error}. Continuing workflow."
+
+IF Task call times out or is aborted:
+    → Do NOT retry the same call
+    → Store timeout in context_store
+    → SKIP the step and continue to the NEXT step
+    → Output: "STEP {N} timed out. Continuing workflow."
+
+NEVER:
+    → Hang or stop after an error (except final workflow-stopping conditions)
+    → Retry the same failed Task call more than once
+    → Output the error and wait for user input (except WAITING_INPUT states)
+```
 
 ---
 
