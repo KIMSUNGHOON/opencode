@@ -155,84 +155,76 @@ Skip if --skip-cache. Otherwise: read `.opencode/workspace-cache/analysis.json`.
 - Valid cache (< 24h) → use it
 - Stale/missing → run workspace-analyzer
 
-Task call:
-- subagent_type: "workspace-analyzer"
-- prompt: "Analyze workspace. Output project type, structure, deps, build system as JSON after CACHE_DATA:. If >10,000 files, analyze main dirs only."
-- description: "Workspace analysis"
+If stale/missing, call Task:
+- subagent_type = workspace-analyzer
+- description = Workspace analysis
+- prompt = include PROJECT_ROOT; agent will scan and output CACHE_DATA JSON per its own instructions
 
 Handle: COMPLETE→save, TIMEOUT→partial, EMPTY/FAILED→null. Proceed to STEP 1.
 
 ### STEP 1: Environment Setup (User Input Required)
-- subagent_type: "env-setup"
-- prompt: "Detect current environment (shell, conda/venv, runtimes). If active env exists, ask Y/n. If none, show list."
-- description: "Environment setup check"
+- subagent_type = env-setup
+- description = Environment setup check
+- prompt = include PROJECT_ROOT; agent will auto-detect shell/env/runtimes
 
 WAITING_INPUT → wait, call again. SUCCESS → proceed to STEP 2.
 
 ### STEP 2: File Input (Git or Direct)
 
 **Option A: Git Mode** (use_git_mode == true)
-- subagent_type: "git-input"
-- prompt: "Parse input options $ARGUMENTS and extract changed file list"
-- description: "Git input parsing"
+- subagent_type = git-input
+- description = Git input parsing
+- prompt = include $ARGUMENTS value; agent will parse git mode and extract file list
 
 Result: SUCCESS→store files→STEP 2.5. NO_CHANGES→end. DELETED_ONLY→STEP 9. NO_GIT_REPO→wait user. DETACHED_HEAD→wait user. MERGE_CONFLICT/REBASE→end. ABORTED→end.
 
 **Option B: Direct File Mode** (--files)
-- subagent_type: "file-input"
-- prompt: "Find code files at: {--files value}"
-- description: "File input parsing"
+- subagent_type = file-input
+- description = File input parsing
+- prompt = include --files value, PROJECT_ROOT, PROJECT_NAME
 
 SUCCESS→STEP 3. NO_FILES/INVALID_PATH→end.
 
 **STEP 2.5 Validation:** empty→end, filter deleted, >100 files→warn, exclude binaries.
 
 ### STEP 3: Pre-Check
-- subagent_type: "pre-checker"
-- prompt: "Run Lint/Format auto-fix for:\n{changed_files as absolute paths}"
-- description: "Lint/Format fix"
+- subagent_type = pre-checker
+- description = Lint/Format fix
+- prompt = list changed_files (absolute paths, one per line)
 
 ### STEP 4: Code Review
-- subagent_type: "code-reviewer"
-- prompt: Build dynamically with actual file paths. Include workspace_cache if available. Request structured JSON output.
-- description: "Code review"
-
-Prompt template:
-```
-[IF workspace_cache: Project Context section]
-## Changed files: {absolute paths}
-Analyze code and find issues.
-## REQUIRED: Output JSON { "review": { "summary": {...}, "issues": [...] } }
-```
+- subagent_type = code-reviewer
+- description = Code review
+- prompt = build dynamically: list changed_files as absolute paths; include workspace_cache if available; request structured JSON output
 
 code-reviewer has ONLY Read tool. All paths must be absolute.
 
 ### STEP 5: Code Fix
-- subagent_type: "code-fixer"
-- prompt: Different for first run vs regression
-- description: "Code fix"
+- subagent_type = code-fixer
+- description = Code fix
+- prompt = build dynamically based on mode:
 
-First run: pass review issues + target files + request structured JSON.
+First run: include review_result issues, changed_files, request structured JSON.
 Regression: include attempt #, trigger source, regression_history, instruction for different approach.
 
 ### STEP 6: Quality Check
-- subagent_type: "quality-checker"
-- prompt: "Check files, calculate quality score. Output QUALITY_SCORE: XX/100 and JSON.\nFiles: {changed_files}\nFixer modified: {fix_result.files_modified}"
-- description: "Quality check"
+- subagent_type = quality-checker
+- description = Quality check
+- prompt = include changed_files and fix_result.files_modified as absolute paths
 
 score >= 70 → STEP 7. score < 70 → regress to STEP 5 (if under limits). Score not found → retry (max 2).
 
 ### STEP 7: Build Test (User Confirmation Required)
-- subagent_type: "build-tester"
-- prompt: "PROJECT_ROOT: {path}\n[ENV_STATE] ACTIVATE_CMD: {cmd} [/ENV_STATE]\nRun build. Show env, get user confirmation. Activate env first."
-- description: "Build test"
+- subagent_type = build-tester
+- description = Build test
+- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE)
 
 WAITING_INPUT→wait. SUCCESS→STEP 8. FAIL→regress STEP 5. FAIL_DEPS→wait user (no regression count).
 
 ### STEP 8: Function Test (User Confirmation Required)
-- subagent_type: "function-tester"
-- prompt: "PROJECT_ROOT: {path}\n[ENV_STATE] ACTIVATE_CMD: {cmd} [/ENV_STATE]\nRun tests. Show detected tests, get confirmation."
-- description: "Function test"
+- subagent_type = function-tester
+- description = Function test
+- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE)
 
 WAITING_INPUT→wait. SUCCESS→STEP 9. FAIL→regress STEP 5. SKIPPED/NO_TESTS→STEP 9.
 
@@ -240,22 +232,22 @@ WAITING_INPUT→wait. SUCCESS→STEP 9. FAIL→regress STEP 5. SKIPPED/NO_TESTS�
 
 Skip if use_git_mode==false or skip_commit_push==true.
 
-- subagent_type: "git-committer"
-- prompt: "Commit changes. Show info, get user confirmation."
-- description: "Git commit"
+- subagent_type = git-committer
+- description = Git commit
+- prompt = include changed_files and fix_result.files_modified
 
 ### STEP 10: Summary Report
-- subagent_type: "summary-reporter"
-- prompt: "Generate QA summary from:\n## Context\n{context_store JSON}\n## Regression\n{regression_history}\n## Files\n{changed_files}"
-- description: "Result report"
+- subagent_type = summary-reporter
+- description = Result report
+- prompt = include ALL of context_store JSON, regression_history, changed_files
 
 ### STEP 11: Push & PR/MR (Git Mode Only)
 
 Skip if use_git_mode==false or skip_commit_push==true.
 
-- subagent_type: "git-pusher"
-- prompt: "Check unpushed commits. If exist, ask user about push and PR/MR. Detect platform."
-- description: "Push and PR/MR"
+- subagent_type = git-pusher
+- description = Push and PR/MR
+- prompt = include commit_result
 
 ---
 

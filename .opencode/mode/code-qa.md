@@ -241,26 +241,28 @@ Read `.opencode/workspace-cache/analysis.json`:
 - Valid cache (< 24h): use it, proceed to STEP 1
 - Stale/missing/corrupt: run workspace-analyzer
 
-Task call for auto-analysis:
-- subagent_type: "workspace-analyzer"
-- prompt: "Analyze current workspace. Output project type, file structure, dependencies, build system as JSON after CACHE_DATA:. If >10,000 files, analyze main directories only."
-- description: "Workspace analysis"
+If stale/missing, call Task with these parameters:
+- subagent_type = workspace-analyzer
+- description = Workspace analysis
+- prompt = construct dynamically: tell the agent to scan PROJECT_ROOT and output CACHE_DATA JSON
+
+Do NOT copy this instruction text into the prompt. Write a short directive for the agent.
 
 Handle: COMPLETE→save cache, TIMEOUT→use partial, EMPTY→null, FAILED→null. Proceed to STEP 1.
 
 ### STEP 1: Environment Setup (User Input Required)
-- subagent_type: "env-setup"
-- prompt: "PROJECT_ROOT: {PROJECT_ROOT}\n\nCheck Shell, environment, Python/CUDA versions. Auto-detect shell and active venv. If env active, confirm with user (Y/n). Only prompt for selection when none detected."
-- description: "Environment setup check"
+- subagent_type = env-setup
+- description = Environment setup check
+- prompt = include PROJECT_ROOT; agent will auto-detect shell/env/runtimes per its own instructions
 
 WAITING_INPUT → wait for user, call again. SUCCESS → parse ENV_STATE block, proceed to STEP 2.
 
 ### STEP 2: File Input (Git or Direct)
 
 **Option A: Git Mode** (use_git_mode == true)
-- subagent_type: "git-input"
-- prompt: "Parse input options $ARGUMENTS and extract changed file list"
-- description: "Git input parsing"
+- subagent_type = git-input
+- description = Git input parsing
+- prompt = include $ARGUMENTS value; agent will parse git mode and extract file list
 
 Result handling:
 - SUCCESS → store FILE_LIST in changed_files → STEP 2.5
@@ -273,9 +275,9 @@ Result handling:
 - ABORTED → end workflow
 
 **Option B: Direct File Mode** (--files)
-- subagent_type: "file-input"
-- prompt: "Find code files at: {--files value}\n\nPROJECT_ROOT: {PROJECT_ROOT}\nPROJECT_NAME: {PROJECT_NAME}\n\nPath rules: verify path exists before searching. Watch for duplicate paths when PROJECT_NAME appears in both root and input. Return absolute paths only."
-- description: "File input parsing"
+- subagent_type = file-input
+- description = File input parsing
+- prompt = include --files value, PROJECT_ROOT, PROJECT_NAME; agent will resolve paths per its own rules
 
 SUCCESS → store in changed_files. NO_FILES / INVALID_PATH → end workflow.
 
@@ -290,71 +292,36 @@ Auto-exclude binary files (.exe, .dll, .so, .zip, .png, .jpg, .pdf, .woff, .mp3,
 ```
 
 ### STEP 3: Pre-Check
-- subagent_type: "pre-checker"
-- prompt: "Run Lint/Format auto-fix for the following files:\n{changed_files as absolute paths, one per line}"
-- description: "Lint/Format fix"
+- subagent_type = pre-checker
+- description = Lint/Format fix
+- prompt = list changed_files (absolute paths, one per line); agent will auto-detect language and run lint/format
 
 Store PRE_CHECK_RESULT (SUCCESS/PARTIAL). If no result token → treat as PARTIAL.
 
 ### STEP 4: Code Review
-- subagent_type: "code-reviewer"
-- prompt: Build dynamically with ACTUAL file paths from STEP 2. Include workspace_cache context if available. Include structured JSON output requirement.
-- description: "Code review"
-
-Prompt template:
-```
-[IF workspace_cache: include Project Context section]
-
-## Changed files to analyze:
-- {actual absolute path per file from changed_files}
-
-Analyze the code and find issues. Use Read tool to read each file.
-
-## REQUIRED: Structured Output
-After your report, output JSON: { "review": { "summary": {...}, "issues": [...] } }
-```
+- subagent_type = code-reviewer
+- description = Code review
+- prompt = build dynamically: list changed_files as absolute paths; optionally include workspace_cache context; request structured JSON output
 
 IMPORTANT: code-reviewer has ONLY Read tool. All paths must be absolute.
 
 Store: context_store.review_result (JSON) and review_issues (text). If no ISSUE_LIST and no JSON after 2 retries → proceed with empty issues.
 
 ### STEP 5: Code Fix
-- subagent_type: "code-fixer"
-- prompt: Build based on first run vs regression
-- description: "Code fix"
+- subagent_type = code-fixer
+- description = Code fix
+- prompt = build dynamically based on mode:
 
-**First run** (regression_history empty):
-```
-## Issues to Fix
-{context_store.review_result or review_issues}
+**First run** (regression_history empty): include review_result issues, changed_files as absolute paths, request structured JSON fix output.
 
-## Target Files
-{changed_files absolute paths}
-
-Fix issues. Output structured JSON: { "fix": { "summary": {...}, "fixed_issues": [...], "files_modified": [...], "changes_applied": [...] } }
-```
-
-**Regression** (regression_history not empty):
-```
-## REGRESSION MODE - Attempt #{total_regressions + 1}
-
-## Trigger: {source} - {specific errors}
-
-## PREVIOUS ATTEMPTS - DO NOT REPEAT
-{regression_history JSON}
-
-## Strategy: try DIFFERENT approach. Read files to see current state. Analyze why previous fix failed.
-
-## Original Issues: {review_result}
-## Target Files: {changed_files}
-```
+**Regression** (regression_history not empty): include attempt number, trigger source, full regression_history JSON, original review_result, changed_files. Instruct agent to try DIFFERENT approach and NOT repeat previous fixes.
 
 Store context_store.fix_result.
 
 ### STEP 6: Quality Check
-- subagent_type: "quality-checker"
-- prompt: "Check files and calculate quality score.\n\nFiles: {changed_files}\nFiles modified by fixer: {fix_result.files_modified}\n\nOutput QUALITY_SCORE: XX/100 and structured JSON."
-- description: "Quality check"
+- subagent_type = quality-checker
+- description = Quality check
+- prompt = include changed_files and fix_result.files_modified as absolute paths; agent will run lint/type checks and calculate score
 
 ```
 IF score >= 70 → STEP 7
@@ -368,9 +335,9 @@ IF score < 70:
 If score not found: retry quality-checker (max 2 parse retries).
 
 ### STEP 7: Build Test (User Confirmation Required)
-- subagent_type: "build-tester"
-- prompt: "PROJECT_ROOT: {path}\n\n[ENV_STATE]\nACTIVATE_CMD: {actual}\nPYTHON_PATH: {actual}\nENV_TYPE: {actual}\n[/ENV_STATE]\n\nRun build. Show env status, get user confirmation first. Activate env using ACTIVATE_CMD."
-- description: "Build test"
+- subagent_type = build-tester
+- description = Build test
+- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE); agent will show env and request user confirmation before building
 
 ```
 WAITING_INPUT → wait (confirm→build, reset→STEP 1)
@@ -380,9 +347,9 @@ FAIL_DEPS → show fix command, wait for user (does NOT count toward regression)
 ```
 
 ### STEP 8: Function Test (User Confirmation Required)
-- subagent_type: "function-tester"
-- prompt: "PROJECT_ROOT: {path}\n\n[ENV_STATE]\nACTIVATE_CMD: {actual}\nPYTHON_PATH: {actual}\nENV_TYPE: {actual}\n[/ENV_STATE]\n\nRun tests. Show detected tests, get user confirmation. Activate env using ACTIVATE_CMD."
-- description: "Function test"
+- subagent_type = function-tester
+- description = Function test
+- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE); agent will detect tests and request user confirmation before running
 
 ```
 WAITING_INPUT → wait (run→test, skip→STEP 9)
@@ -395,32 +362,16 @@ SKIPPED / NO_TESTS → STEP 9
 
 Skip if use_git_mode==false or skip_commit_push==true.
 
-- subagent_type: "git-committer"
-- prompt: "Commit changes. Show commit info and get user confirmation."
-- description: "Git commit"
+- subagent_type = git-committer
+- description = Git commit
+- prompt = include changed_files and fix_result.files_modified; agent will analyze changes and request user confirmation
 
 WAITING_INPUT → wait. SUCCESS / SKIPPED / NO_CHANGES → STEP 10.
 
 ### STEP 10: Summary Report
-- subagent_type: "summary-reporter"
-- prompt: Build with ALL accumulated context
-- description: "Result report"
-
-```
-Generate comprehensive QA summary from:
-
-## Full QA Context
-{JSON.stringify(context_store)}
-
-## Regression History
-Total: {total_regressions}, Counters: quality={N}, build={N}, test={N}
-{JSON.stringify(regression_history)}
-
-## Changed Files
-{changed_files}
-
-Use actual data, not placeholders.
-```
+- subagent_type = summary-reporter
+- description = Result report
+- prompt = include ALL of context_store as JSON, regression_history, changed_files; agent will generate comprehensive QA summary from actual data
 
 ### STEP 11: Push & PR/MR (Git Mode Only)
 
@@ -428,9 +379,9 @@ Skip if use_git_mode==false or skip_commit_push==true.
 
 Pre-check: `git log @{u}.. --oneline 2>/dev/null` — if no unpushed commits, end workflow.
 
-- subagent_type: "git-pusher"
-- prompt: "Check for unpushed commits. If exist, show list and ask user about push. Also ask about PR/MR creation. Detect platform (GitHub/GitLab)."
-- description: "Push and PR/MR"
+- subagent_type = git-pusher
+- description = Push and PR/MR
+- prompt = include commit_result; agent will check unpushed commits and handle push/PR per its own instructions
 
 NO_UNPUSHED_COMMITS → end. WAITING_INPUT → wait. AUTH_ERROR → guide user. SUCCESS / SKIPPED / FAIL → end.
 
