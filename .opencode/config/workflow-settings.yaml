@@ -86,13 +86,13 @@ model:
   assignment:
     # Thinking Model (port 8000) - Reasoning-intensive agents
     thinking_agents:
-      - code-qa          # Orchestrator
       - code-reviewer    # Phase 2: Deep code analysis (CoT)
       - quality-checker  # Phase 4: Quality evaluation/scoring
       - summary-reporter # Phase 8: Comprehensive report generation
 
-    # Coder Model (port 8001) - Code/utility agents
+    # Coder Model (port 8001) - Code/utility agents + Orchestrator
     coder_agents:
+      - code-qa          # Orchestrator (switched from Thinking for tool call stability)
       - env-setup          # Phase -1: Environment detection
       - git-input          # Phase 0: Git parsing
       - workspace-analyzer # Phase 0B: File structure analysis
@@ -118,6 +118,12 @@ model:
       thinking_endpoint: "http://localhost:8000/v1/models"
       coder_endpoint: "http://localhost:8001/v1/models"
       timeout_ms: 5000   # Health check timeout
+
+  # Output token cap override
+  # OpenCode hard-caps output at 32K (llm.ts OUTPUT_TOKEN_MAX).
+  # Coder model supports 65K. Set this env var before launching:
+  #   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
+  output_token_max_env: "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536"
 
   # Context settings
   context:

@@ -636,7 +636,7 @@ Each agent outputs tokens in the following format upon completion:
 
 ### Orchestrator State Variables
 
-State variables tracked by the orchestrator (command/code-qa.md):
+State variables tracked by the orchestrator (mode/code-qa.md):
 
 ```
 # ━━━ Per-Source Retry Counters (prevents infinite loops) ━━━
