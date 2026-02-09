@@ -19,10 +19,12 @@
   // =============================================================================
   // IMPORTANT: Environment Variable Required
   // =============================================================================
-  // OpenCode hard-caps output tokens at 32,000 (packages/opencode/src/session/llm.ts).
-  // Coder model supports 65,536 output tokens. To lift the cap, set:
+  // OpenCode hard-caps output tokens at min(model_limit, 32000) in llm.ts.
+  // The "limit.output" below declares each model's capability to the framework.
+  // Without the env var, actual output is capped at 32K regardless of model capability.
+  // To use the full Coder output (65K) or Thinking output (32K), set:
   //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
-  // before launching opencode. Without this, Coder output will be truncated at 32K.
+  // This lifts the hard cap so models can use their declared output limit.
 
   // =============================================================================
   // Context Window Management

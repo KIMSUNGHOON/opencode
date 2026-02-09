@@ -27,8 +27,8 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 ### 1.2 Key Features
 
 - **Dual Model Strategy**:
-  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
-  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — code-reviewer, quality-checker, summary-reporter
+  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
 - **Regression Loop**: Per-source independent retry counters (quality/build/test: max 3 each, total cap: 5)
@@ -42,12 +42,12 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 | Item | Thinking Model | Coder Model |
 |------|---------------|-------------|
 | **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
-| **Serving Engine** | SGLang (port 8000) | vLLM (port 8001) |
+| **Serving Engine** | SGLang (port 8000) | SGLang (port 8001) |
 | **Context Window** | 256K | 256K |
-| **Output Limit** | 16K | 16K |
+| **Output Limit** | 32K | 65K (requires `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536`) |
 | **Reasoning** | Yes (thinking mode) | No |
 | **Tool Calling** | Yes | Yes |
-| **Agents** | Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter | env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
+| **Agents** | code-reviewer, quality-checker, summary-reporter | Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
 ### 1.4 Official Sampling Parameters
 
@@ -77,8 +77,8 @@ python --version
 # SGLang installation (for Thinking Model)
 pip install sglang[all]
 
-# vLLM installation (for Coder Model)
-pip install vllm
+# SGLang is used for both models
+# pip install sglang[all]  (already installed above)
 
 # Docker (for Sandbox)
 docker --version
@@ -113,15 +113,16 @@ python -m sglang.launch_server \
     --host 0.0.0.0
 ```
 
-**Coder Model — vLLM (port 8001):**
+**Coder Model — SGLang (port 8001):**
 
 ```bash
-# Serve Qwen3-Coder-Next-FP8 with vLLM
-python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-Coder-Next-FP8 \
+# Serve Qwen3-Coder-Next-FP8 with SGLang
+python -m sglang.launch_server \
+    --model-path Qwen/Qwen3-Coder-Next-FP8 \
     --served-model-name Qwen3-Coder-Next-FP8 \
-    --tensor-parallel-size 2 \
-    --max-model-len 262144 \
+    --tp 2 \
+    --context-length 262144 \
+    --tool-call-parser qwen3_coder \
     --port 8001 \
     --host 0.0.0.0
 ```

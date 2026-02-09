@@ -126,6 +126,7 @@ use_git_mode = true          # false if --files
 skip_cache = false            # true if --skip-cache
 is_detached_head = false
 skip_commit_push = false
+degraded_mode = false         # true if one model server is down
 
 retry_counters = { "quality": 0, "build": 0, "test": 0 }
 PER_SOURCE_MAX = 3
@@ -221,7 +222,10 @@ curl -s --max-time 5 http://localhost:8000/v1/models 2>/dev/null && echo "THINKI
 curl -s --max-time 5 http://localhost:8001/v1/models 2>/dev/null && echo "CODER_OK" || echo "CODER_FAIL"
 ```
 
-Both UP → normal. Only 8000 → degraded (coder unavailable). Only 8001 → degraded (thinking unavailable). Neither → ABORT.
+Both UP → normal (degraded_mode=false).
+Only 8000 UP (thinking only) → degraded_mode=true. Coder agents will fail — proceed but expect reduced capability.
+Only 8001 UP (coder only) → degraded_mode=true. Thinking agents (reviewer, quality-checker, reporter) will fail — skip those steps or use fallback model.
+Neither → ABORT workflow immediately.
 
 ### STEP 0: Project Root Detection + Workspace Analysis
 
@@ -245,8 +249,14 @@ mkdir -p .opencode/workspace-cache
 ```
 
 Then read `.opencode/workspace-cache/analysis.json`:
-- Valid cache (< 24h): use it, proceed to STEP 1
-- Stale/missing/corrupt: run workspace-analyzer
+- Valid cache (< 24h, valid JSON with `"version"` key): use it, proceed to STEP 1
+- Stale (> 24h): run workspace-analyzer
+- Missing: run workspace-analyzer
+- Corrupt (invalid JSON or missing required keys): delete it, run workspace-analyzer
+
+**Corrupt cache detection:** If JSON parse fails or `"project_root"` key is missing, the cache is corrupt. Delete it with `rm .opencode/workspace-cache/analysis.json` before re-running workspace-analyzer.
+
+Note: `.opencode/` is excluded from git and code analysis (see `workflow-settings.yaml` filter.exclude). The workspace cache is ephemeral and safe to delete.
 
 If stale/missing, call Task with these parameters:
 - subagent_type = workspace-analyzer
@@ -255,7 +265,7 @@ If stale/missing, call Task with these parameters:
 
 Do NOT copy this instruction text into the prompt. Write a short directive for the agent.
 
-Handle: COMPLETE→save cache, TIMEOUT→use partial, EMPTY→null, FAILED→null. Proceed to STEP 1.
+Handle: COMPLETE→save cache to `.opencode/workspace-cache/analysis.json`, TIMEOUT (>60s)→use partial data as-is, EMPTY→set workspace_cache=null, FAILED→set workspace_cache=null. Always proceed to STEP 1 regardless of outcome.
 
 ### STEP 1: Environment Setup (User Input Required)
 - subagent_type = env-setup
