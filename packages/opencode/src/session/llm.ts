@@ -22,6 +22,7 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import { createToolCallExtractorMiddleware } from "@/provider/tool-call-extractor"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -253,6 +254,13 @@ export namespace LLM {
               return args.params
             },
           },
+          // For openai-compatible providers (SGLang, vLLM, etc.) that may lack
+          // a tool-call-parser, extract tool calls from text content where models
+          // output them as <tool_call>/<tools> XML instead of structured tool_calls.
+          ...(input.model.api.npm === "@ai-sdk/openai-compatible" &&
+          Object.keys(tools).length > 0
+            ? [createToolCallExtractorMiddleware()]
+            : []),
         ],
       }),
       experimental_telemetry: {
