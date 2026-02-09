@@ -43,7 +43,7 @@ This document contains templates like `{changed_files}`, `{review_issues}`, `{EN
 These are NOT auto-replaced. YOU must replace them with ACTUAL values collected from previous steps.
 
 State variables to track after each STEP:
-- STEP 0: PROJECT_ROOT, PROJECT_NAME, SRC_DIR, PROJECT_TYPE
+- STEP 0: PROJECT_ROOT, PROJECT_NAME, SRC_DIR, PROJECT_TYPE, BUILD_CMD (from `.opencode/build-config.yaml` or $ARGUMENTS --cmd, if any)
 - STEP 1 (env-setup): ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE, ENV_NAME, etc.)
 - STEP 2 (git-input): changed_files array
 - STEP 4 (code-reviewer): review_issues / context_store.review_result
@@ -235,6 +235,8 @@ ls -la
 
 Detect PROJECT_TYPE from config files: pyproject.toml→python, package.json→node, Cargo.toml→rust, go.mod→go, pom.xml/build.gradle→java, CMakeLists.txt→cpp, Gemfile→ruby, composer.json→php, Package.swift→swift, *.csproj→dotnet.
 
+Also check for `.opencode/build-config.yaml`. If it exists and contains `build_command`, store its value as BUILD_CMD. This allows per-project build command customization (e.g., `python setup.py build` instead of the default `pip install -e .`).
+
 **Phase B: Workspace Cache** (skip if --skip-cache)
 
 Read `.opencode/workspace-cache/analysis.json`:
@@ -337,7 +339,7 @@ If score not found: retry quality-checker (max 2 parse retries).
 ### STEP 7: Build Test (User Confirmation Required)
 - subagent_type = build-tester
 - description = Build test
-- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE); agent will show env and request user confirmation before building
+- prompt = include PROJECT_ROOT and ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE); if `.opencode/build-config.yaml` exists and has `build_command`, include it as `BUILD_CMD: <value>`; if $ARGUMENTS contains `--cmd`, include that as `BUILD_CMD: <value>` (--cmd takes priority over config file); agent will show env and request user confirmation before building
 
 ```
 WAITING_INPUT → wait (confirm→build, reset→STEP 1)

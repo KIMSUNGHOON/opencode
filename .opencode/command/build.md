@@ -15,13 +15,16 @@ prompt: |
   Parse $ARGUMENTS:
   - --no-sandbox: build directly on host
   - --skip-confirm: skip environment confirmation
-  - Not specified: build in Docker Sandbox
+  - --cmd <command>: use this as the build command (passed as BUILD_CMD to build-tester)
+  - Not specified: build in Docker Sandbox with auto-detected build command
 
   ## Execution
 
+  Extract the --cmd value from $ARGUMENTS if present. Include it as BUILD_CMD in the prompt.
+
   Task tool call:
   - subagent_type: "build-tester"
-  - prompt: "Run build test. Show current environment status and proceed with build only after user confirmation. Options: $ARGUMENTS"
+  - prompt: "Run build test. Show current environment status and proceed with build only after user confirmation. Options: $ARGUMENTS" + (if --cmd was provided: "\nBUILD_CMD: <the command value>")
   - description: "Build test"
 ---
 
@@ -29,7 +32,7 @@ prompt: |
 
 **Usage:**
 ```bash
-# Build in Docker Sandbox (default)
+# Build in Docker Sandbox (default, auto-detects build system)
 /build
 
 # Build directly on host
@@ -38,16 +41,23 @@ prompt: |
 # Skip environment confirmation
 /build --skip-confirm
 
-# Run specific build command
+# Run specific build command (overrides auto-detection)
 /build --cmd "pip install -e ."
+/build --cmd "python setup.py build"
+/build --cmd "pip install ."
+/build --cmd "python -m build"
+/build --cmd "uv pip install -e ."
+/build --cmd "poetry install"
 ```
 
-**Auto-detected build systems:**
+**Auto-detected build systems (used when --cmd is not specified):**
 
-| Language | Build System | Build Command |
-|----------|-------------|---------------|
-| Python | pip/setuptools | `pip install -e .` |
+| Language | Build System | Default Build Command |
+|----------|-------------|----------------------|
+| Python | pip/setuptools (pyproject.toml) | `pip install -e .` |
+| Python | setuptools (setup.py only) | `pip install -e .` |
 | Python | poetry | `poetry install` |
+| Python | pdm | `pdm install` |
 | JavaScript | npm | `npm install && npm run build` |
 | JavaScript | yarn | `yarn install && yarn build` |
 | Go | go mod | `go build ./...` |
@@ -60,5 +70,12 @@ prompt: |
 **Options:**
 - `--no-sandbox`: Build directly on host without Docker
 - `--skip-confirm`: Skip environment confirmation step
-- `--cmd <command>`: Run custom build command
+- `--cmd <command>`: Run custom build command (overrides auto-detection)
 - `--verbose`: Verbose build log output
+
+**Project-level config (`.opencode/build-config.yaml`):**
+```yaml
+# Set a default build command for this project
+build_command: "python setup.py build"
+```
+When set, this is used instead of auto-detection. `--cmd` still takes highest priority.

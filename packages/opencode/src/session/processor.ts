@@ -18,7 +18,45 @@ import { Question } from "@/question"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
+  const FUZZY_DOOM_LOOP_THRESHOLD = 4
+  const ERROR_LOOP_THRESHOLD = 3
   const log = Log.create({ service: "session.processor" })
+
+  /**
+   * Normalize a bash command for fuzzy comparison.
+   * Strips leading env vars, collapses whitespace, trims, and lowercases.
+   */
+  function normalizeBashCommand(input: unknown): string {
+    if (!input || typeof input !== "object") return ""
+    const cmd = (input as Record<string, unknown>).command
+    if (typeof cmd !== "string") return ""
+    return cmd
+      .replace(/^\s*(?:\w+=\S+\s+)*/, "") // strip leading env vars like FOO=bar
+      .replace(/\s+/g, " ")               // collapse whitespace
+      .trim()
+      .toLowerCase()
+  }
+
+  /**
+   * Check if two tool calls are "similar" (fuzzy match).
+   * For Bash: normalize and compare commands.
+   * For others: exact JSON match.
+   */
+  function isSimilarToolCall(
+    existing: { tool: string; input: unknown },
+    incoming: { tool: string; input: unknown },
+  ): boolean {
+    if (existing.tool !== incoming.tool) return false
+    // Exact match
+    if (JSON.stringify(existing.input) === JSON.stringify(incoming.input)) return true
+    // Fuzzy match for bash
+    if (existing.tool === "bash" || existing.tool === "Bash") {
+      const a = normalizeBashCommand(existing.input)
+      const b = normalizeBashCommand(incoming.input)
+      return a.length > 0 && a === b
+    }
+    return false
+  }
 
   export type Info = Awaited<ReturnType<typeof create>>
   export type Result = Awaited<ReturnType<Info["process"]>>
@@ -141,19 +179,60 @@ export namespace SessionProcessor {
                     toolcalls[value.toolCallId] = part as MessageV2.ToolPart
 
                     const parts = await MessageV2.parts(input.assistantMessage.id)
-                    const lastThree = parts.slice(-DOOM_LOOP_THRESHOLD)
+                    const toolParts = parts.filter(
+                      (p): p is MessageV2.ToolPart =>
+                        p.type === "tool" && p.state.status !== "pending",
+                    )
 
-                    if (
-                      lastThree.length === DOOM_LOOP_THRESHOLD &&
-                      lastThree.every(
+                    // Check 1: Exact match (original behavior)
+                    const lastN = toolParts.slice(-DOOM_LOOP_THRESHOLD)
+                    const exactLoop =
+                      lastN.length === DOOM_LOOP_THRESHOLD &&
+                      lastN.every(
                         (p) =>
-                          p.type === "tool" &&
                           p.tool === value.toolName &&
-                          p.state.status !== "pending" &&
                           JSON.stringify(p.state.input) === JSON.stringify(value.input),
                       )
-                    ) {
+
+                    // Check 2: Fuzzy match — catches slightly varied but
+                    // functionally identical bash commands (e.g. extra spaces,
+                    // reordered env vars)
+                    const lastFuzzy = toolParts.slice(-FUZZY_DOOM_LOOP_THRESHOLD)
+                    const fuzzyLoop =
+                      !exactLoop &&
+                      lastFuzzy.length === FUZZY_DOOM_LOOP_THRESHOLD &&
+                      lastFuzzy.every(
+                        (p) =>
+                          p.state.status !== "pending" &&
+                          isSimilarToolCall(
+                            { tool: p.tool, input: p.state.input },
+                            { tool: value.toolName, input: value.input },
+                          ),
+                      )
+
+                    // Check 3: Error loop — same tool keeps erroring out
+                    // even with different inputs
+                    const recentErrors = toolParts
+                      .slice(-ERROR_LOOP_THRESHOLD)
+                      .filter(
+                        (p) =>
+                          p.tool === value.toolName &&
+                          p.state.status === "error",
+                      )
+                    const errorLoop = recentErrors.length === ERROR_LOOP_THRESHOLD
+
+                    if (exactLoop || fuzzyLoop || errorLoop) {
                       const agent = await Agent.get(input.assistantMessage.agent)
+                      const loopType = exactLoop
+                        ? "exact"
+                        : fuzzyLoop
+                          ? "fuzzy"
+                          : "error"
+                      log.info("doom_loop detected", {
+                        type: loopType,
+                        tool: value.toolName,
+                        sessionID: input.assistantMessage.sessionID,
+                      })
                       await PermissionNext.ask({
                         permission: "doom_loop",
                         patterns: [value.toolName],
@@ -161,6 +240,7 @@ export namespace SessionProcessor {
                         metadata: {
                           tool: value.toolName,
                           input: value.input,
+                          loopType,
                         },
                         always: [value.toolName],
                         ruleset: agent.permission,

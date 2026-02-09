@@ -525,7 +525,9 @@ export namespace SessionPrompt {
 
       // normal processing
       const agent = await Agent.get(lastUser.agent)
-      const maxSteps = agent.steps ?? Infinity
+      const DEFAULT_SUBAGENT_MAX_STEPS = 25
+      const maxSteps =
+        agent.steps ?? (agent.mode === "subagent" ? DEFAULT_SUBAGENT_MAX_STEPS : Infinity)
       const isLastStep = step >= maxSteps
       msgs = await insertReminders({
         messages: msgs,
