@@ -28,7 +28,12 @@ export namespace FileIgnore {
     ".webkit-cache",
     "__pycache__",
     ".pytest_cache",
+    ".mypy_cache",
     "mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".nox",
+    ".opencode",
     ".history",
     ".gradle",
   ])

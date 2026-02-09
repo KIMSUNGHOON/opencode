@@ -163,6 +163,11 @@ venv/
 dist/
 build/
 .eggs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
 
 # Node.js
 node_modules/
@@ -266,7 +271,7 @@ Include only code files with these extensions:
 - **Shell:** `*.sh`, `*.bash`, `*.zsh`
 - **Other:** `*.lua`, `*.pl`, `*.pm`, `*.r`, `*.R`
 
-Exclude: `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`, `*.toml`, `*.lock`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `node_modules/`, `venv/`, `__pycache__/`, `target/`, `build/`, `dist/`, `*.min.js`, `*.bundle.js`.
+Exclude: `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`, `*.toml`, `*.lock`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `node_modules/`, `venv/`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`, `.opencode/`, `target/`, `build/`, `dist/`, `*.min.js`, `*.bundle.js`.
 
 ## Step 4: Output Result
 

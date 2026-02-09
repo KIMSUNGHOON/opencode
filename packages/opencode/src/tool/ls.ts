@@ -31,6 +31,12 @@ export const IGNORE_PATTERNS = [
   ".venv/",
   "venv/",
   "env/",
+  ".mypy_cache/",
+  ".ruff_cache/",
+  ".pytest_cache/",
+  ".tox/",
+  ".nox/",
+  ".opencode/",
 ]
 
 const LIMIT = 100

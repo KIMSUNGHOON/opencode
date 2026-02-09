@@ -98,7 +98,7 @@ Include only code files:
 - **Swift:** `*.swift`
 - **Shell:** `*.sh`, `*.bash`, `*.zsh`
 
-Exclude: `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`, `*.toml`, `*.lock`, `node_modules/`, `venv/`, `__pycache__/`, `target/`, `build/`, `dist/`, `*.min.js`, `*.bundle.js`, `.git/`
+Exclude: `*.md`, `*.txt`, `*.json`, `*.yaml`, `*.yml`, `*.toml`, `*.lock`, `node_modules/`, `venv/`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`, `.opencode/`, `target/`, `build/`, `dist/`, `*.min.js`, `*.bundle.js`, `.git/`
 
 ## Result Tokens
 

@@ -1,3 +1,9 @@
 node_modules/
 bun.lock
 workspace-cache/
+
+# Python/tool caches that may appear in .opencode/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
