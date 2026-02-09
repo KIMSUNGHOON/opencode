@@ -82,7 +82,7 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 
 | Agent | File | Language | Model | Purpose |
 |-------|------|----------|-------|---------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Orchestrator |
+| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Orchestrator (Coder for tool call stability) |
 | code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Code review (CoT) |
 | quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Quality verification (CoT) |
 | summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Final summary (CoT) |
@@ -256,7 +256,7 @@ PUSH_RESULT: FAIL
 
 | File | Changes |
 |------|---------|
-| `.opencode/command/code-qa.md` | Full English translation, edge case handling |
+| `.opencode/command/code-qa.md` | Thin wrapper (refs mode/code-qa.md as single source of truth) |
 | `.opencode/agent/git-input.md` | English translation, new result tokens |
 | `.opencode/agent/build-tester.md` | English translation, FAIL_DEPS handling |
 | `.opencode/agent/workspace-analyzer.md` | Full English translation |

@@ -1,6 +1,6 @@
 ---
 description: "Code QA Workflow - Automated Code Quality Assurance"
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen-coder/Qwen3-Coder-Next-FP8
 mode: all
 color: "#E74C3C"
 ---

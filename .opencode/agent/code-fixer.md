@@ -124,11 +124,21 @@ The Edit tool WILL FAIL if `old_string` does not EXACTLY match the file content.
 
 The `old_string` must be copied CHARACTER-FOR-CHARACTER from Read output, including exact indentation, line breaks, quotes, and trailing spaces.
 
-**If Edit fails with "oldString not found":**
+**CRITICAL: old_string and new_string MUST be plain strings, NOT JSON objects.**
+The Edit tool expects string parameters. Passing `{"key": "value"}` as old_string
+will cause a silent failure. Always pass the raw text content as a string.
+Wrong: `old_string: {"line": "def foo():"}` → Edit receives a JSON object, fails silently.
+Right: `old_string: "def foo():"` → Edit receives a string, works correctly.
+
+**If Edit fails (any reason):**
 1. Read the file again to get CURRENT content
 2. Find the exact text that exists NOW
-3. Retry Edit with corrected `old_string`
-4. If it fails again, use Write tool to replace the entire file
+3. Retry Edit with corrected `old_string` (as a plain string)
+4. If 2nd Edit also fails → IMMEDIATELY use Write tool to replace the entire file
+   - Read the full file content first
+   - Apply your fix to the content in memory
+   - Write the complete file with your fix included
+   - Do NOT attempt a 3rd Edit — switch to Write after 2 failures
 
 ## Workflow
 

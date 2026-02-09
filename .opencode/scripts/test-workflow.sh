@@ -302,13 +302,13 @@ test_model_ids() {
         fi
     done
 
-    # Validate orchestrator uses Thinking model
+    # Validate orchestrator uses Coder model (switched from Thinking for tool call stability)
     if [ -f ".opencode/mode/code-qa.md" ]; then
         ORCH_MODEL=$(grep "^model:" ".opencode/mode/code-qa.md" | sed 's/model: *//')
-        if [ "$ORCH_MODEL" = "$THINKING_MODEL" ]; then
-            log_success "orchestrator (mode): model matches Thinking ($ORCH_MODEL)"
+        if [ "$ORCH_MODEL" = "$CODER_MODEL" ]; then
+            log_success "orchestrator (mode): model matches Coder ($ORCH_MODEL)"
         else
-            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$THINKING_MODEL')"
+            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$CODER_MODEL')"
         fi
     fi
 }
@@ -450,44 +450,27 @@ test_orchestrator() {
         log_fail "Catch-all error handling missing"
     fi
 
-    # Check command/code-qa.md per-source retry counters (P0)
+    # Check command/code-qa.md is thin wrapper pointing to mode/code-qa.md
     if [ -f "$CMD_FILE" ]; then
-        if grep -q "retry_counters" "$CMD_FILE"; then
-            log_success "cmd: per-source retry_counters defined"
+        if grep -q "subtask: true" "$CMD_FILE"; then
+            log_success "cmd: subtask flag set (thin wrapper)"
         else
-            log_fail "cmd: per-source retry_counters missing"
+            log_fail "cmd: subtask flag missing"
         fi
 
-        if grep -q "context_store" "$CMD_FILE"; then
-            log_success "cmd: context_store defined"
+        if grep -q "mode/code-qa" "$CMD_FILE"; then
+            log_success "cmd: references mode/code-qa (single source of truth)"
         else
-            log_fail "cmd: context_store missing"
+            log_fail "cmd: missing reference to mode/code-qa"
         fi
 
-        if grep -q "pre_check_result" "$CMD_FILE"; then
-            log_success "cmd: pre_check_result in context_store"
+        # Validate model matches orchestrator
+        CMD_MODEL=$(grep "^model:" "$CMD_FILE" | sed 's/model: *//')
+        ORCH_MODEL=$(grep "^model:" "$MODE_FILE" | sed 's/model: *//')
+        if [ "$CMD_MODEL" = "$ORCH_MODEL" ]; then
+            log_success "cmd: model matches orchestrator ($CMD_MODEL)"
         else
-            log_fail "cmd: pre_check_result missing from context_store"
-        fi
-
-        if grep -q "push_result" "$CMD_FILE"; then
-            log_success "cmd: push_result in context_store"
-        else
-            log_fail "cmd: push_result missing from context_store"
-        fi
-
-        # Check post-fix regression validation in command file
-        if grep -q "Post-Fix Regression Validation" "$CMD_FILE"; then
-            log_success "cmd: post-fix regression validation exists"
-        else
-            log_fail "cmd: post-fix regression validation missing"
-        fi
-
-        # Check regression timeout guard in command file
-        if grep -q "Regression Timeout" "$CMD_FILE"; then
-            log_success "cmd: regression timeout guard exists"
-        else
-            log_fail "cmd: regression timeout guard missing"
+            log_fail "cmd: model mismatch (cmd='$CMD_MODEL', mode='$ORCH_MODEL')"
         fi
     else
         log_fail "command/code-qa.md not found"

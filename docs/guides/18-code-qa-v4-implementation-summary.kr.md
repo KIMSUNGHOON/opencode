@@ -84,7 +84,7 @@
 
 | 에이전트 | 파일 | 언어 | 모델 | 용도 |
 |----------|------|------|------|------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 오케스트레이터 |
+| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 오케스트레이터 (Coder 모델, tool call 안정성) |
 | code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 코드 리뷰 (CoT) |
 | quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 품질 검증 (CoT) |
 | summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 최종 요약 (CoT) |
@@ -258,7 +258,7 @@ PUSH_RESULT: FAIL
 
 | 파일 | 변경 내용 |
 |------|-----------|
-| `.opencode/command/code-qa.md` | 전체 영문 번역, 엣지 케이스 처리 |
+| `.opencode/command/code-qa.md` | 경량 래퍼 (mode/code-qa.md를 단일 소스로 참조) |
 | `.opencode/agent/git-input.md` | 영문 번역, 새로운 결과 토큰 |
 | `.opencode/agent/build-tester.md` | 영문 번역, FAIL_DEPS 처리 |
 | `.opencode/agent/workspace-analyzer.md` | 전체 영문 번역 |

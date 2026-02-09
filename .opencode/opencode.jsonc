@@ -9,11 +9,20 @@
   //
   // Model Assignment:
   //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
-  //     - Orchestrator (code-qa), code-reviewer, quality-checker, summary-reporter
+  //     - code-reviewer, quality-checker, summary-reporter
   //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
-  //     - env-setup, git-input, workspace-analyzer, pre-checker, code-fixer,
-  //       build-tester, function-tester, git-committer, git-pusher, file-input
+  //     - Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
+  //       pre-checker, code-fixer, build-tester, function-tester,
+  //       git-committer, git-pusher, file-input
   // =============================================================================
+
+  // =============================================================================
+  // IMPORTANT: Environment Variable Required
+  // =============================================================================
+  // OpenCode hard-caps output tokens at 32,000 (packages/opencode/src/session/llm.ts).
+  // Coder model supports 65,536 output tokens. To lift the cap, set:
+  //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
+  // before launching opencode. Without this, Coder output will be truncated at 32K.
 
   // =============================================================================
   // Context Window Management
