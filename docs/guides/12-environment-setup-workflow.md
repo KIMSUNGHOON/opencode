@@ -455,7 +455,7 @@ project-root/
 | Item | Value | Description |
 |------|-------|-------------|
 | **mode** | `subagent` | Called from other Agents |
-| **model** | `qwen-coder/Qwen3-Coder-Next-FP8` | Coder model (vLLM, port 8001) |
+| **model** | `glm/GLM-4.7-FP8` | GLM-4.7-FP8 model (SGLang, port 8000) |
 | **color** | `#95A5A6` | UI display color |
 
 ### 7.3 Permission Matrix

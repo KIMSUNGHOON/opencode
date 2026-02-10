@@ -1,7 +1,7 @@
 ---
 description: Workspace Structure Analyzer (File Discovery & Project Analysis)
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 color: "#3498DB"
 tools:
   "*": false

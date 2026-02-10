@@ -26,9 +26,10 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 
 ### 1.2 Key Features
 
-- **Dual Model Strategy**:
-  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — code-reviewer, quality-checker, summary-reporter
-  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+- **Single Model Architecture**:
+  - **GLM-4.7-FP8** (355B MoE, 32B active) — a single unified model serving all 13 agents plus the orchestrator
+  - Interleaved Thinking, Preserved Thinking, and Turn-level Thinking for adaptive reasoning
+  - MIT license, 200K context window, 128K output
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
 - **Regression Loop**: Per-source independent retry counters (quality/build/test: max 3 each, total cap: 5)
@@ -39,24 +40,22 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 
 ### 1.3 Model Specifications
 
-| Item | Thinking Model | Coder Model |
-|------|---------------|-------------|
-| **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
-| **Serving Engine** | SGLang (port 8000) | SGLang (port 8001) |
-| **Context Window** | 256K | 256K |
-| **Output Limit** | 32K | 65K (requires `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536`) |
-| **Reasoning** | Yes (thinking mode) | No |
-| **Tool Calling** | Yes | Yes |
-| **Agents** | code-reviewer, quality-checker, summary-reporter | Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
+| Item | GLM-4.7-FP8 |
+|------|-------------|
+| **Model** | GLM-4.7-FP8 (355B MoE, 32B active) |
+| **Serving Engine** | SGLang or vLLM (port 8000) |
+| **Context Window** | 200K |
+| **Output Limit** | 128K (requires `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072`) |
+| **Reasoning** | Yes (Interleaved Thinking / Preserved Thinking / Turn-level Thinking) |
+| **Tool Calling** | Yes |
+| **License** | MIT |
+| **Agents** | All 13 agents + Orchestrator (code-qa) |
 
 ### 1.4 Official Sampling Parameters
 
 ```
-Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8):
-  Temperature: 0.6, TopP: 0.95, TopK: 20, MinP: 0
-
-Coder Model (Qwen3-Coder-Next-FP8):
-  Temperature: 1.0, TopP: 0.95, TopK: 40
+GLM-4.7-FP8 (all agents):
+  Temperature: 1.0, TopP: 0.95
 ```
 
 ---
@@ -65,8 +64,8 @@ Coder Model (Qwen3-Coder-Next-FP8):
 
 ### 2.1 Hardware
 
-- GPU: 2x H100 NVL 96GB (or equivalent)
-- VRAM: Minimum 160GB (model + KV cache)
+- GPU: 8x H100 80GB or 4x H200 141GB (for FP8)
+- VRAM: Minimum 320GB (355B MoE model + KV cache)
 
 ### 2.2 Software
 
@@ -74,11 +73,11 @@ Coder Model (Qwen3-Coder-Next-FP8):
 # Python 3.10+
 python --version
 
-# SGLang installation (for Thinking Model)
+# SGLang installation (recommended)
 pip install sglang[all]
 
-# SGLang is used for both models
-# pip install sglang[all]  (already installed above)
+# Or vLLM installation (alternative)
+pip install vllm
 
 # Docker (for Sandbox)
 docker --version
@@ -87,44 +86,30 @@ nvidia-docker --version  # For GPU usage
 
 ### 2.3 Model Server Launch
 
-**Thinking Model — SGLang (port 8000):**
+**Option A: SGLang (recommended):**
 
 ```bash
-# Serve Qwen3-Next-80B-A3B-Thinking-FP8 with SGLang
-python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --tp 2 \
-    --context-length 262144 \
-    --port 8000 \
-    --host 0.0.0.0
+python3 -m sglang.launch_server \
+    --model-path zai-org/GLM-4.7-FP8 \
+    --tp-size 4 \
+    --tool-call-parser glm47 \
+    --reasoning-parser glm45 \
+    --mem-fraction-static 0.85 \
+    --served-model-name GLM-4.7-FP8 \
+    --host 0.0.0.0 --port 8000
 ```
 
-**With NEXTN Speculative Decoding (~30% performance boost):**
-```bash
-python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --tp 2 \
-    --context-length 262144 \
-    --speculative-algorithm NEXTN \
-    --speculative-num-draft-tokens 3 \
-    --port 8000 \
-    --host 0.0.0.0
-```
-
-**Coder Model — SGLang (port 8001):**
+**Option B: vLLM (alternative):**
 
 ```bash
-# Serve Qwen3-Coder-Next-FP8 with SGLang
-python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Coder-Next-FP8 \
-    --served-model-name Qwen3-Coder-Next-FP8 \
-    --tp 2 \
-    --context-length 262144 \
-    --tool-call-parser qwen3_coder \
-    --port 8001 \
-    --host 0.0.0.0
+vllm serve zai-org/GLM-4.7-FP8 \
+    --tensor-parallel-size 4 \
+    --speculative-config.method mtp \
+    --speculative-config.num_speculative_tokens 1 \
+    --tool-call-parser glm47 \
+    --reasoning-parser glm45 \
+    --enable-auto-tool-choice \
+    --served-model-name GLM-4.7-FP8
 ```
 
 ---
@@ -167,8 +152,8 @@ Create the config files manually as described in Section 5.
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-export QWEN_BASE_URL="http://localhost:8000/v1"
-export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
+export GLM_BASE_URL="http://localhost:8000/v1"
+export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
 ```
 
 ---
@@ -239,8 +224,8 @@ Copy and use the following content:
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "qwen": {
-      "name": "Qwen3-Next-Thinking (Reasoning)",
+    "glm": {
+      "name": "GLM-4.7-FP8",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8000/v1",
       "env": [],
@@ -249,59 +234,35 @@ Copy and use the following content:
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "Qwen3-Next-80B-A3B-Thinking-FP8": {
-          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
+        "GLM-4.7-FP8": {
+          "name": "GLM-4.7-FP8",
+          "id": "GLM-4.7-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": true,
           "attachment": false,
           "modalities": { "input": ["text"], "output": ["text"] },
-          "limit": { "context": 262144, "output": 16384 },
-          "cost": { "input": 0, "output": 0 }
-        }
-      }
-    },
-    "qwen-coder": {
-      "name": "Qwen3-Coder-Next (Code)",
-      "npm": "@ai-sdk/openai-compatible",
-      "api": "http://localhost:8001/v1",
-      "env": [],
-      "options": {
-        "apiKey": "dummy",
-        "baseURL": "http://localhost:8001/v1"
-      },
-      "models": {
-        "Qwen3-Coder-Next-FP8": {
-          "name": "Qwen3-Coder-Next-FP8",
-          "id": "Qwen3-Coder-Next-FP8",
-          "tool_call": true,
-          "temperature": true,
-          "reasoning": false,
-          "attachment": false,
-          "modalities": { "input": ["text"], "output": ["text"] },
-          "limit": { "context": 262144, "output": 16384 },
+          "limit": { "context": 204800, "output": 131072 },
           "cost": { "input": 0, "output": 0 }
         }
       }
     }
   },
   "agent": {
-    // Thinking Model agents (temp=0.6, top_k=20)
-    "code-reviewer": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "quality-checker": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    "summary-reporter": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    // Coder Model agents (temp=1.0, top_k=40)
-    "env-setup": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "workspace-analyzer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "file-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "pre-checker": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "code-fixer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "build-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "function-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-committer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-pusher": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 }
+    // GLM-4.7-FP8 — all agents (temp=1.0, top_p=0.95)
+    "code-reviewer": { "temperature": 1.0, "top_p": 0.95 },
+    "quality-checker": { "temperature": 1.0, "top_p": 0.95 },
+    "summary-reporter": { "temperature": 1.0, "top_p": 0.95 },
+    "env-setup": { "temperature": 1.0, "top_p": 0.95 },
+    "workspace-analyzer": { "temperature": 1.0, "top_p": 0.95 },
+    "git-input": { "temperature": 1.0, "top_p": 0.95 },
+    "file-input": { "temperature": 1.0, "top_p": 0.95 },
+    "pre-checker": { "temperature": 1.0, "top_p": 0.95 },
+    "code-fixer": { "temperature": 1.0, "top_p": 0.95 },
+    "build-tester": { "temperature": 1.0, "top_p": 0.95 },
+    "function-tester": { "temperature": 1.0, "top_p": 0.95 },
+    "git-committer": { "temperature": 1.0, "top_p": 0.95 },
+    "git-pusher": { "temperature": 1.0, "top_p": 0.95 }
   },
   "experimental": {
     "chatMaxRetries": 5
@@ -491,15 +452,11 @@ Error: Failed to connect to model server
 
 **Solution**:
 ```bash
-# Check Thinking Model server status (SGLang, port 8000)
+# Check GLM-4.7-FP8 model server status (port 8000)
 curl http://localhost:8000/v1/models
 
-# Check Coder Model server status (vLLM, port 8001)
-curl http://localhost:8001/v1/models
-
 # Check environment variables
-echo $QWEN_BASE_URL
-echo $QWEN_CODER_BASE_URL
+echo $GLM_BASE_URL
 ```
 
 ### 8.3 Docker Sandbox Failed
@@ -725,8 +682,8 @@ so it can choose a **different** fix strategy (see `context-schema.md` for JSON 
 ### Environment Variables (Required)
 
 ```bash
-QWEN_BASE_URL="http://localhost:8000/v1"
-QWEN_CODER_BASE_URL="http://localhost:8001/v1"
+GLM_BASE_URL="http://localhost:8000/v1"
+OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
 ```
 
 ### Command Summary
@@ -750,4 +707,4 @@ QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 - [12-environment-setup-workflow.md](./12-environment-setup-workflow.md) - Environment setup details
 - [13-code-qa-v4-complete-diagram.md](./13-code-qa-v4-complete-diagram.md) - Full workflow diagram
 - [18-code-qa-v4-implementation-summary.md](./18-code-qa-v4-implementation-summary.md) - Implementation summary
-- [20-dual-model-strategy-report.md](./20-dual-model-strategy-report.md) - Dual model strategy
+- [20-single-model-migration-report.md](./20-single-model-migration-report.md) - GLM-4.7-FP8 single model architecture

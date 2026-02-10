@@ -1,6 +1,6 @@
 ---
 description: "Workspace analysis and cache generation"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 subtask: true
 prompt: |
   You are a workspace analysis orchestrator.

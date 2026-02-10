@@ -1,6 +1,6 @@
 ---
 description: "Code QA Workflow - Automated Code Quality Assurance"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 mode: all
 color: "#E74C3C"
 ---
@@ -126,7 +126,7 @@ use_git_mode = true          # false if --files
 skip_cache = false            # true if --skip-cache
 is_detached_head = false
 skip_commit_push = false
-degraded_mode = false         # true if one model server is down
+degraded_mode = false         # single model server — either up or workflow aborts
 
 retry_counters = { "quality": 0, "build": 0, "test": 0 }
 PER_SOURCE_MAX = 3
@@ -219,14 +219,11 @@ When regressing to STEP 5, MUST include:
 
 Run before workflow (no Task call needed):
 ```bash
-curl -s --max-time 5 http://localhost:8000/v1/models 2>/dev/null && echo "THINKING_OK" || echo "THINKING_FAIL"
-curl -s --max-time 5 http://localhost:8001/v1/models 2>/dev/null && echo "CODER_OK" || echo "CODER_FAIL"
+curl -s --max-time 5 http://localhost:8000/v1/models 2>/dev/null && echo "GLM_OK" || echo "GLM_FAIL"
 ```
 
-Both UP → normal (degraded_mode=false).
-Only 8000 UP (thinking only) → degraded_mode=true. Coder agents will fail — proceed but expect reduced capability.
-Only 8001 UP (coder only) → degraded_mode=true. Thinking agents (reviewer, quality-checker, reporter) will fail — skip those steps or use fallback model.
-Neither → ABORT workflow immediately.
+Server UP → normal, proceed with workflow.
+Server DOWN → ABORT workflow immediately.
 
 ### STEP 0: Project Root Detection + Workspace Analysis
 

@@ -1,7 +1,7 @@
 ---
 description: Git Push and PR Creation Expert
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 color: "#2ECC71"
 tools:
   "*": false

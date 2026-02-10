@@ -251,8 +251,9 @@ test_structured_output() {
 # =============================================================================
 
 test_model_ids() {
-    log_section "6. Model ID Validation"
+    log_section "6. Model ID Validation (Single GLM-4.7-FP8)"
 
+    EXPECTED_MODEL="glm/GLM-4.7-FP8"
     SETTINGS_FILE=".opencode/config/workflow-settings.yaml"
 
     if [ ! -f "$SETTINGS_FILE" ]; then
@@ -260,56 +261,75 @@ test_model_ids() {
         return
     fi
 
-    # Extract expected model IDs from workflow-settings.yaml
-    THINKING_MODEL=$(grep "^  thinking:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
-    CODER_MODEL=$(grep "^  coder:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
-
-    if [ -n "$THINKING_MODEL" ]; then
-        log_success "Thinking model defined: $THINKING_MODEL"
+    # Validate single model defined in workflow-settings.yaml
+    if grep -q "GLM-4.7-FP8" "$SETTINGS_FILE"; then
+        log_success "GLM-4.7-FP8 model defined in workflow-settings.yaml"
     else
-        log_fail "Thinking model not defined in workflow-settings.yaml"
+        log_fail "GLM-4.7-FP8 model not defined in workflow-settings.yaml"
     fi
 
-    if [ -n "$CODER_MODEL" ]; then
-        log_success "Coder model defined: $CODER_MODEL"
+    # Ensure no stale dual-model references remain
+    if grep -qi "qwen" "$SETTINGS_FILE"; then
+        log_fail "Stale Qwen model reference found in workflow-settings.yaml"
     else
-        log_fail "Coder model not defined in workflow-settings.yaml"
+        log_success "No stale Qwen model references in workflow-settings.yaml"
     fi
 
-    # Validate Thinking agents use Thinking model
-    THINKING_AGENTS=("code-reviewer" "quality-checker" "summary-reporter")
-    for agent in "${THINKING_AGENTS[@]}"; do
+    if grep -q "thinking:" "$SETTINGS_FILE" || grep -q "coder:" "$SETTINGS_FILE"; then
+        log_fail "Stale dual-model keys (thinking/coder) found in workflow-settings.yaml"
+    else
+        log_success "No dual-model keys in workflow-settings.yaml (single model confirmed)"
+    fi
+
+    # Validate ALL agents reference glm/GLM-4.7-FP8 (single model, no dual-model split)
+    ALL_AGENTS=(
+        "env-setup" "workspace-analyzer" "git-input" "file-input"
+        "pre-checker" "code-reviewer" "code-fixer" "quality-checker"
+        "build-tester" "function-tester" "git-committer" "summary-reporter"
+        "git-pusher"
+    )
+
+    for agent in "${ALL_AGENTS[@]}"; do
         if [ -f ".opencode/agent/${agent}.md" ]; then
             AGENT_MODEL=$(grep "^model:" ".opencode/agent/${agent}.md" | sed 's/model: *//')
-            if [ "$AGENT_MODEL" = "$THINKING_MODEL" ]; then
-                log_success "${agent}: model matches Thinking ($AGENT_MODEL)"
+            if [ "$AGENT_MODEL" = "$EXPECTED_MODEL" ]; then
+                log_success "${agent}: model is ${EXPECTED_MODEL}"
             else
-                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$THINKING_MODEL')"
+                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$EXPECTED_MODEL')"
             fi
         fi
     done
 
-    # Validate Coder agents use Coder model
-    CODER_AGENTS=("env-setup" "git-input" "workspace-analyzer" "file-input" "pre-checker" "code-fixer" "build-tester" "function-tester" "git-committer" "git-pusher")
-    for agent in "${CODER_AGENTS[@]}"; do
-        if [ -f ".opencode/agent/${agent}.md" ]; then
-            AGENT_MODEL=$(grep "^model:" ".opencode/agent/${agent}.md" | sed 's/model: *//')
-            if [ "$AGENT_MODEL" = "$CODER_MODEL" ]; then
-                log_success "${agent}: model matches Coder ($AGENT_MODEL)"
-            else
-                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$CODER_MODEL')"
-            fi
-        fi
-    done
-
-    # Validate orchestrator uses Coder model (switched from Thinking for tool call stability)
+    # Validate orchestrator uses same single model
     if [ -f ".opencode/mode/code-qa.md" ]; then
         ORCH_MODEL=$(grep "^model:" ".opencode/mode/code-qa.md" | sed 's/model: *//')
-        if [ "$ORCH_MODEL" = "$CODER_MODEL" ]; then
-            log_success "orchestrator (mode): model matches Coder ($ORCH_MODEL)"
+        if [ "$ORCH_MODEL" = "$EXPECTED_MODEL" ]; then
+            log_success "orchestrator (mode): model is ${EXPECTED_MODEL}"
         else
-            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$CODER_MODEL')"
+            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$EXPECTED_MODEL')"
         fi
+    fi
+
+    # Validate command/code-qa.md uses same single model
+    if [ -f ".opencode/command/code-qa.md" ]; then
+        CMD_MODEL=$(grep "^model:" ".opencode/command/code-qa.md" | sed 's/model: *//')
+        if [ "$CMD_MODEL" = "$EXPECTED_MODEL" ]; then
+            log_success "command (code-qa): model is ${EXPECTED_MODEL}"
+        else
+            log_fail "command (code-qa): model mismatch (got '$CMD_MODEL', expected '$EXPECTED_MODEL')"
+        fi
+    fi
+
+    # Validate OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
+    if grep -q "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX" "$SETTINGS_FILE"; then
+        TOKEN_MAX=$(grep "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX" "$SETTINGS_FILE" | grep -o '[0-9]*')
+        if [ "$TOKEN_MAX" = "131072" ]; then
+            log_success "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072"
+        else
+            log_fail "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX is $TOKEN_MAX (expected 131072)"
+        fi
+    else
+        log_fail "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX not defined in workflow-settings.yaml"
     fi
 }
 
@@ -408,9 +428,37 @@ test_orchestrator() {
         log_fail "Config file reference missing"
     fi
 
-    # Check model health check section (P2-1)
+    # Check model health check section (P2-1) - single server on port 8000
     if grep -q "Model Server Health Check" "$MODE_FILE"; then
         log_success "Model health check section exists"
+
+        # Validate single-server health check (port 8000 only)
+        if grep -q "8000" "$MODE_FILE"; then
+            log_success "  └─ Health check references port 8000"
+        else
+            log_fail "  └─ Health check missing port 8000 reference"
+        fi
+
+        # Ensure no stale dual-server port 8001 reference
+        if grep -q "8001" "$MODE_FILE"; then
+            log_fail "  └─ Stale dual-server port 8001 reference found"
+        else
+            log_success "  └─ No stale port 8001 reference (single server confirmed)"
+        fi
+
+        # Ensure no stale qwen/qwen-coder provider references
+        if grep -qi "qwen" "$MODE_FILE"; then
+            log_fail "  └─ Stale qwen provider reference found"
+        else
+            log_success "  └─ No stale qwen provider references"
+        fi
+
+        # Validate glm provider is referenced
+        if grep -qi "glm" "$MODE_FILE"; then
+            log_success "  └─ glm provider referenced"
+        else
+            log_fail "  └─ glm provider not referenced"
+        fi
     else
         log_fail "Model health check section missing"
     fi
@@ -707,7 +755,7 @@ print_summary() {
 main() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║           Code QA Workflow Test Suite v3                     ║"
+    echo "║           Code QA Workflow Test Suite v4                     ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 

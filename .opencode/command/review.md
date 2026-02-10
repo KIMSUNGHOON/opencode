@@ -1,6 +1,6 @@
 ---
 description: "Code review (standalone)"
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: glm/GLM-4.7-FP8
 subtask: true
 prompt: |
   You are a code review agent.

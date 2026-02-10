@@ -2,36 +2,46 @@
   "$schema": "https://opencode.ai/config.json",
 
   // =============================================================================
-  // Dual Model Provider Configuration (Both SGLang)
+  // Single Model Provider Configuration (GLM-4.7-FP8)
   // =============================================================================
-  // Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
-  // Node 2 (port 8001): Qwen3-Coder-Next (SGLang)     -> Code/utility agents
+  // GLM-4.7 is a 355B MoE model (32B active) by Z.ai, MIT license.
+  // It supports tool calling, interleaved/preserved thinking, and 200K context.
+  // A single model serves ALL agents — no dual-model routing needed.
   //
-  // Model Assignment:
-  //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
-  //     - code-reviewer, quality-checker, summary-reporter
-  //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
-  //     - Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
-  //       pre-checker, code-fixer, build-tester, function-tester,
-  //       git-committer, git-pusher, file-input
+  // Serving (SGLang, single port 8000):
+  //   python3 -m sglang.launch_server \
+  //     --model-path zai-org/GLM-4.7-FP8 \
+  //     --tp-size 4 \
+  //     --tool-call-parser glm47 \
+  //     --reasoning-parser glm45 \
+  //     --mem-fraction-static 0.85 \
+  //     --served-model-name GLM-4.7-FP8 \
+  //     --host 0.0.0.0 --port 8000
+  //
+  // Serving (vLLM alternative):
+  //   vllm serve zai-org/GLM-4.7-FP8 \
+  //     --tensor-parallel-size 4 \
+  //     --speculative-config.method mtp \
+  //     --speculative-config.num_speculative_tokens 1 \
+  //     --tool-call-parser glm47 \
+  //     --reasoning-parser glm45 \
+  //     --enable-auto-tool-choice \
+  //     --served-model-name GLM-4.7-FP8
+  //
+  // Hardware: 8× H100 or 4× H200 (FP8)
   // =============================================================================
 
   // =============================================================================
   // IMPORTANT: Environment Variable Required
   // =============================================================================
   // OpenCode hard-caps output tokens at min(model_limit, 32000) in llm.ts.
-  // The "limit.output" below declares each model's capability to the framework.
-  // Without the env var, actual output is capped at 32K regardless of model capability.
-  // To use the full Coder output (65K) or Thinking output (32K), set:
-  //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
-  // This lifts the hard cap so models can use their declared output limit.
+  // GLM-4.7 supports up to 128K output. To use more than 32K output, set:
+  //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
+  // This lifts the hard cap so the model can use its declared output limit.
 
   // =============================================================================
   // Context Window Management
   // =============================================================================
-  // auto: automatically compact (summarize) conversation when context is full
-  // prune: remove old tool outputs to free context space
-  // Both default to true if omitted. Explicitly enabling for clarity.
   "compaction": {
     "auto": true,
     "prune": true
@@ -39,10 +49,13 @@
 
   "provider": {
     // -------------------------------------------------------------------------
-    // Provider 1: Thinking Model (SGLang, port 8000)
+    // Single Provider: GLM-4.7-FP8 (SGLang or vLLM, port 8000)
     // -------------------------------------------------------------------------
-    "qwen": {
-      "name": "Qwen3-Next-Thinking (Reasoning)",
+    // All agents use this single model. GLM-4.7 handles both reasoning-intensive
+    // tasks (code review, quality check) and code/tool tasks (fixing, building)
+    // via its built-in Interleaved Thinking capability.
+    "glm": {
+      "name": "GLM-4.7-FP8 (Z.ai)",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8000/v1",
       "env": [],
@@ -51,9 +64,9 @@
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "Qwen3-Next-80B-A3B-Thinking-FP8": {
-          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
+        "GLM-4.7-FP8": {
+          "name": "GLM-4.7-FP8",
+          "id": "GLM-4.7-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": true,
@@ -63,58 +76,15 @@
             "output": ["text"]
           },
           "limit": {
-            "context": 262144,
-            "output": 32768
+            "context": 200000,
+            "output": 131072
           },
-          // Sampling params: override SDK defaults via providerOptions → request body
-          // README: temperature 0.6, top_p 0.95, top_k 20
-          "options": {
-            "temperature": 0.6,
-            "top_p": 0.95,
-            "top_k": 20
-          },
-          "cost": {
-            "input": 0,
-            "output": 0
-          }
-        }
-      }
-    },
-
-    // -------------------------------------------------------------------------
-    // Provider 2: Coder Model (SGLang, port 8001)
-    // -------------------------------------------------------------------------
-    "qwen-coder": {
-      "name": "Qwen3-Coder-Next (Code)",
-      "npm": "@ai-sdk/openai-compatible",
-      "api": "http://localhost:8001/v1",
-      "env": [],
-      "options": {
-        "apiKey": "dummy",
-        "baseURL": "http://localhost:8001/v1"
-      },
-      "models": {
-        "Qwen3-Coder-Next-FP8": {
-          "name": "Qwen3-Coder-Next-FP8",
-          "id": "Qwen3-Coder-Next-FP8",
-          "tool_call": true,
-          "temperature": true,
-          "reasoning": false,
-          "attachment": false,
-          "modalities": {
-            "input": ["text"],
-            "output": ["text"]
-          },
-          "limit": {
-            "context": 262144,
-            "output": 65536
-          },
-          // Sampling params: override SDK defaults via providerOptions → request body
-          // README: temperature 1.0, top_p 0.95, top_k 40
+          // Sampling params: Z.ai official recommendation
+          // temperature=1.0, top_p=0.95
+          // "Do NOT adjust both simultaneously" — tune one or the other.
           "options": {
             "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 40
+            "top_p": 0.95
           },
           "cost": {
             "input": 0,

@@ -10,7 +10,7 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 
 1. **Edge Case Handling**: Implement robust handling for all identified edge cases in the workflow
 2. **English Translation**: Translate all orchestrator and sub-agent prompts to English
-3. **Qwen3-Next Compatibility**: Ensure prompts are optimized for Qwen3-Next series models
+3. **GLM-4.7 Compatibility**: Ensure prompts are optimized for GLM-4.7-FP8 (355B MoE, 32B active, 200K context, 128K output, Interleaved Thinking)
 4. **Local Infrastructure**: Design for token-cost-agnostic local LLM serving
 
 ### 1.2 Workflow Architecture
@@ -82,20 +82,20 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 
 | Agent | File | Language | Model | Purpose |
 |-------|------|----------|-------|---------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Orchestrator (Coder for tool call stability) |
-| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Code review (CoT) |
-| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Quality verification (CoT) |
-| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Final summary (CoT) |
-| env-setup | `.opencode/agent/env-setup.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Environment setup |
-| git-input | `.opencode/agent/git-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git diff collection |
-| file-input | `.opencode/agent/file-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Direct file input |
-| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Workspace analysis |
-| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Pre-review checks |
-| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Auto-fix issues (SWE-Bench) |
-| build-tester | `.opencode/agent/build-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Build test |
-| function-tester | `.opencode/agent/function-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Function testing |
-| git-committer | `.opencode/agent/git-committer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git commit |
-| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git push |
+| code-qa | `.opencode/mode/code-qa.md` | English | glm/GLM-4.7-FP8 | Orchestrator (Interleaved Thinking for reasoning + tool calls) |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | glm/GLM-4.7-FP8 | Code review (Interleaved Thinking) |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | glm/GLM-4.7-FP8 | Quality verification (Interleaved Thinking) |
+| summary-reporter | `.opencode/agent/summary-reporter.md` | English | glm/GLM-4.7-FP8 | Final summary (Interleaved Thinking) |
+| env-setup | `.opencode/agent/env-setup.md` | English | glm/GLM-4.7-FP8 | Environment setup |
+| git-input | `.opencode/agent/git-input.md` | English | glm/GLM-4.7-FP8 | Git diff collection |
+| file-input | `.opencode/agent/file-input.md` | English | glm/GLM-4.7-FP8 | Direct file input |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | glm/GLM-4.7-FP8 | Workspace analysis |
+| pre-checker | `.opencode/agent/pre-checker.md` | English | glm/GLM-4.7-FP8 | Pre-review checks |
+| code-fixer | `.opencode/agent/code-fixer.md` | English | glm/GLM-4.7-FP8 | Auto-fix issues |
+| build-tester | `.opencode/agent/build-tester.md` | English | glm/GLM-4.7-FP8 | Build test |
+| function-tester | `.opencode/agent/function-tester.md` | English | glm/GLM-4.7-FP8 | Function testing |
+| git-committer | `.opencode/agent/git-committer.md` | English | glm/GLM-4.7-FP8 | Git commit |
+| git-pusher | `.opencode/agent/git-pusher.md` | English | glm/GLM-4.7-FP8 | Git push |
 
 ### 3.2 Result Token Patterns
 
@@ -164,7 +164,7 @@ PUSH_RESULT: FAIL
 
 ---
 
-## 4. Qwen3-Next Compatibility
+## 4. GLM-4.7 Compatibility
 
 ### 4.1 Design Patterns for LLM Compatibility
 
@@ -182,42 +182,44 @@ PUSH_RESULT: FAIL
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    Dual Model Characteristics                           │
+│                  Single Model: GLM-4.7-FP8                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8, SGLang port 8000):  │
-│    - Self-reasoning capability (CoT)                                    │
-│    - 4 agents: Orchestrator, code-reviewer, quality-checker,           │
-│      summary-reporter                                                   │
-│                                                                         │
-│  Coder Model (Qwen3-Coder-Next-FP8, vLLM port 8001):                  │
-│    - Non-thinking, fast code generation (SWE-Bench 70.6%)              │
-│    - 10 agents: env-setup, git-input, file-input, workspace-analyzer,  │
-│      pre-checker, code-fixer, build-tester, function-tester,           │
-│      git-committer, git-pusher                                         │
+│  GLM-4.7-FP8 (vLLM port 8000):                                        │
+│    - 355B MoE (32B active parameters)                                  │
+│    - 200K context window, 128K max output                              │
+│    - Built-in Interleaved Thinking (no separate Thinking model needed) │
+│    - All 14 agents served by a single model instance                   │
+│    - Sampling: temperature=1.0, top_p=0.95 (no top_k)                 │
+│    - OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072                     │
+│    - Hardware: 8x H100 or 4x H200                                     │
 │                                                                         │
 │  Local Inference:                                                       │
 │    - Token cost: Not relevant (local serving)                          │
 │    - Latency: Proportional to context length                           │
 │    - Quality/Consistency: Primary concern                               │
+│    - Single server simplifies deployment and removes degraded_mode     │
+│      dual-server failover logic                                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.3 Optimization Plan
 
-1. **Dual Model Strategy (Implemented)**
-   - Thinking model: Complex reasoning tasks (code review, quality check)
-   - Coder model: Code generation/modification tasks (SWE-Bench optimized)
+1. **Single Model Strategy (Implemented)**
+   - GLM-4.7-FP8 handles all tasks: reasoning, code generation, tool calls
+   - Interleaved Thinking provides built-in CoT for complex reasoning agents
+   - No need for separate Thinking vs. Coder model split
+   - Eliminates degraded_mode dual-server failover logic
 
-2. **Agent Rebalancing**
-   - Test each agent with both models
-   - Measure accuracy and latency
-   - Assign optimal model per agent
+2. **Sampling Configuration**
+   - temperature=1.0, top_p=0.95 (no top_k)
+   - OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
 
 3. **Workflow Optimization**
    - Parallel execution where possible
    - Caching for repeated operations
+   - Single server on port 8000 simplifies infrastructure
 
 ---
 
@@ -506,7 +508,6 @@ This step prevents the pipeline from processing files that cannot be meaningfull
 | `14-code-qa-v4-quick-start.kr.md` | Quick start guide (KR) |
 | `15-workspace-analysis-workflow.md` | Workspace analysis details |
 | `16-workflow-case-review.md` | Case review and edge cases |
-| `20-dual-model-strategy-report.md` | Dual model strategy report |
 | `.opencode/config/workflow-settings.yaml` | Authoritative config (timeouts, retry, model assignments) |
 | `.opencode/config/context-schema.md` | JSON schemas for structured context passing |
 
@@ -520,3 +521,4 @@ This step prevents the pipeline from processing files that cannot be meaningfull
 | 1.1 | 2025-02-04 | env-setup streamlining (4 steps → 1-2 steps) |
 | 1.2 | 2026-02-05 | Complete result token list, fix step diagram, add all 13 agents |
 | 1.3 | 2026-02-06 | Add per-source regression counters, structured JSON output, STEP 2.5 file validation, config file references |
+| 1.4 | 2026-02-10 | Migrate from dual Qwen3 models to single GLM-4.7-FP8 (355B MoE, 32B active, 200K context, 128K output, Interleaved Thinking); remove dual-server/degraded_mode logic; update sampling and hardware specs |

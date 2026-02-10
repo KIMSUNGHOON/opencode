@@ -361,7 +361,7 @@ Code-QA v4 워크플로우에서 `code-reviewer` 에이전트가 파일을 분�
 ---
 description: Workspace Structure Analyzer
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 tools:
   "*": false
   "Glob": true

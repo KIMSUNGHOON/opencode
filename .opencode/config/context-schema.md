@@ -395,7 +395,7 @@ The Orchestrator maintains a `context_store` dict that accumulates all agent out
 }
 ```
 
-**Single Source of Truth:** Agent model assignments are defined in `workflow-settings.yaml` under `model.assignment`. The `model:` field in each agent's YAML frontmatter MUST match the assignment in `workflow-settings.yaml`. If they differ, `workflow-settings.yaml` is authoritative for documentation/validation purposes.
+**Single Source of Truth:** All agents use a single model `glm/GLM-4.7-FP8`, defined in `workflow-settings.yaml` under `model.assignment`. The `model:` field in each agent's YAML frontmatter MUST be set to `glm/GLM-4.7-FP8` and match the assignment in `workflow-settings.yaml`. If they differ, `workflow-settings.yaml` is authoritative for documentation/validation purposes. There is no distinction between "Thinking" and "Coder" models — every agent runs on the same `glm/GLM-4.7-FP8` model.
 
 **Note:** At runtime, OpenCode reads the `model:` field from each agent's YAML frontmatter directly — it does NOT read `workflow-settings.yaml`. Therefore, both files must be kept in sync. The test script (`test-workflow.sh`) validates this consistency.
 

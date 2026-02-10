@@ -12,7 +12,7 @@
 
 1. **엣지 케이스 처리**: 워크플로우에서 식별된 모든 엣지 케이스에 대한 견고한 처리 구현
 2. **영문 번역**: 모든 오케스트레이터 및 서브 에이전트 프롬프트를 영어로 번역
-3. **Qwen3-Next 호환성**: Qwen3-Next 시리즈 모델에 최적화된 프롬프트 보장
+3. **GLM-4.7 호환성**: GLM-4.7-FP8 모델에 최적화된 프롬프트 보장 (355B MoE, 32B 활성, 200K 컨텍스트, 128K 출력, Interleaved Thinking)
 4. **로컬 인프라**: 토큰 비용에 구애받지 않는 로컬 LLM 서빙을 위한 설계
 
 ### 1.2 워크플로우 아키텍처
@@ -84,20 +84,20 @@
 
 | 에이전트 | 파일 | 언어 | 모델 | 용도 |
 |----------|------|------|------|------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 오케스트레이터 (Coder 모델, tool call 안정성) |
-| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 코드 리뷰 (CoT) |
-| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 품질 검증 (CoT) |
-| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 최종 요약 (CoT) |
-| env-setup | `.opencode/agent/env-setup.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 환경 설정 |
-| git-input | `.opencode/agent/git-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git diff 수집 |
-| file-input | `.opencode/agent/file-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 직접 파일 입력 |
-| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 작업공간 분석 |
-| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 사전 검사 |
-| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 자동 이슈 수정 (SWE-Bench) |
-| build-tester | `.opencode/agent/build-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 빌드 테스트 |
-| function-tester | `.opencode/agent/function-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 기능 테스트 |
-| git-committer | `.opencode/agent/git-committer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git 커밋 |
-| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git 푸시 |
+| code-qa | `.opencode/mode/code-qa.md` | English | glm/GLM-4.7-FP8 | 오케스트레이터 (Interleaved Thinking으로 추론 + tool call) |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | glm/GLM-4.7-FP8 | 코드 리뷰 (Interleaved Thinking) |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | glm/GLM-4.7-FP8 | 품질 검증 (Interleaved Thinking) |
+| summary-reporter | `.opencode/agent/summary-reporter.md` | English | glm/GLM-4.7-FP8 | 최종 요약 (Interleaved Thinking) |
+| env-setup | `.opencode/agent/env-setup.md` | English | glm/GLM-4.7-FP8 | 환경 설정 |
+| git-input | `.opencode/agent/git-input.md` | English | glm/GLM-4.7-FP8 | Git diff 수집 |
+| file-input | `.opencode/agent/file-input.md` | English | glm/GLM-4.7-FP8 | 직접 파일 입력 |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | glm/GLM-4.7-FP8 | 작업공간 분석 |
+| pre-checker | `.opencode/agent/pre-checker.md` | English | glm/GLM-4.7-FP8 | 사전 검사 |
+| code-fixer | `.opencode/agent/code-fixer.md` | English | glm/GLM-4.7-FP8 | 자동 이슈 수정 |
+| build-tester | `.opencode/agent/build-tester.md` | English | glm/GLM-4.7-FP8 | 빌드 테스트 |
+| function-tester | `.opencode/agent/function-tester.md` | English | glm/GLM-4.7-FP8 | 기능 테스트 |
+| git-committer | `.opencode/agent/git-committer.md` | English | glm/GLM-4.7-FP8 | Git 커밋 |
+| git-pusher | `.opencode/agent/git-pusher.md` | English | glm/GLM-4.7-FP8 | Git 푸시 |
 
 ### 3.2 결과 토큰 패턴
 
@@ -166,7 +166,7 @@ PUSH_RESULT: FAIL
 
 ---
 
-## 4. Qwen3-Next 호환성
+## 4. GLM-4.7 호환성
 
 ### 4.1 LLM 호환성을 위한 설계 패턴
 
@@ -184,42 +184,44 @@ PUSH_RESULT: FAIL
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    Dual Model Characteristics                           │
+│                  단일 모델: GLM-4.7-FP8                                  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8, SGLang port 8000):  │
-│    - 자기 추론 능력 (CoT)                                                │
-│    - 4개 에이전트: Orchestrator, code-reviewer, quality-checker,        │
-│      summary-reporter                                                   │
-│                                                                         │
-│  Coder Model (Qwen3-Coder-Next-FP8, vLLM port 8001):                  │
-│    - Non-thinking, 빠른 코드 생성 (SWE-Bench 70.6%)                     │
-│    - 10개 에이전트: env-setup, git-input, file-input,                   │
-│      workspace-analyzer, pre-checker, code-fixer, build-tester,        │
-│      function-tester, git-committer, git-pusher                        │
+│  GLM-4.7-FP8 (vLLM port 8000):                                        │
+│    - 355B MoE (32B 활성 파라미터)                                       │
+│    - 200K 컨텍스트 윈도우, 128K 최대 출력                                 │
+│    - 내장 Interleaved Thinking (별도 Thinking 모델 불필요)               │
+│    - 모든 14개 에이전트를 단일 모델 인스턴스로 서빙                        │
+│    - 샘플링: temperature=1.0, top_p=0.95 (top_k 없음)                  │
+│    - OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072                     │
+│    - 하드웨어: 8x H100 또는 4x H200                                    │
 │                                                                         │
 │  로컬 추론:                                                              │
 │    - 토큰 비용: 해당 없음 (로컬 서빙)                                     │
 │    - 지연 시간: 컨텍스트 길이에 비례                                       │
 │    - 품질/일관성: 주요 관심사                                              │
+│    - 단일 서버로 배포 간소화 및 degraded_mode 듀얼 서버                    │
+│      장애 조치 로직 제거                                                  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.3 최적화 계획
 
-1. **듀얼 모델 전략 (구현 완료)**
-   - Thinking 모델: 복잡한 추론 작업 (코드 리뷰, 품질 검사)
-   - Coder 모델: 코드 생성/수정 작업 (SWE-Bench 최적화)
+1. **단일 모델 전략 (구현 완료)**
+   - GLM-4.7-FP8이 모든 작업 처리: 추론, 코드 생성, tool call
+   - Interleaved Thinking이 복잡한 추론 에이전트에 내장 CoT 제공
+   - 별도의 Thinking vs. Coder 모델 분리 불필요
+   - degraded_mode 듀얼 서버 장애 조치 로직 제거
 
-2. **에이전트 재배치**
-   - 각 에이전트를 두 모델 모두로 테스트
-   - 정확도 및 지연 시간 측정
-   - 에이전트별 최적 모델 할당
+2. **샘플링 설정**
+   - temperature=1.0, top_p=0.95 (top_k 없음)
+   - OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=131072
 
 3. **워크플로우 최적화**
    - 가능한 경우 병렬 실행
    - 반복 작업에 대한 캐싱
+   - 단일 서버(port 8000)로 인프라 간소화
 
 ---
 
@@ -427,7 +429,8 @@ STEP 4: 활성화 확인 → WAITING_INPUT
 | `14-code-qa-v4-quick-start.kr.md` | 빠른 시작 가이드 (KR) |
 | `15-workspace-analysis-workflow.md` | 작업공간 분석 상세 |
 | `16-workflow-case-review.md` | 케이스 리뷰 및 엣지 케이스 |
-| `20-dual-model-strategy-report.md` | 듀얼 모델 전략 보고서 |
+| `.opencode/config/workflow-settings.yaml` | 권한 설정 (타임아웃, 재시도, 모델 할당) |
+| `.opencode/config/context-schema.md` | 구조화된 컨텍스트 전달을 위한 JSON 스키마 |
 
 ---
 
@@ -438,3 +441,4 @@ STEP 4: 활성화 확인 → WAITING_INPUT
 | 1.0 | 2025-02-04 | 초기 구현 요약 |
 | 1.1 | 2025-02-04 | env-setup 간소화 (4단계 → 1-2단계) |
 | 1.2 | 2026-02-05 | 전체 결과 토큰 목록, 단계 다이어그램 수정, 전체 13개 에이전트 추가 |
+| 1.3 | 2026-02-10 | 듀얼 Qwen3 모델에서 단일 GLM-4.7-FP8로 마이그레이션 (355B MoE, 32B 활성, 200K 컨텍스트, 128K 출력, Interleaved Thinking); 듀얼 서버/degraded_mode 로직 제거; 샘플링 및 하드웨어 사양 업데이트 |

@@ -1,7 +1,7 @@
 ---
 description: Code Auto-Cleanup (Lint Fix, Format)
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: glm/GLM-4.7-FP8
 color: "#9B59B6"
 tools:
   "*": false
