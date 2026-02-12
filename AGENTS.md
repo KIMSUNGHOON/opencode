@@ -191,6 +191,13 @@ Build mode has **full access**. It can run `/analyze` directly.
   to understand existing patterns, exports, and dependencies.
 - After significant structural changes (new modules, moved files): suggest cache refresh.
 
+**Fallback:** If `/analyze` completes but `.opencode/workspace-cache/project-map.yaml`
+does not exist, the cache write may have failed. In that case:
+1. Run `ls -la .opencode/workspace-cache/` to check what was created
+2. If empty, inform the user: "Cache generation failed. You can retry with `/analyze --force`
+   or proceed without cache."
+3. Do NOT silently proceed as if cache exists.
+
 ### During Work (Both Modes)
 
 - **Cross-module changes**: Read `dependency-graph.yaml` to understand impact
