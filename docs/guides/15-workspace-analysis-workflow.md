@@ -1,17 +1,19 @@
-# Workspace Analysis Workflow 설계 문서
+# Workspace Analysis Workflow 설계 문서 (v2)
 
-이 문서는 `/analyze` 명령어와 워크스페이스 분석 워크플로우의 설계를 설명합니다.
+이 문서는 `/analyze` 명령어와 3-Level Progressive Cache 기반 워크스페이스 분석 워크플로우의 설계를 설명합니다.
 
 ## 목차
 
 1. [개요](#1-개요)
 2. [동기 및 배경](#2-동기-및-배경)
-3. [아키텍처](#3-아키텍처)
-4. [캐시 스키마](#4-캐시-스키마)
-5. [워크플로우 설계](#5-워크플로우-설계)
-6. [Code-QA 통합](#6-code-qa-통합)
-7. [구현 계획](#7-구현-계획)
-8. [사용 예시](#8-사용-예시)
+3. [아키텍처 (v2)](#3-아키텍처-v2)
+4. [3-Level 캐시 스키마](#4-3-level-캐시-스키마)
+5. [에이전트 설계](#5-에이전트-설계)
+6. [병렬 실행 전략](#6-병렬-실행-전략)
+7. [디렉토리 제외 규칙](#7-디렉토리-제외-규칙)
+8. [Code-QA 통합](#8-code-qa-통합)
+9. [사용 예시](#9-사용-예시)
+10. [에러 처리 및 폴백](#10-에러-처리-및-폴백)
 
 ---
 
@@ -19,16 +21,17 @@
 
 ### 1.1 Workspace Analysis란?
 
-Workspace Analysis는 프로젝트의 구조, 파일 목록, 의존성, 환경 정보를 사전에 분석하여 캐시에 저장하는 워크플로우입니다.
+Workspace Analysis는 프로젝트의 구조, 모듈 경계, 의존성, 빌드 시스템을 사전에 분석하여 3-Level Progressive Cache에 저장하는 워크플로우입니다.
 
-### 1.2 주요 기능
+### 1.2 v1 → v2 변경 사항
 
-- **프로젝트 구조 분석**: 디렉토리 구조, 파일 목록, 파일 타입 분류
-- **의존성 탐지**: package.json, requirements.txt, go.mod 등 분석
-- **빌드 시스템 감지**: npm, cargo, go, make 등 빌드 도구 식별
-- **환경 정보 수집**: 언어 버전, 프레임워크, 설정 파일
-- **캐시 저장**: 분석 결과를 JSON 캐시로 저장
-- **증분 업데이트**: 변경된 파일만 재분석
+| 항목 | v1 (기존) | v2 (현재) |
+|------|-----------|-----------|
+| 에이전트 | workspace-analyzer 1개 | workspace-scanner + module-analyzer N개 |
+| 실행 방식 | 순차 (단일 에이전트) | 병렬 (모듈별 동시 분석) |
+| 캐시 구조 | analysis.json 단일 파일 | 3-Level (project-map + modules + dependency-graph) |
+| 컨텍스트 효율 | 전체 로드 (대규모 프로젝트에서 비효율) | L1만 항상 로드 (~1K), L2는 필요시 (~2-5K/모듈) |
+| 분석 속도 | 직렬, 프로젝트 크기에 비례 | 병렬, 모듈 수 무관하게 ~30초 |
 
 ### 1.3 설계 원칙
 
@@ -37,17 +40,23 @@ Workspace Analysis는 프로젝트의 구조, 파일 목록, 의존성, 환경 �
 │                      ★★★ 핵심 설계 원칙 ★★★                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  1. 관심사 분리 (Separation of Concerns)                                 │
-│     - 분석: workspace-analyzer가 담당                                    │
-│     - 품질 검사: code-qa가 담당                                          │
+│  1. Progressive Disclosure                                               │
+│     - L1 (~1K tokens): 항상 로드, 프로젝트 전체 맵                       │
+│     - L2 (~2-5K/module): 필요시 로드, 모듈 상세 분석                     │
+│     - L3 (원본): 필요시 Read tool로 직접 접근                            │
 │                                                                          │
-│  2. 데이터 중심 설계 (Data-Driven)                                       │
-│     - 모델이 파일을 추측하지 않음                                        │
-│     - 사전 분석된 정확한 데이터 제공                                     │
+│  2. 병렬 실행 (Parallel Execution)                                       │
+│     - 모듈 분석을 단일 응답에서 N개 Task 동시 호출                       │
+│     - AI SDK fire-and-forget 패턴으로 실제 병렬 실행                     │
 │                                                                          │
-│  3. Unix 철학                                                            │
-│     - 한 가지 일을 잘 수행하는 도구                                      │
-│     - 파이프라인으로 조합 가능                                           │
+│  3. 관심사 분리 (Separation of Concerns)                                 │
+│     - Scanner: 빠른 구조 스캔 (what modules exist)                       │
+│     - Analyzer: 깊은 모듈 분석 (what each module does)                   │
+│     - Orchestrator: 결과 통합 및 캐시 저장                               │
+│                                                                          │
+│  4. 레거시 호환                                                          │
+│     - analysis.json도 동시에 생성                                        │
+│     - v1 캐시가 있으면 그것도 활용                                       │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -56,114 +65,105 @@ Workspace Analysis는 프로젝트의 구조, 파일 목록, 의존성, 환경 �
 
 ## 2. 동기 및 배경
 
-### 2.1 기존 문제점
-
-Code-QA v4 워크플로우에서 `code-reviewer` 에이전트가 파일을 분석할 때 발생하는 문제:
+### 2.1 v1의 한계
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      문제 상황                                          │
+│                      v1 한계점                                          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  1. 파일 할루시네이션                                                    │
-│     - 모델이 존재하지 않는 파일 경로를 추측                              │
-│     - 예: main.py, model.py, test_*.py 등 일반적 이름 시도               │
+│  1. 단일 에이전트 병목                                                   │
+│     - workspace-analyzer 1개가 전체 프로젝트를 순차 분석                 │
+│     - 대규모 프로젝트(100+ 모듈)에서 수 분 소요                         │
 │                                                                          │
-│  2. 불완전한 분석                                                        │
-│     - 일부 파일만 분석하고 완료 처리                                     │
-│     - 중요한 파일 누락 가능                                              │
+│  2. 컨텍스트 비효율                                                     │
+│     - analysis.json 전체를 로드 → 대규모 프로젝트에서 수만 토큰          │
+│     - 256K 컨텍스트에서 분석 데이터가 차지하는 비중 과다                  │
 │                                                                          │
-│  3. 비효율성                                                             │
-│     - 매번 같은 파일 구조를 재분석                                       │
-│     - 동일한 프로젝트에서 반복적인 탐색                                  │
+│  3. All-or-Nothing                                                       │
+│     - 특정 모듈만 재분석 불가                                            │
+│     - 부분 실패 시 전체 재실행 필요                                      │
+│                                                                          │
+│  4. 자기 참조 문제                                                       │
+│     - .opencode/ 디렉토리를 분석 대상에 포함                             │
+│     - 캐시 디렉토리, 빌드 결과물 등 불필요한 파일 스캔                   │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 해결 방안
+### 2.2 v2 해결 전략
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      해결 전략                                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  기존 접근 (제한적):                                                     │
-│    → code-reviewer의 도구 제한 (Glob, Grep, Bash 제거)                  │
-│    → 문제: 오케스트레이터가 정확한 파일 목록을 제공해야 함               │
-│                                                                          │
-│  새로운 접근 (근본적):                                                   │
-│    → 사전 분석 워크플로우로 정확한 데이터 생성                           │
-│    → 캐시된 데이터를 code-qa에서 재사용                                  │
-│    → 모델이 추측할 필요 없음                                             │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 2.3 장점
-
-| 장점 | 설명 |
+| 문제 | 해결 |
 |------|------|
-| **정확성** | 실제 파일 시스템 기반 정확한 데이터 |
-| **재사용성** | 한 번 분석, 여러 번 사용 |
-| **효율성** | 증분 업데이트로 빠른 재분석 |
-| **독립성** | code-qa 없이 분석만 수행 가능 |
-| **확장성** | 다른 워크플로우에서도 활용 가능 |
+| 단일 에이전트 병목 | 2-Phase 병렬: Scanner(1개) → Analyzer(N개 동시) |
+| 컨텍스트 비효율 | 3-Level Cache: L1 항상 로드, L2/L3 필요시만 |
+| All-or-Nothing | 모듈별 독립 캐시 → `--modules-only`로 부분 재분석 |
+| 자기 참조 | EXCLUDED_DIRS 규칙을 3중 적용 (Scanner + Analyzer + Orchestrator) |
 
 ---
 
-## 3. 아키텍처
+## 3. 아키텍처 (v2)
 
 ### 3.1 컴포넌트 다이어그램
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                       Workspace Analysis Architecture                    │
+│              Workspace Analysis Architecture (v2)                        │
 └─────────────────────────────────────────────────────────────────────────┘
 
                               사용자
                                 │
                                 ▼
                     ┌───────────────────┐
-                    │  /analyze 명령어   │
-                    │   (command)        │
+                    │  /analyze 명령어   │  (Thinking Model - Orchestrator)
+                    │  (analyze.md)     │
                     └─────────┬─────────┘
                               │
-                              ▼
-                    ┌───────────────────┐
-                    │ workspace-analyzer │
-                    │     (agent)        │
-                    │                    │
-                    │  Tools:            │
-                    │  - Glob            │
-                    │  - Grep            │
-                    │  - Read            │
-                    │  - Bash (read-only)│
-                    └─────────┬─────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-        ┌──────────┐   ┌──────────┐   ┌──────────┐
-        │ Project  │   │ Deps     │   │ Build    │
-        │ Structure│   │ Analysis │   │ System   │
-        └────┬─────┘   └────┬─────┘   └────┬─────┘
-              │               │               │
-              └───────────────┼───────────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │   Cache File      │
-                    │                   │
-                    │ .opencode/        │
-                    │ workspace-cache/  │
-                    │   analysis.json   │
-                    └───────────────────┘
-                              │
-                              │ (재사용)
-                              ▼
-                    ┌───────────────────┐
-                    │    Code-QA        │
-                    │   Orchestrator    │
-                    └───────────────────┘
+              ┌───────────────┘
+              ▼
+    ┌───────────────────┐
+    │ workspace-scanner  │  Phase 1: Fast Scan (~15s)
+    │   (Coder Model)   │
+    │                    │
+    │  Tools: Glob,      │
+    │  Read, Bash        │
+    └─────────┬─────────┘
+              │
+              │ modules[] 반환
+              ▼
+    ┌─────────────────────────────────────────────────────┐
+    │              Phase 2: Parallel Module Analysis        │
+    │                                                       │
+    │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+    │  │ module-  │ │ module-  │ │ module-  │  ... × N    │
+    │  │ analyzer │ │ analyzer │ │ analyzer │  (동시 실행) │
+    │  │ (api)    │ │ (models) │ │ (utils)  │            │
+    │  └────┬─────┘ └────┬─────┘ └────┬─────┘            │
+    │       │             │             │                   │
+    └───────┼─────────────┼─────────────┼───────────────────┘
+            │             │             │
+            └─────────────┼─────────────┘
+                          │
+                          ▼
+                ┌───────────────────┐
+                │  Phase 3: Merge   │  Orchestrator가 결과 통합
+                └─────────┬─────────┘
+                          │
+          ┌───────────────┼───────────────────────────┐
+          ▼               ▼               ▼            ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐  ┌──────────┐
+    │ L1:      │   │ L2:      │   │ Dep      │  │ Legacy:  │
+    │ project- │   │ modules/ │   │ Graph    │  │ analysis │
+    │ map.yaml │   │ *.yaml   │   │ .yaml    │  │ .json    │
+    └──────────┘   └──────────┘   └──────────┘  └──────────┘
+          │
+          │ (항상 로드)
+          ▼
+    ┌───────────────────┐
+    │ Code-QA / 일반    │
+    │ 코딩 작업에서     │
+    │ 컨텍스트로 활용   │
+    └───────────────────┘
 ```
 
 ### 3.2 파일 구조
@@ -171,163 +171,189 @@ Code-QA v4 워크플로우에서 `code-reviewer` 에이전트가 파일을 분�
 ```
 .opencode/
 ├── command/
-│   └── analyze.md              # /analyze 명령어 정의
+│   └── analyze.md              # /analyze 명령어 (Orchestrator)
 ├── agent/
-│   └── workspace-analyzer.md   # 분석 에이전트 정의
+│   ├── workspace-scanner.md    # Phase 1: 빠른 프로젝트 스캔
+│   ├── module-analyzer.md      # Phase 2: 모듈별 딥 분석
+│   └── workspace-analyzer.md   # (레거시) v1 분석 에이전트
 ├── mode/
-│   └── code-qa.md              # (수정) 캐시 통합 로직 추가
+│   └── code-qa.md              # STEP 0에서 캐시 통합
+├── config/
+│   └── workflow-settings.yaml  # 에이전트 타임아웃/모델 설정
 └── workspace-cache/            # 캐시 저장 디렉토리
-    ├── analysis.json           # 메인 분석 결과
-    └── file-hashes.json        # 파일 해시 (증분 업데이트용)
+    ├── project-map.yaml        # L1: 프로젝트 전체 맵 (~1K tokens)
+    ├── modules/                # L2: 모듈별 상세 분석
+    │   ├── api.yaml            #     (~2-5K tokens per module)
+    │   ├── models.yaml
+    │   └── services.yaml
+    ├── dependency-graph.yaml   # 모듈간 의존성 그래프
+    ├── .cache-meta.json        # 캐시 메타데이터
+    └── analysis.json           # 레거시 호환용 (v1 형식)
 ```
 
 ### 3.3 데이터 흐름
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                       데이터 흐름                                        │
-└─────────────────────────────────────────────────────────────────────────┘
-
 1. 분석 실행 (/analyze)
-   ┌────────┐     ┌─────────────────┐     ┌────────────────┐
-   │  User  │────▶│ workspace-      │────▶│ analysis.json  │
-   │        │     │ analyzer        │     │                │
-   └────────┘     └─────────────────┘     └────────────────┘
 
-2. Code-QA에서 캐시 사용
-   ┌────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-   │ analysis.json  │────▶│ code-qa         │────▶│ code-reviewer   │
-   │                │     │ orchestrator    │     │ (정확한 데이터) │
-   └────────────────┘     └─────────────────┘     └─────────────────┘
+   ┌────────┐     ┌─────────────────┐     ┌───────────────────────────────┐
+   │  User  │────▶│ workspace-      │────▶│ modules[] (JSON)              │
+   │        │     │ scanner         │     │ [{name, path, file_count}...] │
+   └────────┘     └─────────────────┘     └───────────────┬───────────────┘
+                                                           │
+                                           ┌───────────────┼───────────────┐
+                                           ▼               ▼               ▼
+                                     ┌──────────┐   ┌──────────┐   ┌──────────┐
+                                     │ module-  │   │ module-  │   │ module-  │
+                                     │ analyzer │   │ analyzer │   │ analyzer │
+                                     └────┬─────┘   └────┬─────┘   └────┬─────┘
+                                           │               │               │
+                                           └───────────────┼───────────────┘
+                                                           │
+                                                           ▼
+                                                  ┌────────────────┐
+                                                  │ Merge & Save   │
+                                                  │ 3-Level Cache  │
+                                                  └────────────────┘
 
-3. 증분 업데이트
-   ┌────────────────┐     ┌─────────────────┐     ┌────────────────┐
-   │ file-hashes    │────▶│ 변경 감지       │────▶│ 부분 재분석    │
-   │ (이전)         │     │                 │     │                │
-   └────────────────┘     └─────────────────┘     └────────────────┘
+2. Code-QA / 일반 작업에서 캐시 사용
+
+   ┌─────────────────┐     ┌─────────────────────┐
+   │ project-map.yaml│────▶│ 프로젝트 구조 파악   │  (L1: ~1K tokens, 항상)
+   │ (L1)            │     │ 어떤 모듈이 있는지   │
+   └─────────────────┘     └─────────────────────┘
+                                     │
+                                     │ (특정 모듈 작업 시)
+                                     ▼
+   ┌─────────────────┐     ┌─────────────────────┐
+   │ modules/api.yaml│────▶│ 모듈 상세 파악       │  (L2: ~2-5K tokens, 필요시)
+   │ (L2)            │     │ 어떤 파일/함수가     │
+   └─────────────────┘     └─────────────────────┘
+                                     │
+                                     │ (실제 코드 필요 시)
+                                     ▼
+   ┌─────────────────┐     ┌─────────────────────┐
+   │ src/api/app.py  │────▶│ 코드 직접 읽기       │  (L3: Read tool)
+   │ (L3 원본)       │     │                     │
+   └─────────────────┘     └─────────────────────┘
 ```
 
 ---
 
-## 4. 캐시 스키마
+## 4. 3-Level 캐시 스키마
 
-### 4.1 analysis.json 스키마
+### 4.1 Level 1: project-map.yaml (~500-1K tokens)
+
+항상 시스템 프롬프트에 포함되는 프로젝트 전체 맵.
+
+```yaml
+version: "2.0"
+analyzed_at: "2025-01-15T10:30:00Z"
+project_root: "/home/user/myproject"
+
+project:
+  name: "myproject"
+  type: "node"
+  languages: ["typescript", "javascript"]
+  frameworks: ["react", "express"]
+
+build:
+  build_command: "npm run build"
+  test_command: "npm test"
+  lint_command: "eslint src/"
+
+modules:
+  api:
+    path: "src/api"
+    summary: "FastAPI REST endpoints with JWT auth"
+    files: 12
+    key_exports: ["create_app", "router", "verify_token"]
+  models:
+    path: "src/models"
+    summary: "SQLAlchemy ORM models for users, orders, products"
+    files: 8
+    key_exports: ["User", "Order", "Product"]
+  services:
+    path: "src/services"
+    summary: "Business logic layer with transaction support"
+    files: 6
+    key_exports: ["UserService", "OrderService"]
+
+dependencies:
+  api: [services, models]
+  services: [models]
+  models: []
+
+entry_points:
+  - "src/main.py"
+  - "src/server.ts"
+
+git:
+  remote_url: "git@github.com:user/myproject.git"
+  current_branch: "main"
+```
+
+### 4.2 Level 2: modules/{name}.yaml (~2-5K tokens per module)
+
+특정 모듈 작업 시 on-demand로 로드.
+
+```yaml
+name: "api"
+path: "src/api"
+summary: "FastAPI REST endpoints with JWT auth and role-based access control"
+file_count: 12
+test_count: 3
+total_lines: 1850
+
+files:
+  - path: "src/api/app.py"
+    role: "FastAPI app factory, CORS setup, exception handlers"
+    exports: ["create_app"]
+    lines: 85
+  - path: "src/api/routes/users.py"
+    role: "User CRUD endpoints - register, login, profile"
+    exports: ["router"]
+    lines: 120
+    imports_from: ["services.UserService", "models.User"]
+
+key_exports: ["create_app", "router", "verify_token", "require_role"]
+
+internal_dependencies:
+  - module: "services"
+    imports: ["UserService", "OrderService"]
+  - module: "models"
+    imports: ["User", "Order", "Product"]
+
+patterns:
+  - "All routes use Depends(verify_token) for auth"
+  - "Pydantic schemas in schemas/ for request/response validation"
+```
+
+### 4.3 dependency-graph.yaml
+
+```yaml
+# 모듈간 의존성 관계
+graph:
+  api: [services, models]
+  services: [models, database]
+  models: [database]
+  database: []
+```
+
+### 4.4 .cache-meta.json
 
 ```json
 {
-  "version": "1.0",
-  "analyzed_at": "2024-01-15T10:30:00Z",
-  "project_root": "/home/user/myproject",
-
-  "project": {
-    "name": "myproject",
-    "type": "typescript",
-    "languages": ["typescript", "javascript"],
-    "frameworks": ["react", "express"]
-  },
-
-  "structure": {
-    "directories": [
-      "src/",
-      "src/components/",
-      "src/utils/",
-      "tests/",
-      "docs/"
-    ],
-    "total_files": 156,
-    "total_directories": 23
-  },
-
-  "files": {
-    "by_type": {
-      "typescript": [
-        {"path": "src/index.ts", "size": 1234, "mtime": "2024-01-15T09:00:00Z"},
-        {"path": "src/app.ts", "size": 5678, "mtime": "2024-01-15T08:30:00Z"}
-      ],
-      "javascript": [
-        {"path": "scripts/build.js", "size": 890, "mtime": "2024-01-10T12:00:00Z"}
-      ],
-      "json": [
-        {"path": "package.json", "size": 2345, "mtime": "2024-01-14T15:00:00Z"},
-        {"path": "tsconfig.json", "size": 567, "mtime": "2024-01-01T10:00:00Z"}
-      ]
-    },
-    "entry_points": ["src/index.ts", "src/server.ts"],
-    "config_files": ["package.json", "tsconfig.json", ".eslintrc.js"],
-    "test_files": ["tests/**/*.test.ts"]
-  },
-
-  "dependencies": {
-    "package_manager": "npm",
-    "manifest_file": "package.json",
-    "lock_file": "package-lock.json",
-    "production": {
-      "react": "^18.2.0",
-      "express": "^4.18.2"
-    },
-    "development": {
-      "typescript": "^5.0.0",
-      "jest": "^29.0.0"
-    }
-  },
-
-  "build_system": {
-    "type": "npm",
-    "scripts": {
-      "build": "tsc && vite build",
-      "test": "jest",
-      "lint": "eslint src/"
-    },
-    "build_command": "npm run build",
-    "test_command": "npm test"
-  },
-
-  "environment": {
-    "node_version": "20.x",
-    "typescript_version": "5.0.0",
-    "env_files": [".env.example"],
-    "docker": {
-      "has_dockerfile": true,
-      "has_compose": true
-    }
-  },
-
-  "git": {
-    "is_repo": true,
-    "remote_url": "git@github.com:user/myproject.git",
-    "default_branch": "main",
-    "current_branch": "feature/new-feature"
-  },
-
-  "analysis_stats": {
-    "files_analyzed": 156,
-    "duration_ms": 2340,
-    "errors": []
-  }
+  "version": "2.0",
+  "analyzed_at": "2025-01-15T10:30:00Z",
+  "scanner_version": "1.0",
+  "modules_analyzed": 5,
+  "modules_skipped": 0,
+  "total_analysis_time_ms": 28500
 }
 ```
 
-### 4.2 file-hashes.json 스키마
-
-```json
-{
-  "version": "1.0",
-  "generated_at": "2024-01-15T10:30:00Z",
-  "algorithm": "mtime",
-  "files": {
-    "src/index.ts": {
-      "mtime": "2024-01-15T09:00:00Z",
-      "size": 1234
-    },
-    "src/app.ts": {
-      "mtime": "2024-01-15T08:30:00Z",
-      "size": 5678
-    }
-  }
-}
-```
-
-### 4.3 캐시 무효화 전략
+### 4.5 캐시 무효화 전략
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -335,305 +361,346 @@ Code-QA v4 워크플로우에서 `code-reviewer` 에이전트가 파일을 분�
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  자동 무효화:                                                            │
-│    - 캐시 파일이 24시간 이상 경과                                        │
-│    - package.json, go.mod 등 의존성 파일 변경                            │
-│    - 새 파일 추가 또는 파일 삭제                                         │
+│    - analyzed_at이 24시간 이상 경과                                      │
+│    - /analyze --force로 강제 재분석                                      │
 │                                                                          │
 │  부분 업데이트:                                                          │
-│    - 기존 파일의 mtime 변경 시 해당 파일만 재분석                        │
-│    - 구조적 변경 없이 내용만 변경된 경우                                 │
+│    - /analyze --modules-only: 스캐너 스킵, 모듈만 재분석                 │
+│    - 개별 모듈 yaml 삭제 → 해당 모듈만 재분석                            │
 │                                                                          │
-│  강제 재분석:                                                            │
-│    - /analyze --force 옵션 사용                                          │
-│    - 캐시 디렉토리 삭제                                                  │
+│  레거시 폴백:                                                            │
+│    - project-map.yaml 없고 analysis.json만 있으면 v1 캐시 사용           │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. 워크플로우 설계
+## 5. 에이전트 설계
 
-### 5.1 workspace-analyzer 에이전트
+### 5.1 workspace-scanner (Phase 1)
+
+빠른 프로젝트 스캔으로 모듈 목록을 생성합니다.
 
 ```yaml
-# .opencode/agent/workspace-analyzer.md
+# .opencode/agent/workspace-scanner.md
 ---
-description: Workspace Structure Analyzer
+description: Fast workspace scanner
 mode: subagent
 model: qwen-coder/Qwen3-Coder-Next-FP8
-tools:
-  "*": false
-  "Glob": true
-  "Grep": true
-  "Read": true
-  "Bash": true  # read-only commands only
-permission:
-  read: allow
-  edit: deny
+tools: [Glob, Read, Bash]
+permission: read-only
 ---
 ```
 
-### 5.2 분석 단계
+**실행 단계:**
+
+| Step | 작업 | 도구 | 소요 시간 |
+|------|------|------|-----------|
+| 1 | 프로젝트 루트 & 타입 감지 | Bash (pwd, ls) | ~1s |
+| 2 | 디렉토리 구조 매핑 | Glob | ~2s |
+| 3 | 모듈 경계 탐지 | Glob | ~5s |
+| 4 | 모듈별 파일 수 카운트 | Bash (find) | ~3s |
+| 5 | 엔트리 포인트 & 설정 감지 | Glob | ~2s |
+| 6 | 모노레포 감지 | Read (package.json) | ~1s |
+
+**출력:** `WORKSPACE_SCAN_RESULT: COMPLETE` + `SCAN_DATA` JSON
+
+**모듈 경계 탐지 기준:**
+
+| 언어 | 경계 마커 |
+|------|-----------|
+| Python | `__init__.py` |
+| TypeScript/JS | `index.ts`, `index.js`, `package.json` |
+| Go | 디렉토리 내 `.go` 파일 |
+| Rust | `mod.rs`, `lib.rs`, `main.rs` |
+| Java | `src/main/java/` 하위 디렉토리 |
+
+### 5.2 module-analyzer (Phase 2)
+
+단일 모듈의 파일, 내보내기, 의존성을 딥 분석합니다.
+
+```yaml
+# .opencode/agent/module-analyzer.md
+---
+description: Deep module analyzer
+mode: subagent
+model: qwen-coder/Qwen3-Coder-Next-FP8
+tools: [Glob, Grep, Read]
+permission: read-only
+---
+```
+
+**입력:** `MODULE_PATH`, `MODULE_NAME`, `PROJECT_ROOT`, `PROJECT_TYPE`
+
+**실행 단계:**
+
+| Step | 작업 | 도구 |
+|------|------|------|
+| 1 | 파일 인벤토리 | Glob |
+| 2 | 공개 API / 내보내기 탐지 | Grep |
+| 3 | 내부 의존성 분석 | Grep |
+| 4 | 파일별 역할 요약 (상위 20개) | Read (첫 50줄) |
+| 5 | 모듈 요약 생성 | - |
+
+**출력:** `MODULE_ANALYSIS_RESULT: COMPLETE` + `MODULE_DATA` JSON
+
+### 5.3 workspace-analyzer (레거시)
+
+v1 호환용 단일 분석 에이전트. workspace-scanner가 실패할 경우 폴백으로 사용됩니다.
+
+### 5.4 타임아웃 설정
+
+```yaml
+# workflow-settings.yaml
+timeout:
+  agent:
+    workspace-scanner: 30000   # 30초
+    module-analyzer: 60000     # 1분 (per module)
+```
+
+---
+
+## 6. 병렬 실행 전략
+
+### 6.1 AI SDK 병렬 실행 원리
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      분석 워크플로우 단계                                │
+│                      AI SDK 병렬 실행 메커니즘                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  AI SDK의 runToolsTransformation()은 tool-call 이벤트를 받으면:          │
+│                                                                          │
+│    outstandingToolResults.add(toolCallId)                                │
+│    executeToolCall(toolCall)  // ← await 없이 fire-and-forget            │
+│                                                                          │
+│  모델이 하나의 응답에서 여러 Task 호출을 하면,                            │
+│  각 Task는 await 없이 즉시 시작됨 → 실제 병렬 실행                       │
+│                                                                          │
+│  핵심: 모델이 하나의 응답에 N개의 Task call을 포함해야 함                 │
+│  → 프롬프트 설계가 병렬 실행의 핵심                                      │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
-
-STEP 1: 프로젝트 타입 감지
-├── package.json → Node.js/TypeScript
-├── go.mod → Go
-├── Cargo.toml → Rust
-├── requirements.txt/pyproject.toml → Python
-├── pom.xml/build.gradle → Java
-└── Makefile → C/C++
-
-STEP 2: 파일 구조 수집
-├── 모든 소스 파일 목록 (Glob)
-├── 디렉토리 구조 매핑
-├── 파일 타입별 분류
-└── mtime 기록
-
-STEP 3: 의존성 분석
-├── 패키지 매니저 식별
-├── 의존성 파일 파싱
-├── 직접 의존성 목록
-└── 개발 의존성 분리
-
-STEP 4: 빌드 시스템 분석
-├── 빌드 도구 감지
-├── 빌드 스크립트 파싱
-├── 테스트 명령 식별
-└── 린트 설정 확인
-
-STEP 5: 환경 정보 수집
-├── 언어 버전
-├── 프레임워크 버전
-├── 환경 설정 파일
-└── Docker 설정
-
-STEP 6: 캐시 저장
-├── analysis.json 생성
-├── file-hashes.json 생성
-└── 결과 요약 출력
 ```
 
-### 5.3 출력 형식
-
-```
-═══════════════════════════════════════════════════════════════
-WORKSPACE_ANALYSIS_RESULT: COMPLETE
-═══════════════════════════════════════════════════════════════
-
-📊 분석 요약
-┌──────────────────┬──────────────────┐
-│ 프로젝트 타입     │ TypeScript       │
-│ 총 파일 수       │ 156              │
-│ 소스 파일        │ 89               │
-│ 테스트 파일      │ 34               │
-│ 설정 파일        │ 12               │
-│ 의존성           │ 45 packages      │
-│ 분석 시간        │ 2.34s            │
-└──────────────────┴──────────────────┘
-
-📁 주요 디렉토리
-├── src/           (소스 코드)
-├── tests/         (테스트)
-├── docs/          (문서)
-└── scripts/       (빌드 스크립트)
-
-💾 캐시 저장됨
-→ .opencode/workspace-cache/analysis.json
-
-═══════════════════════════════════════════════════════════════
-```
-
----
-
-## 6. Code-QA 통합
-
-### 6.1 통합 방식
+### 6.2 analyze.md의 병렬 실행 지시
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      Code-QA 통합 전략                                   │
+│                      병렬 실행 패턴                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ✅ 올바른 방법 (1 응답에 5 Task 호출):                                  │
+│                                                                          │
+│    Orchestrator Response:                                                │
+│    ├── Task(module-analyzer, "Analyze api")                              │
+│    ├── Task(module-analyzer, "Analyze models")                           │
+│    ├── Task(module-analyzer, "Analyze services")                         │
+│    ├── Task(module-analyzer, "Analyze utils")                            │
+│    └── Task(module-analyzer, "Analyze tests")                            │
+│                                                                          │
+│    → 5개 에이전트 동시 실행, ~30초 완료                                  │
+│                                                                          │
+│  ❌ 잘못된 방법 (5개 응답에 각 1 Task):                                  │
+│                                                                          │
+│    Response 1: Task(module-analyzer, "Analyze api")     → 30초           │
+│    Response 2: Task(module-analyzer, "Analyze models")  → 30초           │
+│    Response 3: Task(module-analyzer, "Analyze services") → 30초          │
+│    ...                                                                    │
+│                                                                          │
+│    → 순차 실행, ~150초 소요                                              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 모듈 수 제한
+
+- 15개 이하 모듈: 전부 병렬 분석
+- 15개 초과 모듈: file_count 기준 상위 15개만 분석, 나머지는 unanalyzed로 기록
+
+---
+
+## 7. 디렉토리 제외 규칙
+
+### 7.1 제외 대상
+
+```
+EXCLUDED_DIRS:
+  .opencode, .git, node_modules, __pycache__, .venv, venv, .env,
+  target, build, dist, out, .next, .nuxt, .output,
+  vendor, .cache, .gradle, .idea, .vscode,
+  .mypy_cache, .ruff_cache, .pytest_cache, .tox, .nox,
+  .turbo, .parcel-cache, .webpack,
+  coverage, .nyc_output, htmlcov, workspace-cache
+```
+
+### 7.2 3중 적용 원칙
+
+제외 규칙은 3개 레이어 모두에서 적용됩니다:
+
+| 레이어 | 적용 위치 | 방식 |
+|--------|-----------|------|
+| **workspace-scanner** | Glob 결과 필터링, `find` 명령에 `-not -path` | 스캔 단계에서 제외 |
+| **module-analyzer** | Glob/Grep 결과 필터링 | 분석 단계에서 제외 |
+| **analyze.md (Orchestrator)** | 스캐너 결과 후처리 | 제외된 경로의 모듈을 분석 대상에서 제거 |
+
+### 7.3 제외가 필요한 이유
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      자기 참조 방지                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  .opencode/ 를 분석하면:                                                 │
+│    - 에이전트 정의 파일(.md)을 소스코드로 분석                            │
+│    - workspace-cache/를 분석 결과로 다시 읽기                             │
+│    - 무한 자기참조 루프 가능성                                            │
+│                                                                          │
+│  build/dist/ 를 분석하면:                                                │
+│    - 트랜스파일된 코드를 원본으로 오인                                    │
+│    - 번들된 파일이 모듈로 감지                                            │
+│    - 분석 결과 부풀리기 (context overflow)                                │
+│                                                                          │
+│  __pycache__/.mypy_cache/ 를 분석하면:                                   │
+│    - 캐시 파일을 소스코드로 오인                                          │
+│    - changed_files 목록 폭증 → context overflow → 워크플로우 실패         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 8. Code-QA 통합
+
+### 8.1 STEP 0 흐름
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Code-QA STEP 0: Workspace Cache                     │
 └─────────────────────────────────────────────────────────────────────────┘
 
-시나리오 1: 캐시 존재 + 최신
-┌────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ /code-qa 실행  │────▶│ 캐시 확인       │────▶│ 캐시 데이터     │
-│                │     │ (유효)          │     │ 직접 사용       │
-└────────────────┘     └─────────────────┘     └─────────────────┘
-
-시나리오 2: 캐시 없음 또는 오래됨
-┌────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ /code-qa 실행  │────▶│ 캐시 확인       │────▶│ /analyze 자동   │
-│                │     │ (무효)          │     │ 실행            │
-└────────────────┘     └─────────────────┘     └─────────────────┘
-                                                       │
-                                               ┌───────▼───────┐
-                                               │ 분석 완료 후  │
-                                               │ code-qa 계속  │
-                                               └───────────────┘
-
-시나리오 3: 강제 스킵
-┌────────────────┐     ┌─────────────────┐
-│ /code-qa       │────▶│ 캐시 무시       │
-│ --skip-cache   │     │ 기존 방식 사용  │
-└────────────────┘     └─────────────────┘
+  /code-qa 실행
+      │
+      ▼
+  mkdir -p .opencode/workspace-cache/modules
+      │
+      ▼
+  ┌─────────────────────────────────────────┐
+  │ project-map.yaml 존재 + 24시간 이내?    │
+  └────────────┬────────────┬───────────────┘
+               │            │
+           YES │        NO  │
+               ▼            ▼
+  ┌──────────────┐   ┌─────────────────────────────┐
+  │ L1 캐시 사용  │   │ analysis.json 존재 + 유효?  │
+  │ STEP 1 진행  │   └──────────┬─────────┬────────┘
+  └──────────────┘              │         │
+                            YES │     NO  │
+                                ▼         ▼
+                   ┌──────────────┐   ┌──────────────────────┐
+                   │ 레거시 캐시   │   │ 분석 실행            │
+                   │ 사용         │   │ Scanner → Analyzer×N │
+                   │ STEP 1 진행  │   │ → Merge → STEP 1    │
+                   └──────────────┘   └──────────────────────┘
+                                              │
+                                              │ (Scanner 실패 시)
+                                              ▼
+                                      ┌──────────────────────┐
+                                      │ 레거시 폴백           │
+                                      │ workspace-analyzer   │
+                                      └──────────────────────┘
 ```
 
-### 6.2 code-qa.md 수정 사항
+### 8.2 Code-QA에서의 캐시 활용
 
-```markdown
-## Phase 0: Cache Check (새로 추가)
-
-### 0.1 캐시 확인
-1. `.opencode/workspace-cache/analysis.json` 존재 확인
-2. `analyzed_at` 타임스탬프 확인 (24시간 이내)
-3. 주요 파일 mtime 비교
-
-### 0.2 캐시 유효 시
-- 캐시 데이터를 컨텍스트에 로드
-- Phase 1로 직접 진행
-
-### 0.3 캐시 무효 시
-- workspace-analyzer 자동 호출
-- 분석 완료 후 Phase 1 진행
-
-### 0.4 캐시 데이터 활용 위치
-- **Phase 2 (Code Review)**: 파일 목록 제공
-- **Phase 4 (Build Test)**: 빌드 명령 참조
-- **Phase 5 (Function Test)**: 테스트 명령 참조
-```
-
-### 6.3 code-reviewer 프롬프트 개선
-
-```markdown
-## 기존 방식 (Changed files만 전달)
-Changed files:
-- /path/to/file1.ts
-- /path/to/file2.ts
-
-## 개선된 방식 (캐시 데이터 포함)
-Project Context (from workspace cache):
-- Project Type: TypeScript
-- Entry Points: src/index.ts, src/server.ts
-- Test Framework: Jest
-
-Changed files to analyze:
-- /path/to/file1.ts (src/components/)
-- /path/to/file2.ts (src/utils/)
-
-Related files (for context):
-- /path/to/types.ts (type definitions)
-- /path/to/config.ts (configuration)
-```
+| Phase | 사용하는 캐시 | 용도 |
+|-------|--------------|------|
+| STEP 0 | project-map.yaml | 프로젝트 구조 파악 |
+| STEP 4 (Review) | modules/*.yaml | 리뷰 대상 모듈 컨텍스트 |
+| STEP 5 (Build) | project-map.yaml → build_command | 빌드 명령 참조 |
+| STEP 6 (Test) | project-map.yaml → test_command | 테스트 명령 참조 |
 
 ---
 
-## 7. 구현 계획
+## 9. 사용 예시
 
-### 7.1 Phase 1: MVP (최소 기능)
-
-| 작업 | 설명 | 우선순위 |
-|------|------|----------|
-| workspace-analyzer.md | 에이전트 정의 | P0 |
-| analyze.md | 명령어 정의 | P0 |
-| 프로젝트 구조 분석 | 파일 목록, 디렉토리 | P0 |
-| 의존성 분석 | package.json 등 파싱 | P0 |
-| 캐시 저장 | analysis.json 생성 | P0 |
-| code-qa 통합 | 캐시 확인 로직 | P1 |
-
-### 7.2 Phase 2: 확장 기능
-
-| 작업 | 설명 | 우선순위 |
-|------|------|----------|
-| 증분 업데이트 | 변경 파일만 재분석 | P1 |
-| 다중 언어 지원 | Go, Rust, Java 등 | P1 |
-| 복잡도 분석 | cyclomatic complexity | P2 |
-| 의존성 그래프 | 파일 간 import 관계 | P2 |
-| 보안 스캔 | 민감 파일 감지 | P2 |
-
-### 7.3 구현 순서
-
-```
-Day 1: 기본 구조
-├── workspace-analyzer.md 생성
-├── analyze.md 생성
-└── 캐시 디렉토리 구조 설정
-
-Day 2: 분석 로직
-├── 프로젝트 타입 감지
-├── 파일 구조 수집
-└── 의존성 분석
-
-Day 3: 캐시 및 통합
-├── analysis.json 생성 로직
-├── code-qa.md 캐시 통합
-└── code-reviewer 프롬프트 개선
-
-Day 4: 테스트 및 문서화
-├── 다양한 프로젝트 타입 테스트
-├── 문서 업데이트
-└── 버그 수정
-```
-
----
-
-## 8. 사용 예시
-
-### 8.1 기본 사용
+### 9.1 기본 사용
 
 ```bash
-# 워크스페이스 분석
+# 워크스페이스 분석 (캐시 유효하면 스킵)
 /analyze
 
-# 결과 확인
-cat .opencode/workspace-cache/analysis.json
+# 강제 재분석
+/analyze --force
+
+# 모듈만 재분석 (스캐너 결과 재사용)
+/analyze --modules-only
 ```
 
-### 8.2 Code-QA와 함께 사용
+### 9.2 Code-QA와 자동 통합
 
 ```bash
 # 방법 1: 사전 분석 후 QA
 /analyze
 /code-qa
 
-# 방법 2: code-qa가 자동으로 분석 실행
+# 방법 2: code-qa가 자동으로 캐시 확인/분석
 /code-qa  # 캐시 없으면 자동 분석
 ```
 
-### 8.3 강제 재분석
+### 9.3 일반 코딩 작업에서 캐시 활용
 
 ```bash
-# 캐시 무시하고 재분석
-/analyze --force
+# 프로젝트 구조 빠르게 파악 (L1만 읽기)
+Read .opencode/workspace-cache/project-map.yaml
 
-# code-qa에서 캐시 무시
-/code-qa --skip-cache
+# 특정 모듈 상세 확인 (L2 로드)
+Read .opencode/workspace-cache/modules/api.yaml
+
+# 모듈간 의존성 확인
+Read .opencode/workspace-cache/dependency-graph.yaml
 ```
 
-### 8.4 분석만 사용 (QA 없이)
+---
 
-```bash
-# 프로젝트 구조 파악용
-/analyze
+## 10. 에러 처리 및 폴백
 
-# 결과 활용
-# - 신규 개발자 온보딩
-# - 프로젝트 문서화
-# - 코드 리뷰 준비
+### 10.1 에러 시나리오
+
+| 에러 | 처리 |
+|------|------|
+| Scanner 실패 | → 레거시 workspace-analyzer 폴백 |
+| 개별 module-analyzer 실패 | → 해당 모듈 스킵, cache-meta에 기록 |
+| 모든 module-analyzer 실패 | → Scanner 결과만으로 L1 생성 (L2 없음) |
+| JSON 파싱 실패 | → 에러 로그, 가용 데이터로 계속 |
+| 캐시 파일 손상 | → `rm .opencode/workspace-cache/` 후 재분석 |
+
+### 10.2 레거시 폴백 흐름
+
+```
+Scanner 실패
+    │
+    ▼
+┌─────────────────────┐
+│ workspace-analyzer  │  (v1 에이전트)
+│ 단일 분석 실행       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ analysis.json 저장  │  (v1 형식)
+│ L2/L3 캐시 없음     │
+└─────────────────────┘
 ```
 
 ---
 
 ## 부록 A: 지원 프로젝트 타입
 
-| 타입 | 감지 파일 | 패키지 매니저 |
-|------|-----------|---------------|
-| TypeScript/JavaScript | package.json, tsconfig.json | npm, yarn, pnpm |
+| 타입 | 감지 파일 | 빌드 도구 |
+|------|-----------|-----------|
+| TypeScript/JavaScript | package.json, tsconfig.json | npm, yarn, pnpm, bun |
 | Python | requirements.txt, pyproject.toml, setup.py | pip, poetry, pipenv |
 | Go | go.mod | go modules |
 | Rust | Cargo.toml | cargo |
@@ -642,16 +709,21 @@ cat .opencode/workspace-cache/analysis.json
 | Ruby | Gemfile | bundler |
 | PHP | composer.json | composer |
 
----
+## 부록 B: workflow-settings.yaml 설정
 
-## 부록 B: 에러 처리
+```yaml
+timeout:
+  agent:
+    workspace-scanner: 30000   # 30초
+    module-analyzer: 60000     # 1분
 
-| 에러 상황 | 처리 방식 |
-|-----------|-----------|
-| 빈 프로젝트 | 기본 구조로 캐시 생성 |
-| 권한 오류 | 경고 후 접근 가능한 파일만 분석 |
-| 대용량 프로젝트 | 진행 상황 표시, 타임아웃 설정 |
-| 알 수 없는 프로젝트 타입 | "unknown" 타입으로 기본 분석 |
+model:
+  assignment:
+    coder_agents:
+      - workspace-scanner      # Phase 0B: Fast project scan
+      - module-analyzer        # Phase 0B: Per-module deep analysis
+      - workspace-analyzer     # Phase 0B: Legacy fallback
+```
 
 ---
 
@@ -659,4 +731,5 @@ cat .opencode/workspace-cache/analysis.json
 
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
-| 1.0 | 2024-01-15 | 초기 설계 문서 |
+| 1.0 | 2024-01-15 | 초기 설계 문서 (v1: 단일 workspace-analyzer) |
+| 2.0 | 2025-02-12 | v2 전면 개정: 3-Level Cache, 병렬 실행, 디렉토리 제외 규칙 |
