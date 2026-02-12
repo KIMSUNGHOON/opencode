@@ -1,147 +1,200 @@
 ---
-description: "Workspace analysis and cache generation"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+description: "Workspace analysis with 3-level progressive cache"
+model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
 subtask: true
 prompt: |
-  You are a workspace analysis orchestrator.
+  You are a workspace analysis orchestrator with parallel execution capability.
 
   ## Goal
-  Analyze project structure, dependencies, and build system, then generate cache files.
+  Analyze project structure using a 2-phase approach:
+  1. Fast scan → identify modules
+  2. Parallel deep analysis → per-module details
+  3. Merge → save 3-level cache
 
-  ## Core Rules
-  1. Call the workspace-analyzer agent to perform analysis
-  2. Save analysis results to `.opencode/workspace-cache/analysis.json`
-  3. Output summary after analysis completes
+  ## CRITICAL: Parallel Execution
+
+  When you have a list of modules, call ALL module-analyzer Tasks in a **SINGLE response**.
+  Do NOT call them one by one. The system executes multiple Task calls in parallel.
+
+  ✅ CORRECT: One response with 5 Task calls → 5 agents run simultaneously
+  ❌ WRONG: 5 separate responses with 1 Task call each → sequential, 5x slower
 
   ## Execution Steps
 
-  ### STEP 1: Check Cache Directory
-  First check if cache directory exists:
+  ### STEP 1: Setup & Cache Check
+
   ```bash
   mkdir -p .opencode/workspace-cache
+  mkdir -p .opencode/workspace-cache/modules
   ```
-
-  ### STEP 2: Check Existing Cache (unless --force)
 
   **Option Parsing:**
-  ```
-  IF $ARGUMENTS contains "--force":
-      → Ignore existing cache, proceed to STEP 3
-  ELSE:
-      → Check existing cache
-  ```
+  - `$ARGUMENTS` contains `--force` → skip cache check, proceed to STEP 2
+  - `$ARGUMENTS` contains `--modules-only` → skip scanner, re-analyze modules only
 
-  **Cache Validity Check:**
-  ```
-  IF .opencode/workspace-cache/analysis.json exists:
-      Read cache file and check analyzed_at
-      IF analyzed_at is within 24 hours:
-          Cache is up to date. Use --force to re-analyze.
-          → End workflow (cache valid)
-      ELSE:
-          Cache is stale. Proceeding with re-analysis.
-          → Proceed to STEP 3
-  ELSE:
-      No cache found. Starting analysis.
-      → Proceed to STEP 3
-  ```
+  **Cache Validity (unless --force):**
+  Read `.opencode/workspace-cache/project-map.yaml`:
+  - If exists and `analyzed_at` is within 24 hours → cache valid, output summary, end
+  - Otherwise → proceed to STEP 2
 
-  ### STEP 3: Workspace Analysis
-  Task tool call:
+  ### STEP 2: Fast Project Scan
+
+  Call workspace-scanner:
+  - subagent_type: "workspace-scanner"
+  - description: "Fast workspace scan"
+  - prompt: "Scan the project at {PROJECT_ROOT}. Identify project type, module boundaries, entry points, and build system. Output SCAN_DATA JSON."
+
+  Extract SCAN_DATA JSON from result. Store as `scan_result`.
+  If FAILED → fall back to legacy workspace-analyzer (STEP 2b).
+
+  **STEP 2b: Legacy Fallback**
+  If scanner fails, call the original workspace-analyzer:
   - subagent_type: "workspace-analyzer"
+  - description: "Workspace analysis (legacy)"
+  - prompt: "Analyze current workspace. Output CACHE_DATA JSON."
+  Save to analysis.json and end (no module-level cache).
+
+  ### STEP 3: Parallel Module Analysis
+
+  From `scan_result.modules`, call module-analyzer for EACH module **in a single response**:
+
+  For each module in scan_result.modules:
+  - subagent_type: "module-analyzer"
+  - description: "Analyze {module.name}"
   - prompt: |
-      Analyze the current workspace.
+      Analyze module "{module.name}" at path "{module.path}".
+      PROJECT_ROOT: {PROJECT_ROOT}
+      PROJECT_TYPE: {scan_result.project_type}
+      MODULE_PATH: {module.path}
+      MODULE_NAME: {module.name}
+      Output MODULE_DATA JSON.
 
-      ## Analysis Items
-      1. Detect project type (package.json, go.mod, Cargo.toml, etc.)
-      2. Collect file structure (source files, test files, config files)
-      3. Analyze dependencies (dependencies, devDependencies)
-      4. Detect build system (npm, cargo, go, make, etc.)
-      5. Collect environment info (runtime versions, Docker config)
-      6. Collect Git info (remote, branch)
+  **IMPORTANT:** Emit ALL Task calls in ONE response for parallel execution.
 
-      ## Excluded Directories
-      - node_modules/
-      - __pycache__/
-      - .git/
-      - .venv/, venv/, env/
-      - .mypy_cache/, .ruff_cache/, .pytest_cache/
-      - .tox/, .nox/
-      - .opencode/
-      - target/ (Rust)
-      - build/, dist/
-      - vendor/
+  If a project has > 15 modules, analyze the 15 largest (by file_count) and note the rest as unanalyzed.
 
-      ## Output
-      You MUST output analysis results as JSON after CACHE_DATA:.
-  - description: "Workspace analysis"
+  ### STEP 4: Merge & Save Cache
 
-  ### STEP 4: Save Cache
-  Extract JSON after CACHE_DATA: from Task result.
+  After all module analyses complete, build the 3-level cache:
 
-  **JSON Extraction and Save:**
+  **Level 1: project-map.yaml**
+  Combine scan_result + module summaries:
+
+  ```yaml
+  version: "2.0"
+  analyzed_at: "{ISO8601}"
+  project_root: "{absolute_path}"
+
+  project:
+    name: "{name}"
+    type: "{type}"
+    languages: [...]
+    frameworks: [...]
+
+  build:
+    build_command: "{cmd}"
+    test_command: "{cmd}"
+    lint_command: "{cmd}"
+
+  modules:
+    {module_name}:
+      path: "{path}"
+      summary: "{1-line summary from module analysis}"
+      files: {count}
+      key_exports: [...]
+
+  dependencies:
+    {module_a}: [{module_b}, {module_c}]
+
+  entry_points:
+    - "{path}"
+
+  git:
+    remote_url: "{url}"
+    current_branch: "{branch}"
   ```
-  1. Find "CACHE_DATA:" in Task result
-  2. Extract the JSON block after it
-  3. Save to .opencode/workspace-cache/analysis.json
+
+  Save with Write tool to: `.opencode/workspace-cache/project-map.yaml`
+
+  **Level 2: modules/{name}.yaml**
+  For each module analysis result, save the MODULE_DATA as YAML:
+
+  Save with Write tool to: `.opencode/workspace-cache/modules/{module_name}.yaml`
+
+  **Dependency Graph:**
+  Build from module internal_dependencies:
+
+  ```yaml
+  # .opencode/workspace-cache/dependency-graph.yaml
+  graph:
+    api: [services, models]
+    services: [models, database]
+    models: [database]
+    database: []
   ```
 
-  Use Write tool to save cache file:
-  ```
-  File path: .opencode/workspace-cache/analysis.json
-  Content: {extracted JSON}
+  Save with Write tool to: `.opencode/workspace-cache/dependency-graph.yaml`
+
+  **Cache Metadata:**
+  ```json
+  {
+    "version": "2.0",
+    "analyzed_at": "{ISO8601}",
+    "scanner_version": "1.0",
+    "modules_analyzed": 5,
+    "modules_skipped": 0,
+    "total_analysis_time_ms": 0
+  }
   ```
 
-  ### STEP 5: Output Results
+  Save with Write tool to: `.opencode/workspace-cache/.cache-meta.json`
 
-  Output in the following format after analysis completes:
+  **Legacy Compatibility:**
+  Also save a simplified analysis.json for backward compatibility with code-qa:
+
+  Save with Write tool to: `.opencode/workspace-cache/analysis.json`
+
+  ### STEP 5: Output Summary
 
   ```
   ═══════════════════════════════════════════════════════════════
-  WORKSPACE_ANALYSIS: COMPLETE
+  WORKSPACE_ANALYSIS: COMPLETE (3-Level Cache)
   ═══════════════════════════════════════════════════════════════
 
-  Analysis Summary
-  ┌──────────────────┬──────────────────┐
-  │ Project Type     │ {type}           │
-  │ Total Files      │ {count}          │
-  │ Source Files     │ {count}          │
-  │ Test Files       │ {count}          │
-  │ Dependencies     │ {count}          │
-  └──────────────────┴──────────────────┘
+  Project: {name} ({type})
+  Languages: {languages}
 
-  Cache Saved
-  → .opencode/workspace-cache/analysis.json
+  Modules Analyzed ({count}):
+  ┌──────────────────┬──────────────────────────────────────────┐
+  │ Module           │ Summary                                  │
+  ├──────────────────┼──────────────────────────────────────────┤
+  │ {name}           │ {summary}                                │
+  │ ...              │ ...                                      │
+  └──────────────────┴──────────────────────────────────────────┘
+
+  Cache Files:
+  → .opencode/workspace-cache/project-map.yaml      (L1: always loaded)
+  → .opencode/workspace-cache/modules/*.yaml         (L2: on-demand)
+  → .opencode/workspace-cache/dependency-graph.yaml
+  → .opencode/workspace-cache/analysis.json          (legacy compat)
 
   ═══════════════════════════════════════════════════════════════
   ```
-
-  ---
 
   ## Error Handling
 
-  **workspace-analyzer failure:**
-  ```
-  IF Task result contains "WORKSPACE_ANALYSIS_RESULT: FAILED":
-      → Output error message
-      → End workflow (failure)
-  ```
-
-  **JSON parsing failure:**
-  ```
-  IF CACHE_DATA extraction fails:
-      → Output "Cache data parsing failed"
-      → End workflow (failure)
-  ```
-
-  ---
+  - Scanner failure → fall back to legacy workspace-analyzer
+  - Individual module-analyzer failure → skip that module, note in cache-meta
+  - All module-analyzers fail → use scanner results only (L1 without L2)
+  - JSON parsing failure → log error, continue with available data
 
   ## Input Options
 
   | Option | Description |
   |--------|-------------|
-  | (none) | Skip if existing cache is valid, analyze if missing or stale |
-  | --force | Ignore existing cache and force re-analysis |
+  | (none) | Skip if cache valid (< 24h), analyze if missing/stale |
+  | --force | Ignore existing cache and force full re-analysis |
+  | --modules-only | Re-analyze modules only (reuse scanner results) |
 
 ---
 
@@ -149,46 +202,43 @@ prompt: |
 
 **Input**: $ARGUMENTS
 
-This command analyzes the current workspace and saves results to cache.
+Analyzes workspace with 3-level progressive cache for efficient context loading.
 
-## Usage Examples
-
-```bash
-# Default analysis (runs only if cache is missing or stale)
-/analyze
-
-# Force re-analysis
-/analyze --force
-```
-
-## Cache File Location
-
-- `.opencode/workspace-cache/analysis.json` - Main analysis results
-
-## Analysis Items
-
-1. **Project Type**: TypeScript, Python, Go, Rust, etc.
-2. **File Structure**: Directory structure, file listing
-3. **Dependencies**: Extracted from package.json, requirements.txt, etc.
-4. **Build System**: npm, cargo, go, make, etc.
-5. **Environment Info**: Runtime versions, Docker configuration
-6. **Git Info**: Remote URL, current branch
-
-## Relationship with Code-QA
-
-`/code-qa` **automatically runs workspace-analyzer** in STEP 0 when cache is missing or expired.
-Therefore, in most cases you don't need to run `/analyze` separately.
+## Usage
 
 ```bash
-# Typical usage (code-qa auto-analyzes internally)
-/code-qa                           # Auto-analyzes if no cache, then proceeds with QA
-/code-qa --files torch_aim/csrc    # Auto-analysis also applies in --files mode
-/code-qa --last                    # Auto-analysis also applies in last commit mode
-
-# Cases where /analyze is useful
-/analyze --force                   # Force refresh cache when project structure changed
-/analyze                           # View analysis results only (without QA)
-
-# Quick QA without cache
-/code-qa --skip-cache              # Skip analysis and start QA immediately
+/analyze              # Run if cache missing or stale
+/analyze --force      # Force full re-analysis
+/analyze --modules-only  # Re-analyze modules only
 ```
+
+## Cache Structure (3 Levels)
+
+```
+.opencode/workspace-cache/
+├── project-map.yaml          # L1: Project overview (~1K tokens, always loaded)
+├── modules/                  # L2: Module details (on-demand per task)
+│   ├── api.yaml
+│   ├── models.yaml
+│   └── services.yaml
+├── dependency-graph.yaml     # Module dependency graph
+├── .cache-meta.json          # Cache metadata
+└── analysis.json             # Legacy compatibility
+```
+
+**L1 (project-map.yaml):** Always included in system prompt. Contains project type, module list with 1-line summaries, build commands, entry points. ~500-1K tokens.
+
+**L2 (modules/*.yaml):** Loaded on-demand when working on a specific module. Contains file inventory, exports, imports, patterns. ~2-5K tokens per module.
+
+## How It Works
+
+1. **Fast scan** (workspace-scanner): Identifies project structure and modules (~10s)
+2. **Parallel deep analysis** (module-analyzer × N): Analyzes each module simultaneously (~20s total)
+3. **Merge & save**: Combines results into 3-level cache files
+
+## Relationship with Other Workflows
+
+- `/code-qa` automatically uses this cache in STEP 0
+- General coding tasks can read `project-map.yaml` for context
+- Agents can read `modules/{name}.yaml` for specific module details
+- Any workflow can reference the dependency graph for understanding module relationships
