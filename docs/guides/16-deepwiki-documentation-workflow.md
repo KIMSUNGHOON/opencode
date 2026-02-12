@@ -18,6 +18,8 @@ and cross-linked pages. Everything runs locally via AI agents.
 │  (Phase 2: plan wiki structure)         │
 │  (Phase 3: parallel page generation)    │
 │  (Phase 4: assemble & save)             │
+│  (Phase 5: publish — HITL deployment)   │
+│  (Phase 6: output summary)             │
 └──────────────┬──────────────────────────┘
                │ Task tool (parallel)
                ▼
@@ -135,14 +137,33 @@ For a 50-module project, this typically results in:
 - 1 appendix page listing Tier 3 modules
 - Plus Overview, Architecture, Config/Deploy pages = ~12 pages total
 
-## Publishing Options
+## Publishing (HITL Deployment)
+
+After wiki generation, the orchestrator asks the user how to publish:
+
+| Choice | Action |
+|--------|--------|
+| **Setup GitLab Pages** | Generate `mkdocs.yml` + `.gitlab-ci.yml`, commit all, push |
+| **Commit only** | `git add docs/wiki/ && git commit` (local only) |
+| **Skip** | Files saved to disk, no git operations |
+
+### GitLab Pages Auto-Deploy
+
+When "Setup GitLab Pages" is chosen, the agent:
+1. Generates `mkdocs.yml` (Material theme + Mermaid support)
+2. Generates `.gitlab-ci.yml` (Pages deployment pipeline)
+3. Commits and pushes all files
+4. Wiki becomes available at `https://{namespace}.gitlab.io/{project}/`
+
+Existing config files (`mkdocs.yml`, `.gitlab-ci.yml`) are NOT overwritten unless `--force` is used.
+
+### Other Publishing Options
 
 | Platform | How To |
 |----------|--------|
 | **GitHub Wiki** | Copy `docs/wiki/*.md` to your repo's wiki directory |
-| **MkDocs** | Set `docs_dir: docs/wiki` in `mkdocs.yml` |
 | **Docusaurus** | Import markdown files into `docs/` with sidebar config |
-| **GitHub Pages** | Use any static site generator with `docs/wiki/` as source |
+| **MkDocs local** | `mkdocs serve` for local preview at `http://localhost:8000` |
 | **Direct viewing** | Open `docs/wiki/index.md` in VS Code, Obsidian, or any markdown viewer |
 
 ## Performance
@@ -153,6 +174,7 @@ For a 50-module project, this typically results in:
 | Structure planning | ~10s | LLM plans 8-12 pages |
 | Page generation | ~30-60s | All pages generated in parallel |
 | Assembly | ~5s | Write index, sidebar, verify |
+| Publish (HITL) | ~5-10s | User choice: GitLab Pages / commit / skip |
 | **Total** | **~1-2 min** | With workspace cache |
 
 Without cache, add ~30s for direct file scanning.

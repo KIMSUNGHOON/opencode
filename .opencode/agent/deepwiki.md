@@ -287,7 +287,119 @@ Save with Write tool to: `docs/wiki/_sidebar.md`
 ls -la docs/wiki/
 ```
 
-### PHASE 5: Output Summary
+### PHASE 5: Publish (HITL Deployment)
+
+After wiki generation and verification, use the **question tool** to ask the user about deployment:
+
+> Wiki generation complete! {count} pages saved to `docs/wiki/`. How would you like to publish?
+
+Provide options via question tool:
+- **"Setup GitLab Pages"** → Generate `mkdocs.yml` + `.gitlab-ci.yml`, commit all, push
+- **"Commit only"** → `git add docs/wiki/ && git commit` (no CI/push)
+- **"Skip"** → Do nothing, just show summary
+
+**If "Setup GitLab Pages" chosen:**
+
+**Step 5a:** Check if `mkdocs.yml` already exists:
+```
+Read mkdocs.yml
+```
+
+If it does NOT exist, generate and save:
+```yaml
+# mkdocs.yml
+site_name: "{Project Name} Wiki"
+docs_dir: docs/wiki
+theme:
+  name: material
+  features:
+    - navigation.sidebar
+    - navigation.expand
+    - content.code.copy
+    - search.highlight
+  palette:
+    scheme: default
+    primary: indigo
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - tables
+```
+
+Save with Write tool to: `mkdocs.yml`
+
+**Step 5b:** Check if `.gitlab-ci.yml` already exists:
+```
+Read .gitlab-ci.yml
+```
+
+If it does NOT exist, generate and save:
+```yaml
+# .gitlab-ci.yml
+pages:
+  stage: deploy
+  image: python:3.11-slim
+  before_script:
+    - pip install mkdocs mkdocs-material pymdown-extensions
+  script:
+    - mkdocs build --site-dir public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - docs/wiki/**/*
+        - mkdocs.yml
+```
+
+Save with Write tool to: `.gitlab-ci.yml`
+
+If either file already exists, inform the user and do NOT overwrite (unless `--force` option was given).
+
+**Step 5c:** Commit and push:
+```bash
+git add docs/wiki/ mkdocs.yml .gitlab-ci.yml
+git commit -m "docs: add DeepWiki project documentation
+
+Generated {count} wiki pages with mermaid diagrams.
+Includes GitLab Pages CI pipeline for auto-deployment.
+
+Pages: {page_list}
+"
+git push
+```
+
+After push, inform the user:
+> Pushed! Your wiki will be available at `https://{namespace}.gitlab.io/{project}/` after the CI pipeline completes.
+
+**If "Commit only" chosen:**
+
+```bash
+git add docs/wiki/
+git commit -m "docs: add DeepWiki project documentation
+
+Generated {count} wiki pages with mermaid diagrams.
+
+Pages: {page_list}
+"
+```
+
+Do NOT push. Inform user: "Committed locally. Run `git push` when ready."
+
+**If "Skip" chosen:**
+
+Proceed directly to PHASE 6 (summary only).
+
+### PHASE 6: Output Summary
 
 ```
 ═══════════════════════════════════════════════════════════════
@@ -311,9 +423,13 @@ Output: docs/wiki/
   → _sidebar.md       (navigation)
   → {N} content pages
 
-To view: open docs/wiki/index.md
-For GitHub Wiki: copy files to your repo's wiki
-For MkDocs/Docusaurus: integrate docs/wiki/ into your site config
+Deployment: {deployment_status}
+  → "GitLab Pages: pushed, CI pipeline triggered"
+  → "Committed locally (not pushed)"
+  → "Files saved only (not committed)"
+
+To view locally: open docs/wiki/index.md
+For MkDocs local preview: mkdocs serve
 
 ═══════════════════════════════════════════════════════════════
 ```
