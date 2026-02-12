@@ -99,11 +99,28 @@ The `/deepwiki` command leverages the 3-level workspace cache from `/analyze`:
 
 | Cache Level | How DeepWiki Uses It |
 |-------------|---------------------|
-| **L1** (`project-map.yaml`) | Project type, module list, build commands → wiki structure planning |
+| **L1** (`project-map.yaml`) | Project type, module list, **tier info**, build commands → wiki structure planning |
 | **L2** (`modules/*.yaml`) | File inventory, exports, dependencies → module page content |
 | **L3** (source files) | Actual code → code snippets, detailed explanations |
 
 Without cache, DeepWiki still works by scanning files directly (slower but functional).
+
+### Tier-Aware Page Planning (v2.1)
+
+When the workspace cache includes tier information (from `/analyze` v2.1+), DeepWiki
+uses it to plan pages intelligently:
+
+| Module Tier | Page Strategy |
+|-------------|---------------|
+| **Tier 1** (core) | One dedicated page per module (full detail, individual diagrams) |
+| **Tier 2** (important) | Group 2-3 related modules into combined pages |
+| **Tier 3** (peripheral) | Mentioned briefly in Overview or appendix page |
+
+For a 50-module project, this typically results in:
+- 5 Tier 1 dedicated pages
+- 3-4 Tier 2 grouped pages
+- 1 appendix page listing Tier 3 modules
+- Plus Overview, Architecture, Config/Deploy pages = ~12 pages total
 
 ## Publishing Options
 

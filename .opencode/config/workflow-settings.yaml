@@ -147,6 +147,32 @@ model:
       top_k: 40
 
 # =============================================================================
+# Workspace Analysis Settings
+# =============================================================================
+analysis:
+  # Tier classification thresholds (importance_score from scanner)
+  tier_thresholds:
+    tier1: 20              # Score >= 20 → Tier 1 (full deep analysis)
+    tier2: 8               # Score >= 8  → Tier 2 (standard analysis)
+                           # Score < 8   → Tier 3 (quick summary)
+
+  # Batched execution for large projects (> 15 modules)
+  batch:
+    size: 10               # Max modules per parallel batch
+    delay_between_ms: 1000 # Pause between batches (server cooldown)
+
+  # Incremental cache settings
+  incremental:
+    enabled: true          # Check file modification times before re-analyzing
+    skip_unchanged: true   # Skip modules with no file changes since last analysis
+
+  # Module limits
+  limits:
+    small_project_max: 15  # Projects with ≤ this many modules use single-batch mode
+    tier3_default: "skip"  # "skip" or "analyze" — what to do with Tier 3 by default
+    max_modules_total: 100 # Absolute cap on modules to analyze
+
+# =============================================================================
 # Docker Sandbox Settings
 # =============================================================================
 sandbox:

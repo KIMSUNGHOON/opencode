@@ -52,6 +52,22 @@ You will receive:
 - `MODULE_NAME`: module name (e.g., `api`)
 - `PROJECT_ROOT`: absolute project root
 - `PROJECT_TYPE`: python, node, go, rust, etc.
+- `ANALYSIS_TIER`: (optional) 1, 2, or 3. Defaults to 1 if not provided.
+
+## Tier-Based Analysis Depth
+
+| Tier | Steps | Depth | Target Time |
+|------|-------|-------|-------------|
+| **1** (core) | Steps 1-9 (all) | Full deep analysis: schema, API, types, errors | 60s |
+| **2** (important) | Steps 1-4 + 9 | Standard: files, exports, deps, file roles, summary | 30s |
+| **3** (peripheral) | Steps 1-2 + 9 | Quick: file inventory, key exports, summary only | 10s |
+
+**Rules:**
+- If `ANALYSIS_TIER` is not provided or is `1`: execute ALL steps (current default behavior)
+- If `ANALYSIS_TIER` is `2`: execute Steps 1, 2, 3, 4, 9 only. Skip Steps 5-8.
+- If `ANALYSIS_TIER` is `3`: execute Steps 1, 2, 9 only. Skip Steps 3-8.
+- For Tier 2/3, omit the skipped fields from output JSON (set to empty arrays).
+- The output format is identical for all tiers — only the depth of data differs.
 
 ---
 
@@ -285,6 +301,7 @@ MODULE_DATA:
 {
   "name": "api",
   "path": "src/api",
+  "tier": 1,
   "summary": "FastAPI REST endpoints with JWT auth and role-based access control. Handles user CRUD, order management, and payment processing via Stripe integration.",
   "file_count": 12,
   "test_count": 3,

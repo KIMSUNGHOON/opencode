@@ -116,7 +116,43 @@ For each identified module, count source files (with exclusions):
 find <module_path> -type f \( -name "*.py" -o -name "*.ts" -o -name "*.js" -o -name "*.go" -o -name "*.rs" -o -name "*.java" \) -not -path '*/node_modules/*' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/.opencode/*' -not -path '*/build/*' -not -path '*/dist/*' | wc -l
 ```
 
-## STEP 5: Entry Points & Config
+## STEP 5: Module Importance Scoring
+
+For each module, compute an importance score to classify into tiers:
+
+**Score formula:**
+```
+importance_score =
+  file_count × 2
+  + (contains_entry_point ? 10 : 0)
+  + (has_test_files ? 3 : 0)
+  + (has_schema_or_model_files ? 5 : 0)
+  + (has_route_or_api_files ? 5 : 0)
+  + (is_in_src_or_lib ? 3 : 0)
+```
+
+**Quick detection (no file reads, Glob only):**
+- `contains_entry_point`: module path contains any file from entry_points list
+- `has_test_files`: `Glob: {module_path}/**/test_*` or `**/*.test.*` or `**/*.spec.*` has results
+- `has_schema_or_model_files`: `Glob: {module_path}/**/*model*` or `**/*schema*` has results
+- `has_route_or_api_files`: `Glob: {module_path}/**/*route*` or `**/*controller*` or `**/*handler*` has results
+- `is_in_src_or_lib`: path starts with `src/`, `lib/`, `packages/`, `apps/`, `internal/`, `cmd/`
+
+**Tier classification:**
+
+| Tier | Score | Analysis Depth | Typical Modules |
+|------|-------|----------------|-----------------|
+| 1 | ≥ 20 | Full 9-step deep analysis | Core business logic, API, data layer |
+| 2 | ≥ 8 | Standard 4-step analysis | Utilities, middleware, helpers |
+| 3 | < 8 | Quick summary (files + exports) | Config, scripts, tiny modules |
+
+Assign `importance_score` and `tier` (1, 2, or 3) to each module.
+
+**Performance note:** This step uses only Glob pattern matching (no file reads).
+Keep within 5 seconds. If > 30 modules, score only file_count × 2 + is_in_src_or_lib × 3
+for speed, then apply bonus points only to top 20.
+
+## STEP 6: Entry Points & Config
 
 Detect entry points:
 - `main.py`, `app.py`, `__main__.py`, `manage.py`
@@ -129,7 +165,7 @@ Detect config files:
 - `package.json`, `tsconfig.json`
 - `.env.example`, `docker-compose.yml`, `Dockerfile`
 
-## STEP 6: Monorepo Detection
+## STEP 7: Monorepo Detection
 
 If `packages/`, `apps/`, or `workspaces` in package.json:
 - Mark as monorepo
@@ -155,14 +191,27 @@ SCAN_DATA:
       "path": "src/api",
       "type": "package",
       "file_count": 12,
-      "boundary_marker": "__init__.py"
+      "boundary_marker": "__init__.py",
+      "importance_score": 32,
+      "tier": 1
     },
     {
       "name": "models",
       "path": "src/models",
       "type": "package",
       "file_count": 8,
-      "boundary_marker": "__init__.py"
+      "boundary_marker": "__init__.py",
+      "importance_score": 24,
+      "tier": 1
+    },
+    {
+      "name": "scripts",
+      "path": "scripts",
+      "type": "directory",
+      "file_count": 3,
+      "boundary_marker": null,
+      "importance_score": 6,
+      "tier": 3
     }
   ],
   "entry_points": ["src/main.py"],

@@ -32,6 +32,8 @@ Workspace Analysis는 프로젝트의 구조, 모듈 경계, 의존성, 빌드 �
 | 캐시 구조 | analysis.json 단일 파일 | 3-Level (project-map + modules + dependency-graph) |
 | 컨텍스트 효율 | 전체 로드 (대규모 프로젝트에서 비효율) | L1만 항상 로드 (~1K), L2는 필요시 (~2-5K/모듈) |
 | 분석 속도 | 직렬, 프로젝트 크기에 비례 | 병렬, 모듈 수 무관하게 ~30초 |
+| 대규모 프로젝트 | 미지원 (타임아웃) | Tiered + Batched (v2.1): 모듈 중요도별 3단계 분석 |
+| 증분 분석 | 없음 (매번 전체) | Incremental (v2.1): 변경된 모듈만 재분석 |
 
 ### 1.3 설계 원칙
 
@@ -265,16 +267,19 @@ build:
 modules:
   api:
     path: "src/api"
+    tier: 1
     summary: "FastAPI REST endpoints with JWT auth"
     files: 12
     key_exports: ["create_app", "router", "verify_token"]
   models:
     path: "src/models"
+    tier: 1
     summary: "SQLAlchemy ORM models for users, orders, products"
     files: 8
     key_exports: ["User", "Order", "Product"]
   services:
     path: "src/services"
+    tier: 2
     summary: "Business logic layer with transaction support"
     files: 6
     key_exports: ["UserService", "OrderService"]
@@ -395,11 +400,17 @@ graph:
 
 ```json
 {
-  "version": "2.0",
+  "version": "2.1",
   "analyzed_at": "2025-01-15T10:30:00Z",
-  "scanner_version": "1.0",
+  "scanner_version": "1.1",
   "modules_analyzed": 5,
   "modules_skipped": 0,
+  "modules_reused": 2,
+  "tier_breakdown": {
+    "tier1": 3,
+    "tier2": 2,
+    "tier3": 0
+  },
   "total_analysis_time_ms": 28500
 }
 ```
@@ -414,6 +425,11 @@ graph:
 │  자동 무효화:                                                            │
 │    - analyzed_at이 24시간 이상 경과                                      │
 │    - /analyze --force로 강제 재분석                                      │
+│                                                                          │
+│  증분 캐시 (v2.1):                                                      │
+│    - 모듈별 파일 수정 시간 비교 (find -newer)                            │
+│    - 변경된 모듈만 재분석, 나머지는 캐시 재사용                          │
+│    - --force 시 무시                                                     │
 │                                                                          │
 │  부분 업데이트:                                                          │
 │    - /analyze --modules-only: 스캐너 스킵, 모듈만 재분석                 │
@@ -452,8 +468,17 @@ permission: read-only
 | 2 | 디렉토리 구조 매핑 | Glob | ~2s |
 | 3 | 모듈 경계 탐지 | Glob | ~5s |
 | 4 | 모듈별 파일 수 카운트 | Bash (find) | ~3s |
-| 5 | 엔트리 포인트 & 설정 감지 | Glob | ~2s |
-| 6 | 모노레포 감지 | Read (package.json) | ~1s |
+| 5 | **모듈 중요도 점수 & Tier 분류** | Glob | ~3s |
+| 6 | 엔트리 포인트 & 설정 감지 | Glob | ~2s |
+| 7 | 모노레포 감지 | Read (package.json) | ~1s |
+
+**Tier 분류 기준 (v2.1):**
+
+| Tier | 점수 기준 | 분석 깊이 | 일반적 모듈 |
+|------|-----------|-----------|-------------|
+| T1 (core) | ≥ 20 | 9-step 전체 딥 분석 | 핵심 비즈니스 로직, API, 데이터 레이어 |
+| T2 (important) | ≥ 8 | 4-step 표준 분석 | 유틸리티, 미들웨어, 헬퍼 |
+| T3 (peripheral) | < 8 | 파일 목록 + exports만 | 설정, 스크립트, 작은 모듈 |
 
 **출력:** `WORKSPACE_SCAN_RESULT: COMPLETE` + `SCAN_DATA` JSON
 
@@ -482,7 +507,7 @@ permission: read-only
 ---
 ```
 
-**입력:** `MODULE_PATH`, `MODULE_NAME`, `PROJECT_ROOT`, `PROJECT_TYPE`
+**입력:** `MODULE_PATH`, `MODULE_NAME`, `PROJECT_ROOT`, `PROJECT_TYPE`, `ANALYSIS_TIER` (optional, default: 1)
 
 **실행 단계:**
 
@@ -569,10 +594,24 @@ timeout:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.3 모듈 수 제한
+### 6.3 Tiered Batched Execution (v2.1)
 
-- 15개 이하 모듈: 전부 병렬 분석
-- 15개 초과 모듈: file_count 기준 상위 15개만 분석, 나머지는 unanalyzed로 기록
+**Small project (≤ 15 modules):**
+- 전부 Tier 1 (full deep analysis)로 단일 배치 병렬 분석 (기존 동작과 동일)
+
+**Large project (> 15 modules):**
+```
+Batch 1: Tier 1 모듈 전부 (병렬)  → 결과 즉시 L2 저장
+Batch 2: Tier 2 모듈 1-10 (병렬)  → 결과 즉시 L2 저장
+Batch 3: Tier 2 모듈 11-20 (병렬) → 결과 즉시 L2 저장
+...
+Final:   Tier 3 모듈 (--all 시만)  → 결과 즉시 L2 저장
+```
+
+- 배치 내: 병렬 실행 (단일 응답에 N개 Task)
+- 배치 간: 순차 (이전 배치 결과 저장 후 다음 시작)
+- 배치 크기: 기본 10 (`--batch-size N`으로 조정)
+- Tier 3 모듈: `--all` 플래그 없으면 스킵 (project-map.yaml에 목록만 기록)
 
 ---
 
@@ -683,14 +722,23 @@ EXCLUDED_DIRS:
 ### 9.1 기본 사용
 
 ```bash
-# 워크스페이스 분석 (캐시 유효하면 스킵)
+# 워크스페이스 분석 (캐시 유효하면 스킵, 증분: 변경 모듈만)
 /analyze
 
-# 강제 재분석
+# 강제 전체 재분석
 /analyze --force
 
 # 모듈만 재분석 (스캐너 결과 재사용)
 /analyze --modules-only
+
+# Tier 3 (peripheral) 모듈까지 전부 분석
+/analyze --all
+
+# 전체 모듈 강제 재분석 (대규모 프로젝트)
+/analyze --all --force
+
+# 배치 크기 조정 (서버 부하 제어)
+/analyze --batch-size 5
 ```
 
 ### 9.2 Code-QA와 자동 통합
@@ -778,6 +826,20 @@ model:
       - workspace-scanner      # Phase 0B: Fast project scan
       - module-analyzer        # Phase 0B: Per-module deep analysis
       - workspace-analyzer     # Phase 0B: Legacy fallback
+
+analysis:
+  tier_thresholds:
+    tier1: 20                  # Score >= 20 → full deep analysis
+    tier2: 8                   # Score >= 8  → standard analysis
+  batch:
+    size: 10                   # Max modules per parallel batch
+    delay_between_ms: 1000     # Pause between batches
+  incremental:
+    enabled: true              # Skip unchanged modules
+  limits:
+    small_project_max: 15      # Single-batch mode threshold
+    tier3_default: "skip"      # "skip" or "analyze"
+    max_modules_total: 100     # Absolute cap
 ```
 
 ---
@@ -788,3 +850,4 @@ model:
 |------|------|-----------|
 | 1.0 | 2024-01-15 | 초기 설계 문서 (v1: 단일 workspace-analyzer) |
 | 2.0 | 2025-02-12 | v2 전면 개정: 3-Level Cache, 병렬 실행, 디렉토리 제외 규칙 |
+| 2.1 | 2026-02-12 | Tiered Priority + Batched Parallel + Incremental Cache |

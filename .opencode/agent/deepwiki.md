@@ -77,7 +77,10 @@ Glob: **/main.{ts,js,py,go,rs}
 ls .opencode/workspace-cache/modules/ 2>/dev/null
 ```
 
-Read up to 5 module caches for context (the largest/most important ones).
+Read module caches for context, prioritizing by tier:
+- Read ALL Tier 1 module caches (these are the core modules)
+- Read up to 5 Tier 2 module caches (the most relevant to the task)
+- Skip Tier 3 module caches (peripheral, minimal data)
 
 ### PHASE 2: Plan Wiki Structure
 
@@ -119,16 +122,36 @@ pages:
 **Page Planning Rules:**
 
 1. **Always include:** Overview, Architecture, at least 2 module-specific pages, Configuration/Deployment
-2. **Module pages:** Create one page per major module (from L1 cache `modules:` section or directory scan)
-3. **Optional pages** (include if relevant):
+2. **Tier-aware page allocation** (if L1 cache has `tier` info per module):
+   - **Tier 1 modules** → one dedicated page each (full detail, individual diagrams)
+   - **Tier 2 modules** → group 2-3 related modules into one combined page
+   - **Tier 3 modules** → mentioned briefly in Overview or an "Other Modules" appendix page
+3. **Without tier info** (no cache or old cache): Create one page per major module
+4. **Optional pages** (include if relevant):
    - Data Flow / Pipeline (if data processing project)
    - API Reference (if REST/GraphQL API)
    - Database & Models (if DB layer exists)
    - Frontend Components (if UI project)
    - Testing & CI/CD (if test infrastructure exists)
    - Plugin / Extension System (if extensible architecture)
-4. **Max 12 pages.** If > 12 modules, group related ones into combined pages.
-5. **Importance:** Mark 3-4 pages as `high`, rest as `medium`
+5. **Max 12 pages.** If Tier 1+2 modules exceed 10, group Tier 2 more aggressively.
+6. **Importance:** Mark Tier 1 module pages as `high`, Tier 2 grouped pages as `medium`
+
+**Example: 50-module project with tiers**
+```
+Page 1:  Overview (all modules mentioned)
+Page 2:  Architecture (Tier 1 focused, system-level diagrams)
+Page 3:  Core: API Gateway (Tier 1 — dedicated)
+Page 4:  Core: Data Models (Tier 1 — dedicated)
+Page 5:  Core: Auth Service (Tier 1 — dedicated)
+Page 6:  Core: Business Logic (Tier 1 — dedicated)
+Page 7:  Core: Event System (Tier 1 — dedicated)
+Page 8:  Services: Middleware & Caching (Tier 2 × 3 grouped)
+Page 9:  Services: Logging & Monitoring (Tier 2 × 3 grouped)
+Page 10: Utilities & Helpers (Tier 2 × 4 grouped)
+Page 11: Configuration & Deployment
+Page 12: Development Guide (Tier 3 modules listed in appendix)
+```
 
 Save with Write tool to: `docs/wiki/.wiki-structure.yaml`
 
@@ -160,7 +183,12 @@ For each page:
 
     Generate the full markdown page following your instructions.
 
-**IMPORTANT:** Emit ALL Task calls in ONE response for parallel execution.
+**Parallel Execution Rules:**
+- If ≤ 12 pages: emit ALL Task calls in ONE response (parallel).
+- If > 12 pages (shouldn't happen, but as safety): split into batches of 10,
+  save each batch's results before starting the next batch.
+
+**IMPORTANT:** Within each batch, emit ALL Task calls in ONE response for parallel execution.
 
 ### PHASE 4: Assemble Wiki
 
