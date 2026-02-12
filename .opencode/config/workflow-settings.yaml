@@ -9,6 +9,8 @@ timeout:
   agent:
     env-setup: 60000        # 1 min (environment detection)
     git-input: 30000        # 30 sec (Git parsing)
+    workspace-scanner: 30000  # 30 sec (fast project scan)
+    module-analyzer: 60000    # 1 min (per-module deep analysis)
     pre-checker: 120000     # 2 min (Lint/Format)
     code-reviewer: 300000   # 5 min (code analysis)
     code-fixer: 300000      # 5 min (code fix)
@@ -95,7 +97,9 @@ model:
       - code-qa          # Orchestrator (switched from Thinking for tool call stability)
       - env-setup          # Phase -1: Environment detection
       - git-input          # Phase 0: Git parsing
-      - workspace-analyzer # Phase 0B: File structure analysis
+      - workspace-analyzer # Phase 0B: File structure analysis (legacy)
+      - workspace-scanner  # Phase 0B: Fast project scan (new)
+      - module-analyzer    # Phase 0B: Per-module deep analysis (new)
       - pre-checker        # Phase 1: Lint/Format
       - code-fixer         # Phase 3: Code fix (SWE-Bench)
       - build-tester       # Phase 5: Build test

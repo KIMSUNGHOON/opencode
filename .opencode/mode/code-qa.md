@@ -244,29 +244,47 @@ Also check for `.opencode/build-config.yaml`. If it exists and contains `build_c
 
 **Phase B: Workspace Cache** (skip if --skip-cache)
 
-First, ensure the cache directory exists:
+First, ensure the cache directories exist:
 ```bash
-mkdir -p .opencode/workspace-cache
+mkdir -p .opencode/workspace-cache/modules
 ```
 
-Then read `.opencode/workspace-cache/analysis.json`:
-- Valid cache (< 24h, valid JSON with `"version"` key): use it, proceed to STEP 1
-- Stale (> 24h): run workspace-analyzer
-- Missing: run workspace-analyzer
-- Corrupt (invalid JSON or missing required keys): delete it, run workspace-analyzer
+Check for 3-level cache first, then fall back to legacy:
 
-**Corrupt cache detection:** If JSON parse fails or `"project_root"` key is missing, the cache is corrupt. Delete it with `rm .opencode/workspace-cache/analysis.json` before re-running workspace-analyzer.
+**3-Level Cache Check:** Read `.opencode/workspace-cache/project-map.yaml`:
+- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to STEP 1
+- Otherwise → check legacy cache
 
-Note: `.opencode/` is excluded from git and code analysis (see `workflow-settings.yaml` filter.exclude). The workspace cache is ephemeral and safe to delete.
+**Legacy Cache Check:** Read `.opencode/workspace-cache/analysis.json`:
+- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to STEP 1
+- Otherwise → run analysis
 
-If stale/missing, call Task with these parameters:
+**Analysis (if cache stale/missing):**
+
+STEP 0-B1: Call workspace-scanner first:
+- subagent_type = workspace-scanner
+- description = Fast workspace scan
+- prompt = "Scan the project at {PROJECT_ROOT}. Identify project type, module boundaries, entry points, and build system. Output SCAN_DATA JSON."
+
+If scanner succeeds and returns modules:
+
+STEP 0-B2: Call module-analyzer for ALL modules **in a single response** (parallel execution):
+- For each module: subagent_type = module-analyzer, description = "Analyze {name}", prompt with MODULE_PATH, MODULE_NAME, PROJECT_ROOT, PROJECT_TYPE
+
+**CRITICAL:** Emit ALL module-analyzer Task calls in ONE response for parallel execution.
+
+STEP 0-B3: Merge results → save project-map.yaml, modules/*.yaml, dependency-graph.yaml, analysis.json (legacy).
+
+If scanner fails → fall back to legacy workspace-analyzer:
 - subagent_type = workspace-analyzer
 - description = Workspace analysis
 - prompt = construct dynamically: tell the agent to scan PROJECT_ROOT and output CACHE_DATA JSON
 
 Do NOT copy this instruction text into the prompt. Write a short directive for the agent.
 
-Handle: COMPLETE→save cache to `.opencode/workspace-cache/analysis.json`, TIMEOUT (>60s)→use partial data as-is, EMPTY→set workspace_cache=null, FAILED→set workspace_cache=null. Always proceed to STEP 1 regardless of outcome.
+Handle: COMPLETE→save cache, TIMEOUT (>60s)→use partial data as-is, EMPTY→set workspace_cache=null, FAILED→set workspace_cache=null. Always proceed to STEP 1 regardless of outcome.
+
+Note: `.opencode/` is excluded from git and code analysis (see `workflow-settings.yaml` filter.exclude). The workspace cache is ephemeral and safe to delete.
 
 ### STEP 1: Environment Setup (User Input Required)
 - subagent_type = env-setup
