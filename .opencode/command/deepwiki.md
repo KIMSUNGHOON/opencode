@@ -68,10 +68,16 @@ docs/wiki/
 └── {N}-development-guide.md    # Development guide
 ```
 
-## Prerequisites
+## Prerequisites & Cache Behavior (HITL)
 
-- **Recommended:** Run `/analyze` first to build workspace cache (faster, richer results)
-- **Without cache:** Works but slower (reads files directly during generation)
+When `/deepwiki` starts, it checks for workspace cache and **asks the user** what to do:
+
+- **Cache exists (fresh):** "Use existing cache" / "Refresh" / "Generate without cache"
+- **Cache exists (stale):** "Refresh cache" / "Use stale cache" / "Generate without cache"
+- **No cache:** "Run /analyze first" / "Generate without cache"
+
+If the user chooses to run `/analyze`, it executes automatically before wiki generation.
+No need to run `/analyze` separately — the HITL prompt handles it.
 
 ## Page Content
 

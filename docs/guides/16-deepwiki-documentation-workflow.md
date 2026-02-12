@@ -44,10 +44,23 @@ and cross-linked pages. Everything runs locally via AI agents.
 /deepwiki --module api # Regenerate only one module's page
 ```
 
-### Recommended Workflow
+### Cache Check (HITL)
+
+When `/deepwiki` starts, it checks for workspace cache and asks the user:
+
+| Cache Status | Options Presented |
+|-------------|-------------------|
+| **Fresh** (< 24h) | Use cache / Refresh / Generate without cache |
+| **Stale** (> 24h) | Refresh cache / Use stale / Generate without cache |
+| **Missing** | Run /analyze first / Generate without cache |
+
+If the user chooses to run `/analyze`, it executes automatically before wiki generation.
+No need to run `/analyze` separately.
+
+### Manual Workflow (alternative)
 
 ```bash
-# Step 1: Analyze project (builds workspace cache)
+# Step 1: Analyze project (builds workspace cache with tier info)
 /analyze
 
 # Step 2: Generate wiki (uses cache for faster, richer results)

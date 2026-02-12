@@ -7,6 +7,7 @@ steps: 40
 tools:
   "*": false
   "task": true
+  "question": true
   "Read": true
   "Write": true
   "Bash": true
@@ -14,6 +15,7 @@ tools:
   "Grep": true
 permission:
   task: allow
+  question: allow
   read: allow
   write: allow
   bash: allow
@@ -50,21 +52,48 @@ Do NOT call them one by one. The system executes multiple Task calls in parallel
 
 ## Execution Steps
 
-### PHASE 1: Gather Project Context
+### PHASE 1: Gather Project Context (HITL Cache Check)
 
 **Step 1a:** Check workspace cache:
 ```
 Read .opencode/workspace-cache/project-map.yaml
 ```
 
-**Step 1b:** If no cache, do a quick scan:
-```bash
-pwd
-ls -la
-```
-Read README.md (or README.rst, README.txt) if it exists.
+**Step 1b:** Based on cache status, use the **question tool** to ask the user:
 
-**Step 1c:** Understand project structure. Use Glob to find key files:
+**If cache exists and is recent (< 24h):**
+> Workspace cache found (analyzed {timestamp}). {project_type} project with {N} modules ({T1} core, {T2} important, {T3} peripheral).
+
+Provide options via question tool:
+- **"Use existing cache"** → Read L1/L2, proceed to PHASE 2
+- **"Refresh cache first"** → Run /analyze via Task tool, then proceed
+- **"Generate without cache"** → Use direct file scanning (lower quality)
+
+**If cache exists but is stale (> 24h):**
+> Workspace cache found but stale ({age}). Refreshing improves wiki quality.
+
+Provide options via question tool:
+- **"Refresh cache"** → Run /analyze via Task tool, then proceed
+- **"Use stale cache"** → Read L1/L2, proceed to PHASE 2
+- **"Generate without cache"** → Use direct file scanning
+
+**If no cache exists:**
+> No workspace cache found. Running `/analyze` first produces significantly better wiki documentation (module details, tier info, dependency graph).
+
+Provide options via question tool:
+- **"Run /analyze first"** → Run /analyze via Task tool, then proceed
+- **"Generate without cache"** → Use direct file scanning (slower, less detailed)
+
+**Running /analyze (when chosen):**
+- subagent_type: "analyze"
+- description: "Workspace analysis for wiki"
+- prompt: "Analyze the workspace. Output 3-level cache to .opencode/workspace-cache/."
+
+After /analyze completes, re-read `.opencode/workspace-cache/project-map.yaml`.
+
+**Step 1c:** Read README.md (or README.rst, README.txt) if it exists.
+
+**Step 1d:** Understand project structure. Use Glob to find key files:
 ```
 Glob: src/*/
 Glob: packages/*/
@@ -72,7 +101,7 @@ Glob: **/index.{ts,js,py,go,rs}
 Glob: **/main.{ts,js,py,go,rs}
 ```
 
-**Step 1d:** If L2 module caches exist, list them:
+**Step 1e:** If L2 module caches exist, list them:
 ```bash
 ls .opencode/workspace-cache/modules/ 2>/dev/null
 ```
