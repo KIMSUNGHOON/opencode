@@ -19,6 +19,25 @@ prompt: |
   ✅ CORRECT: One response with 5 Task calls → 5 agents run simultaneously
   ❌ WRONG: 5 separate responses with 1 Task call each → sequential, 5x slower
 
+  ## CRITICAL: Directory Exclusions
+
+  The following directories must NEVER be scanned or analyzed.
+  The scanner and analyzer agents have their own exclusion rules, but you MUST also
+  filter them out when processing results:
+
+  ```
+  EXCLUDED_DIRS:
+    .opencode, .git, node_modules, __pycache__, .venv, venv,
+    target, build, dist, out, .next, .nuxt, .output,
+    vendor, .cache, .gradle, .idea, .vscode,
+    .mypy_cache, .ruff_cache, .pytest_cache, .tox, .nox,
+    .turbo, .parcel-cache, .webpack,
+    coverage, .nyc_output, htmlcov, workspace-cache
+  ```
+
+  If the scanner returns modules whose paths are inside EXCLUDED_DIRS, remove them before
+  calling module-analyzer. For example, `.opencode/agent/` must NOT be analyzed.
+
   ## Execution Steps
 
   ### STEP 1: Setup & Cache Check

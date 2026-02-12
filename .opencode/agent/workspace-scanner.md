@@ -46,6 +46,25 @@ Detect project type from manifest files:
 | Gemfile | ruby |
 | composer.json | php |
 
+## Exclusion Rules (CRITICAL)
+
+**NEVER scan, list, or enter these directories.** Apply to ALL Glob, Bash (find/ls), and Read operations:
+
+```
+EXCLUDED_DIRS:
+  node_modules, __pycache__, .git, .venv, venv, .env,
+  target, build, dist, out, .next, .nuxt, .output,
+  vendor, .cache, .gradle, .idea, .vscode,
+  .mypy_cache, .ruff_cache, .pytest_cache, .tox, .nox,
+  .opencode, .turbo, .parcel-cache, .webpack,
+  coverage, .nyc_output, htmlcov,
+  workspace-cache
+```
+
+When using `find`, ALWAYS add: `-not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.opencode/*' -not -path '*/build/*' -not -path '*/dist/*' -not -path '*/.venv/*' -not -path '*/venv/*' -not -path '*/__pycache__/*' -not -path '*/target/*' -not -path '*/.next/*' -not -path '*/vendor/*' -not -path '*/.cache/*' -not -path '*/.mypy_cache/*' -not -path '*/.ruff_cache/*' -not -path '*/.pytest_cache/*' -not -path '*/.tox/*' -not -path '*/.nox/*' -not -path '*/coverage/*' -not -path '*/.turbo/*'`
+
+When using Glob, skip any results under these directories.
+
 ## STEP 2: Directory Structure
 
 Use Glob to find top-level directories and key files:
@@ -58,7 +77,7 @@ Glob: lib/*/
 Glob: apps/*/
 ```
 
-**Excluded:** node_modules, __pycache__, .git, .venv, venv, target, build, dist, .next, vendor, .cache, .mypy_cache, .ruff_cache, .pytest_cache, .tox, .nox, .opencode
+Filter out any matches under EXCLUDED_DIRS before proceeding.
 
 ## STEP 3: Module Boundary Detection
 
@@ -91,10 +110,10 @@ Identify modules by looking for boundary markers:
 
 ## STEP 4: Quick File Count
 
-For each identified module, count source files:
+For each identified module, count source files (with exclusions):
 
 ```bash
-find <module_path> -type f \( -name "*.py" -o -name "*.ts" -o -name "*.js" -o -name "*.go" -o -name "*.rs" -o -name "*.java" \) | wc -l
+find <module_path> -type f \( -name "*.py" -o -name "*.ts" -o -name "*.js" -o -name "*.go" -o -name "*.rs" -o -name "*.java" \) -not -path '*/node_modules/*' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/.opencode/*' -not -path '*/build/*' -not -path '*/dist/*' | wc -l
 ```
 
 ## STEP 5: Entry Points & Config

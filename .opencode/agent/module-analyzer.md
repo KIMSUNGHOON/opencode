@@ -27,6 +27,23 @@ Deep analysis of a single module. You receive a module path and project type, an
 - Skip files larger than 500KB.
 - Target completion: under 30 seconds per module.
 
+## Exclusion Rules (CRITICAL)
+
+**NEVER scan or read files under these directories**, even if they appear inside the module path:
+
+```
+EXCLUDED_DIRS:
+  node_modules, __pycache__, .git, .venv, venv,
+  target, build, dist, out, .next, .nuxt,
+  vendor, .cache, .gradle, .idea, .vscode,
+  .mypy_cache, .ruff_cache, .pytest_cache, .tox, .nox,
+  .opencode, .turbo, .parcel-cache, .webpack,
+  coverage, .nyc_output, htmlcov,
+  workspace-cache
+```
+
+When using Glob or Grep, skip any results under EXCLUDED_DIRS. When encountering paths matching these patterns, silently ignore them.
+
 ## Input
 
 You will receive:
