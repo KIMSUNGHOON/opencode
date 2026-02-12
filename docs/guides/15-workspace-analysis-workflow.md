@@ -293,14 +293,14 @@ git:
   current_branch: "main"
 ```
 
-### 4.2 Level 2: modules/{name}.yaml (~2-5K tokens per module)
+### 4.2 Level 2: modules/{name}.yaml (~3-8K tokens per module)
 
-특정 모듈 작업 시 on-demand로 로드.
+특정 모듈 작업 시 on-demand로 로드. DB 스키마, API 계약, 타입 정의까지 포함.
 
 ```yaml
 name: "api"
 path: "src/api"
-summary: "FastAPI REST endpoints with JWT auth and role-based access control"
+summary: "FastAPI REST endpoints with JWT auth and role-based access control. Handles user CRUD, order management, and payment processing via Stripe."
 file_count: 12
 test_count: 3
 total_lines: 1850
@@ -324,10 +324,61 @@ internal_dependencies:
   - module: "models"
     imports: ["User", "Order", "Product"]
 
+# --- Deep Analysis (Steps 5-8) ---
+
+data_models:
+  - name: "User"
+    type: "sqlalchemy"
+    file: "src/models/user.py"
+    fields:
+      - {name: "id", type: "Integer", primary_key: true}
+      - {name: "email", type: "String(255)", unique: true, nullable: false}
+      - {name: "hashed_password", type: "String(255)", nullable: false}
+      - {name: "is_active", type: "Boolean", default: true}
+    relationships:
+      - {field: "orders", target: "Order", type: "one-to-many"}
+
+api_endpoints:
+  - {method: "POST", path: "/api/users/register", handler: "register_user", request_type: "UserCreateSchema", response_type: "UserResponse", auth: false}
+  - {method: "GET", path: "/api/users/me", handler: "get_current_user", response_type: "UserResponse", auth: "verify_token"}
+
+type_definitions:
+  - name: "UserCreateSchema"
+    kind: "pydantic"
+    file: "src/api/schemas/user.py"
+    fields: [{name: "email", type: "EmailStr"}, {name: "password", type: "str", min_length: 8}]
+  - name: "UserResponse"
+    kind: "pydantic"
+    file: "src/api/schemas/user.py"
+    fields: [{name: "id", type: "int"}, {name: "email", type: "str"}, {name: "is_active", type: "bool"}]
+
+error_handling:
+  custom_errors:
+    - {name: "UserNotFoundError", file: "src/api/errors.py", http_status: 404}
+    - {name: "DuplicateEmailError", file: "src/api/errors.py", http_status: 409}
+  error_handlers: ["global_exception_handler in app.py"]
+
+config:
+  env_vars:
+    - {name: "DATABASE_URL", file: "src/api/config.py", required: true}
+    - {name: "JWT_SECRET", file: "src/api/auth.py", required: true}
+
 patterns:
   - "All routes use Depends(verify_token) for auth"
   - "Pydantic schemas in schemas/ for request/response validation"
+  - "Custom exceptions mapped to HTTP status codes via global handler"
+  - "Config loaded from env vars with pydantic Settings"
 ```
+
+**Deep Analysis 필드 설명:**
+
+| 필드 | 탐지 대상 | 용도 |
+|------|-----------|------|
+| `data_models` | SQLAlchemy, Django, Prisma, Drizzle, TypeORM, GORM 등 | DB 스키마 이해, 마이그레이션 계획 |
+| `api_endpoints` | FastAPI, Express, NestJS, Gin 등의 라우트 | API 계약 파악, 새 엔드포인트 일관성 |
+| `type_definitions` | Pydantic, Zod, TypeScript interfaces, Go structs | DTO/스키마 재사용, 타입 안전성 |
+| `error_handling` | 커스텀 에러 클래스, 에러 핸들러 | 에러 처리 패턴 일관성 |
+| `config` | 환경변수, 설정 파일 참조 | 새 기능의 설정 요구사항 파악 |
 
 ### 4.3 dependency-graph.yaml
 
@@ -435,15 +486,19 @@ permission: read-only
 
 **실행 단계:**
 
-| Step | 작업 | 도구 |
-|------|------|------|
-| 1 | 파일 인벤토리 | Glob |
-| 2 | 공개 API / 내보내기 탐지 | Grep |
-| 3 | 내부 의존성 분석 | Grep |
-| 4 | 파일별 역할 요약 (상위 20개) | Read (첫 50줄) |
-| 5 | 모듈 요약 생성 | - |
+| Step | 작업 | 도구 | 상세 |
+|------|------|------|------|
+| 1 | 파일 인벤토리 | Glob | 소스/테스트/스키마/라우트/타입 파일 분류 |
+| 2 | 공개 API / 내보내기 탐지 | Grep | 언어별 export 패턴 |
+| 3 | 내부 의존성 분석 | Grep | 프로젝트 내부 import만 추출 |
+| 4 | 파일별 역할 요약 (상위 20개) | Read (첫 50줄) | 스키마/라우트/타입 파일 우선 |
+| 5 | **DB 모델/스키마 탐지** | Grep + Read | SQLAlchemy, Prisma, Drizzle, TypeORM 등 |
+| 6 | **API 엔드포인트 탐지** | Grep + Read | FastAPI, Express, NestJS, Gin 등 |
+| 7 | **타입/인터페이스 추출** | Grep + Read | Pydantic, Zod, TS interfaces, Go structs |
+| 8 | **에러 처리 & 설정 탐지** | Grep | 커스텀 에러, 환경변수, 설정 참조 |
+| 9 | 모듈 요약 생성 | - | 전체 데이터 기반 2-3문장 요약 |
 
-**출력:** `MODULE_ANALYSIS_RESULT: COMPLETE` + `MODULE_DATA` JSON
+**출력:** `MODULE_ANALYSIS_RESULT: COMPLETE` + `MODULE_DATA` JSON (스키마, API, 타입, 에러, 설정 포함)
 
 ### 5.3 workspace-analyzer (레거시)
 
@@ -456,7 +511,7 @@ v1 호환용 단일 분석 에이전트. workspace-scanner가 실패할 경우 �
 timeout:
   agent:
     workspace-scanner: 30000   # 30초
-    module-analyzer: 60000     # 1분 (per module)
+    module-analyzer: 90000     # 1.5분 (per module, deep analysis w/ schema+API+types)
 ```
 
 ---
@@ -715,7 +770,7 @@ Scanner 실패
 timeout:
   agent:
     workspace-scanner: 30000   # 30초
-    module-analyzer: 60000     # 1분
+    module-analyzer: 90000     # 1.5분
 
 model:
   assignment:

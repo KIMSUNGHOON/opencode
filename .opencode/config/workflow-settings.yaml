@@ -10,7 +10,7 @@ timeout:
     env-setup: 60000        # 1 min (environment detection)
     git-input: 30000        # 30 sec (Git parsing)
     workspace-scanner: 30000  # 30 sec (fast project scan)
-    module-analyzer: 60000    # 1 min (per-module deep analysis)
+    module-analyzer: 90000    # 1.5 min (per-module deep analysis w/ schema+API+types)
     pre-checker: 120000     # 2 min (Lint/Format)
     code-reviewer: 300000   # 5 min (code analysis)
     code-fixer: 300000      # 5 min (code fix)
