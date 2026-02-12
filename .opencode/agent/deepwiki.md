@@ -300,9 +300,15 @@ Provide options via question tool:
 
 **If "Setup GitLab Pages" chosen:**
 
-**Step 5a:** Check if `mkdocs.yml` already exists:
+**CRITICAL: Resolve repository root path first.**
+```bash
+git rev-parse --show-toplevel
 ```
-Read mkdocs.yml
+Store this as `REPO_ROOT`. All config files MUST be saved to `REPO_ROOT`, NOT to the current working directory.
+
+**Step 5a:** Check if `mkdocs.yml` already exists at repo root:
+```
+Read {REPO_ROOT}/mkdocs.yml
 ```
 
 If it does NOT exist, generate and save:
@@ -334,11 +340,11 @@ markdown_extensions:
   - tables
 ```
 
-Save with Write tool to: `mkdocs.yml`
+Save with Write tool to: `{REPO_ROOT}/mkdocs.yml`
 
-**Step 5b:** Check if `.gitlab-ci.yml` already exists:
+**Step 5b:** Check if `.gitlab-ci.yml` already exists at repo root:
 ```
-Read .gitlab-ci.yml
+Read {REPO_ROOT}/.gitlab-ci.yml
 ```
 
 If it does NOT exist, generate and save:
@@ -361,11 +367,11 @@ pages:
         - mkdocs.yml
 ```
 
-Save with Write tool to: `.gitlab-ci.yml`
+Save with Write tool to: `{REPO_ROOT}/.gitlab-ci.yml`
 
 If either file already exists, inform the user and do NOT overwrite (unless `--force` option was given).
 
-**Step 5c:** Commit and push:
+**Step 5c:** Commit and push (run from REPO_ROOT):
 ```bash
 git add docs/wiki/ mkdocs.yml .gitlab-ci.yml
 git commit -m "docs: add DeepWiki project documentation
