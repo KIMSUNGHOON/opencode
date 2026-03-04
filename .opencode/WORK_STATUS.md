@@ -82,17 +82,20 @@
 
 ## 3. 아키텍처 요약
 
-### 듀얼 엔드포인트 구성 (Qwen3.5-122B-A10B-FP8)
+### 단일 서버 + 요청별 Thinking 제어 (Qwen3.5-122B-A10B-FP8)
 ```
-SGLang (port 8000): Qwen3.5-122B-A10B-FP8 Thinking (--reasoning-parser qwen3)
-  → code-reviewer, quality-checker, summary-reporter,
-    deepwiki, analyze, wiki-page-generator
+SGLang (port 8000): Qwen3.5-122B-A10B-FP8
+  --reasoning-parser qwen3 --tool-call-parser qwen3_coder
 
-SGLang (port 8001): Qwen3.5-122B-A10B-FP8 Instruct (enable_thinking=false)
-  → Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
-    pre-checker, code-fixer, build-tester, function-tester,
-    git-committer, git-pusher, file-input, module-analyzer,
-    workspace-scanner
+  Thinking (chat_template_kwargs: enable_thinking=true):
+    → code-reviewer, quality-checker, summary-reporter,
+      deepwiki, analyze, wiki-page-generator
+
+  Instruct (chat_template_kwargs: enable_thinking=false):
+    → Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
+      pre-checker, code-fixer, build-tester, function-tester,
+      git-committer, git-pusher, file-input, module-analyzer,
+      workspace-scanner
 ```
 
 ### Sampling 파라미터 (opencode.jsonc에서 통합 관리, Qwen3.5 권장값)
