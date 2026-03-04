@@ -2,18 +2,35 @@
   "$schema": "https://opencode.ai/config.json",
 
   // =============================================================================
-  // Dual Model Provider Configuration (Both SGLang)
+  // Dual Endpoint Provider Configuration (Qwen3.5-122B-A10B-FP8, Both SGLang)
   // =============================================================================
-  // Node 1 (port 8000): Qwen3-Next-Thinking (SGLang)  -> Reasoning-intensive agents
-  // Node 2 (port 8001): Qwen3-Coder-Next (SGLang)     -> Code/utility agents
+  // Node 1 (port 8000): Qwen3.5 Thinking Mode (SGLang, --reasoning-parser qwen3)
+  // Node 2 (port 8001): Qwen3.5 Instruct Mode (SGLang, enable_thinking=false)
+  //
+  // Both endpoints serve the SAME model: Qwen/Qwen3.5-122B-A10B-FP8
+  // Difference: Thinking parses <think> blocks, Instruct disables thinking.
+  //
+  // SGLang Launch Commands:
+  //   Thinking: python -m sglang.launch_server \
+  //     --model-path Qwen/Qwen3.5-122B-A10B-FP8 --port 8000 --tp-size 8 \
+  //     --mem-fraction-static 0.8 --context-length 262144 \
+  //     --reasoning-parser qwen3 --tool-call-parser qwen3_coder
+  //
+  //   Instruct: python -m sglang.launch_server \
+  //     --model-path Qwen/Qwen3.5-122B-A10B-FP8 --port 8001 --tp-size 8 \
+  //     --mem-fraction-static 0.8 --context-length 262144 \
+  //     --chat-template-kwargs '{"enable_thinking": false}' \
+  //     --tool-call-parser qwen3_coder
   //
   // Model Assignment:
-  //   Thinking (qwen/Qwen3-Next-80B-A3B-Thinking-FP8):
+  //   Thinking (qwen/Qwen3.5-122B-A10B-FP8):
   //     - code-reviewer, quality-checker, summary-reporter
-  //   Coder (qwen-coder/Qwen3-Coder-Next-FP8):
+  //     - deepwiki, analyze, wiki-page-generator
+  //   Instruct (qwen-instruct/Qwen3.5-122B-A10B-FP8):
   //     - Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
   //       pre-checker, code-fixer, build-tester, function-tester,
-  //       git-committer, git-pusher, file-input
+  //       git-committer, git-pusher, file-input, module-analyzer,
+  //       workspace-scanner
   // =============================================================================
 
   // =============================================================================
@@ -22,8 +39,8 @@
   // OpenCode hard-caps output tokens at min(model_limit, 32000) in llm.ts.
   // The "limit.output" below declares each model's capability to the framework.
   // Without the env var, actual output is capped at 32K regardless of model capability.
-  // To use the full Coder output (65K) or Thinking output (32K), set:
-  //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
+  // To use the full output (32K), set:
+  //   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=32768
   // This lifts the hard cap so models can use their declared output limit.
 
   // =============================================================================
@@ -39,10 +56,12 @@
 
   "provider": {
     // -------------------------------------------------------------------------
-    // Provider 1: Thinking Model (SGLang, port 8000)
+    // Provider 1: Thinking Mode (SGLang, port 8000)
     // -------------------------------------------------------------------------
+    // Sampling: temperature 0.6, top_p 0.95, top_k 20 (Qwen3.5 recommended)
+    // enable_thinking=true (default), reasoning-parser qwen3
     "qwen": {
-      "name": "Qwen3-Next-Thinking (Reasoning)",
+      "name": "Qwen3.5-122B-A10B Thinking",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8000/v1",
       "env": [],
@@ -51,9 +70,9 @@
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "Qwen3-Next-80B-A3B-Thinking-FP8": {
-          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
+        "Qwen3.5-122B-A10B-FP8": {
+          "name": "Qwen3.5-122B-A10B-FP8",
+          "id": "Qwen3.5-122B-A10B-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": true,
@@ -66,8 +85,7 @@
             "context": 262144,
             "output": 32768
           },
-          // Sampling params: override SDK defaults via providerOptions → request body
-          // README: temperature 0.6, top_p 0.95, top_k 20
+          // Qwen3.5 Thinking mode recommended: temp 0.6, top_p 0.95, top_k 20
           "options": {
             "temperature": 0.6,
             "top_p": 0.95,
@@ -82,10 +100,12 @@
     },
 
     // -------------------------------------------------------------------------
-    // Provider 2: Coder Model (SGLang, port 8001)
+    // Provider 2: Instruct Mode (SGLang, port 8001)
     // -------------------------------------------------------------------------
-    "qwen-coder": {
-      "name": "Qwen3-Coder-Next (Code)",
+    // Sampling: temperature 0.7, top_p 0.8, top_k 20 (Qwen3.5 recommended)
+    // enable_thinking=false via chat_template_kwargs at server launch
+    "qwen-instruct": {
+      "name": "Qwen3.5-122B-A10B Instruct",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8001/v1",
       "env": [],
@@ -94,9 +114,9 @@
         "baseURL": "http://localhost:8001/v1"
       },
       "models": {
-        "Qwen3-Coder-Next-FP8": {
-          "name": "Qwen3-Coder-Next-FP8",
-          "id": "Qwen3-Coder-Next-FP8",
+        "Qwen3.5-122B-A10B-FP8": {
+          "name": "Qwen3.5-122B-A10B-FP8",
+          "id": "Qwen3.5-122B-A10B-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": false,
@@ -107,14 +127,13 @@
           },
           "limit": {
             "context": 262144,
-            "output": 65536
+            "output": 32768
           },
-          // Sampling params: override SDK defaults via providerOptions → request body
-          // README: temperature 1.0, top_p 0.95, top_k 40
+          // Qwen3.5 Instruct mode recommended: temp 0.7, top_p 0.8, top_k 20
           "options": {
-            "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 40
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20
           },
           "cost": {
             "input": 0,

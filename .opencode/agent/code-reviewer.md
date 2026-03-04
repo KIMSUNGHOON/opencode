@@ -1,7 +1,7 @@
 ---
 description: Deep Code Analysis Expert (Chain-of-Thought)
 mode: subagent
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#E74C3C"
 tools:
   "*": false

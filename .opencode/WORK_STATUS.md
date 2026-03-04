@@ -82,21 +82,23 @@
 
 ## 3. 아키텍처 요약
 
-### 듀얼 모델 구성
+### 듀얼 엔드포인트 구성 (Qwen3.5-122B-A10B-FP8)
 ```
-SGLang (port 8000): Qwen3-Next-80B-A3B-Thinking-FP8
-  → code-reviewer, quality-checker, summary-reporter
+SGLang (port 8000): Qwen3.5-122B-A10B-FP8 Thinking (--reasoning-parser qwen3)
+  → code-reviewer, quality-checker, summary-reporter,
+    deepwiki, analyze, wiki-page-generator
 
-SGLang (port 8001): Qwen3-Coder-Next-FP8
+SGLang (port 8001): Qwen3.5-122B-A10B-FP8 Instruct (enable_thinking=false)
   → Orchestrator (code-qa), env-setup, git-input, workspace-analyzer,
     pre-checker, code-fixer, build-tester, function-tester,
-    git-committer, git-pusher, file-input
+    git-committer, git-pusher, file-input, module-analyzer,
+    workspace-scanner
 ```
 
-### Sampling 파라미터 (opencode.jsonc에서 통합 관리)
+### Sampling 파라미터 (opencode.jsonc에서 통합 관리, Qwen3.5 권장값)
 ```
 Thinking: temperature=0.6, top_p=0.95, top_k=20
-Coder:    temperature=1.0, top_p=0.95, top_k=40
+Instruct: temperature=0.7, top_p=0.8,  top_k=20
 ```
 
 ### 파라미터 우선순위 체인
@@ -124,7 +126,7 @@ STEP 11: git-pusher → push_result ← uses git directly
 
 ### 핵심 환경변수
 ```bash
-export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536  # Coder 65K output 활성화
+export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=32768  # Qwen3.5 32K output 활성화
 ```
 
 ---

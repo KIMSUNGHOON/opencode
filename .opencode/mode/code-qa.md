@@ -1,6 +1,6 @@
 ---
 description: "Code QA Workflow - Automated Code Quality Assurance"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 mode: all
 color: "#E74C3C"
 ---

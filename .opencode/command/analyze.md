@@ -1,6 +1,6 @@
 ---
 description: "Workspace analysis with 3-level progressive cache"
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 agent: analyze
 subtask: true
 prompt: |

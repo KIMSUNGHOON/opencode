@@ -1,6 +1,6 @@
 ---
 description: "Auto-fix code issues (standalone)"
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |
   You are a code fix agent.

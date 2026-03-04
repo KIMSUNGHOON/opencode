@@ -1,7 +1,7 @@
 ---
 description: Fast workspace scanner - identifies project structure and module boundaries
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 color: "#2ECC71"
 tools:
   "*": false

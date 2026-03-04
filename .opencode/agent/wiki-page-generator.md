@@ -1,7 +1,7 @@
 ---
 description: Generates a single DeepWiki-style documentation page with mermaid diagrams
 mode: subagent
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#3498DB"
 steps: 20
 tools:

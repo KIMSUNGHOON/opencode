@@ -1,7 +1,7 @@
 ---
 description: Workspace analysis orchestrator - delegates scanning and module analysis via Task tool
 mode: subagent
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#9B59B6"
 steps: 30
 tools:

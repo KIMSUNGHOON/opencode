@@ -1,6 +1,6 @@
 ---
 description: "Generate DeepWiki-style project documentation with mermaid diagrams"
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 agent: deepwiki
 subtask: true
 prompt: |

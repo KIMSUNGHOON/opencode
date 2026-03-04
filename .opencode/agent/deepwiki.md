@@ -1,7 +1,7 @@
 ---
 description: DeepWiki orchestrator - generates comprehensive project wiki with mermaid diagrams
 mode: subagent
-model: qwen/Qwen3-Next-80B-A3B-Thinking-FP8
+model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#8E44AD"
 steps: 40
 tools:

@@ -75,14 +75,14 @@ quality:
 # Model Settings (Dual Model Strategy)
 # =============================================================================
 model:
-  # Reasoning model (Thinking) - Orchestrator, Reviewer, QC, Reporter
-  thinking: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"
+  # Reasoning model (Thinking) - Reviewer, QC, Reporter, DeepWiki, Analyze
+  thinking: "qwen/Qwen3.5-122B-A10B-FP8"
 
-  # Code model (Coder) - Fixer, Tester, Git, Utility agents
-  coder: "qwen-coder/Qwen3-Coder-Next-FP8"
+  # Instruct model - Orchestrator, Fixer, Tester, Git, Utility agents
+  instruct: "qwen-instruct/Qwen3.5-122B-A10B-FP8"
 
   # Fallback model (when one server is down)
-  fallback: "qwen/Qwen3-Next-80B-A3B-Thinking-FP8"
+  fallback: "qwen/Qwen3.5-122B-A10B-FP8"
 
   # Per-agent model assignment
   assignment:
@@ -92,8 +92,8 @@ model:
       - quality-checker  # Phase 4: Quality evaluation/scoring
       - summary-reporter # Phase 8: Comprehensive report generation
 
-    # Coder Model (port 8001) - Code/utility agents + Orchestrator
-    coder_agents:
+    # Instruct Model (port 8001) - Code/utility agents + Orchestrator
+    instruct_agents:
       - code-qa          # Orchestrator (switched from Thinking for tool call stability)
       - env-setup          # Phase -1: Environment detection
       - git-input          # Phase 0: Git parsing
@@ -111,40 +111,41 @@ model:
   # Model ID validation (P2-1: prevent routing failures)
   # All QA workflow agents MUST use model IDs matching this format:
   #   {provider}/{model-name}
-  # Valid providers for QA workflow: "qwen", "qwen-coder"
+  # Valid providers for QA workflow: "qwen", "qwen-instruct"
   # Non-QA commands (commit, issues, triage) may use other providers.
   validation:
     required_format: "{provider}/{model-name}"
     valid_providers:
-      - "qwen"           # Thinking model provider
-      - "qwen-coder"     # Coder model provider
+      - "qwen"             # Thinking model provider
+      - "qwen-instruct"    # Instruct model provider
     health_check:
       thinking_endpoint: "http://localhost:8000/v1/models"
-      coder_endpoint: "http://localhost:8001/v1/models"
+      instruct_endpoint: "http://localhost:8001/v1/models"
       timeout_ms: 5000   # Health check timeout
 
   # Output token cap override
   # OpenCode hard-caps output at 32K (llm.ts OUTPUT_TOKEN_MAX).
-  # Coder model supports 65K. Set this env var before launching:
-  #   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536
-  output_token_max_env: "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536"
+  # Qwen3.5 supports 32K output. Set this env var before launching:
+  #   export OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=32768
+  output_token_max_env: "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=32768"
 
   # Context settings
   context:
     max_length: 262144      # Maximum context length (256K)
     reduce_ratio: 0.5       # Reduction ratio on OOM
 
-  # Sampling parameters (per-model, from official recommendations)
+  # Sampling parameters (per-model, from Qwen3.5 official recommendations)
   sampling:
     thinking:
       temperature: 0.6
       top_p: 0.95
       top_k: 20
       min_p: 0
-    coder:
-      temperature: 1.0
-      top_p: 0.95
-      top_k: 40
+    instruct:
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 20
+      min_p: 0
 
 # =============================================================================
 # Workspace Analysis Settings

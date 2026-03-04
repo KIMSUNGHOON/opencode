@@ -1,7 +1,7 @@
 ---
 description: Development Environment Detection and Setup Expert
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 color: "#95A5A6"
 tools:
   "*": false

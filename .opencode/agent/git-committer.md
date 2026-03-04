@@ -1,7 +1,7 @@
 ---
 description: Git Commit Expert
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 color: "#E67E22"
 tools:
   "*": false
