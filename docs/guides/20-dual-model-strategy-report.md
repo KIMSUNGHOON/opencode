@@ -102,7 +102,7 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │ git-input        │ ★☆☆☆☆    │ ☆☆☆☆☆  │ ★★☆☆☆  │ 소형       │ C. 유틸리티     │
 │ git-committer    │ ★★☆☆☆    │ ☆☆☆☆☆  │ ★★☆☆☆  │ 소형       │ C. 유틸리티     │
 │ git-pusher       │ ★☆☆☆☆    │ ☆☆☆☆☆  │ ★★☆☆☆  │ 소형       │ C. 유틸리티     │
-│ workspace-analyzer│ ★★☆☆☆   │ ☆☆☆☆☆  │ ★★★☆☆  │ 중간       │ C. 유틸리티     │
+│ workspace-analyzer│ ★★☆☆☆   │ ☆☆☆☆☆  │ ★★★☆☆  │ 중간       │ C. (DEPRECATED) │
 └──────────────────┴────────────┴───────────┴───────────┴───────────┴────────────────┘
 ```
 
@@ -147,10 +147,12 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  │                                                                                │  │
 │  │  [Phase 2] code-reviewer  ★ 핵심 추론 에이전트                                 │  │
 │  │    이유: 보안 취약점, 논리적 오류, 코드 품질 문제를 깊이 있게 분석                   │  │
-│  │    특성: Read 도구만 사용, CoT로 심층 분석 수행                                   │  │
+│  │    특성: Read 도구만 사용, CoT로 수동 코드 리딩을 통한 이슈 발견                    │  │
+│  │    범위: 이슈 발견 전담 — 외부 도구 실행은 quality-checker가 담당                  │  │
 │  │                                                                                │  │
 │  │  [Phase 4] quality-checker                                                     │  │
-│  │    이유: 정적 분석 결과를 종합하여 점수 산정 + 합격/불합격 판단                      │  │
+│  │    이유: 외부 도구(linter, type checker, 복잡도 메트릭) 실행 후 점수 산정           │  │
+│  │    범위: 도구 기반 점수 산출 전담 — 수동 코드 리딩은 code-reviewer가 담당           │  │
 │  │                                                                                │  │
 │  │  [Phase 8] summary-reporter                                                    │  │
 │  │    이유: 전체 QA 결과를 종합 분석하여 의미 있는 리포트 생성                          │  │

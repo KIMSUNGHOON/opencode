@@ -83,13 +83,13 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 | Agent | File | Language | Model | Purpose |
 |-------|------|----------|-------|---------|
 | code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Orchestrator (Coder for tool call stability) |
-| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Code review (CoT) |
-| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Quality verification (CoT) |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Issue discovery via manual code reading (CoT) |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Tool-based quality scoring (CoT) |
 | summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Final summary (CoT) |
 | env-setup | `.opencode/agent/env-setup.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Environment setup |
 | git-input | `.opencode/agent/git-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git diff collection |
 | file-input | `.opencode/agent/file-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Direct file input |
-| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Workspace analysis |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Workspace analysis (DEPRECATED — legacy fallback) |
 | pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Pre-review checks |
 | code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Auto-fix issues (SWE-Bench) |
 | build-tester | `.opencode/agent/build-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Build test |

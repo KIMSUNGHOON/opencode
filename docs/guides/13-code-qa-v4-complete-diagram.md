@@ -77,16 +77,18 @@ This document provides an integrated diagram of the complete **Code QA v4 Workfl
 | **-1** | `@env-setup` | Qwen3-Coder-Next | Shell/conda/venv environment detection | Host |
 | **0** | `@git-input` | Qwen3-Coder-Next | Git diff extraction, changed file list | Host |
 | **1** | `@pre-checker` | Qwen3-Coder-Next | Auto-fix (lint --fix, format) | Host |
-| **2** | `@code-reviewer` | Qwen3-Next-Thinking | Deep code analysis, issue detection (CoT) | Host |
+| **2** | `@code-reviewer` | Qwen3-Next-Thinking | Issue discovery via manual code reading (CoT) | Host |
 | **3** | `@code-fixer` | Qwen3-Coder-Next | Fix discovered issues (SWE-Bench) | Host |
-| **4** | `@quality-checker` | Qwen3-Next-Thinking | Quality score check (≥70%) | Host |
+| **4** | `@quality-checker` | Qwen3-Next-Thinking | Tool-based quality scoring (≥70%) | Host |
 | **5** | `@build-tester` | Qwen3-Coder-Next | Build test (GPU) | **Sandbox** |
 | **6** | `@function-tester` | Qwen3-Coder-Next | Function test (GPU) | **Sandbox** |
 | **7** | `@git-committer` | Qwen3-Coder-Next | Commit or Amend | Host |
 | **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown result report (CoT) | Host |
 | **9** | `@git-pusher` | Qwen3-Coder-Next | Push & PR creation | Host |
 
-> ⚠️ **Note**: code-reviewer has Read permission only (Glob/Grep/Bash disabled). It can only analyze files explicitly passed by the orchestrator.
+> ⚠️ **Note**: code-reviewer has Read permission only (Glob/Grep/Bash disabled). It discovers issues by manually reading code — does NOT run external tools. See quality-checker for tool-based scoring.
+>
+> ⚠️ **Note**: pre-checker has `edit: deny` intentionally. File modifications happen through linter `--fix` commands via Bash only.
 
 ### 2.1 Dual Model Strategy
 

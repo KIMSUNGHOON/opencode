@@ -525,9 +525,10 @@ permission: read-only
 
 **출력:** `MODULE_ANALYSIS_RESULT: COMPLETE` + `MODULE_DATA` JSON (스키마, API, 타입, 에러, 설정 포함)
 
-### 5.3 workspace-analyzer (레거시)
+### 5.3 workspace-analyzer (DEPRECATED)
 
 v1 호환용 단일 분석 에이전트. workspace-scanner가 실패할 경우 폴백으로 사용됩니다.
+이 폴백이 빈번하게 발생한다면 workspace-scanner의 실패 원인을 조사해야 합니다.
 
 ### 5.4 타임아웃 설정
 

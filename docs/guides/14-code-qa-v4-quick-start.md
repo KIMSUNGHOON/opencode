@@ -28,7 +28,8 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 
 - **Dual Model Strategy**:
   - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — code-reviewer, quality-checker, summary-reporter
-  - **Coder Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+  - **Instruct Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+    - Note: Config key renamed from `coder` to `instruct` in `workflow-settings.yaml`. workspace-analyzer is deprecated (legacy fallback only).
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
 - **Regression Loop**: Per-source independent retry counters (quality/build/test: max 3 each, total cap: 5)
@@ -594,13 +595,13 @@ List of tools available to each agent:
 
 | Agent | Bash | Read | Edit | Write | Glob | Grep | Primary Role |
 |-------|:----:|:----:|:----:|:-----:|:----:|:----:|-------------|
-| **workspace-analyzer** | Yes | Yes | No | No | Yes | Yes | Workspace analysis |
+| **workspace-analyzer** | Yes | Yes | No | No | Yes | Yes | Workspace analysis (DEPRECATED) |
 | env-setup | Yes | Yes | No | No | Yes | Yes | Environment detection |
 | git-input | Yes | Yes | No | No | Yes | No | Git parsing |
-| pre-checker | Yes | Yes | No | No | Yes | Yes | Lint/Format |
-| **code-reviewer** | **No** | Yes | No | No | **No** | **No** | Code analysis |
+| pre-checker | Yes | Yes | No | No | Yes | Yes | Lint/Format (edit:deny intentional) |
+| **code-reviewer** | **No** | Yes | No | No | **No** | **No** | Issue discovery (manual reading) |
 | code-fixer | Yes | Yes | Yes | Yes | Yes | Yes | Code modification |
-| quality-checker | Yes | Yes | No | No | Yes | Yes | Quality check |
+| quality-checker | Yes | Yes | No | No | Yes | Yes | Tool-based quality scoring |
 | build-tester | Yes | Yes | No | No | Yes | No | Build testing |
 | function-tester | Yes | Yes | No | No | Yes | Yes | Function testing |
 | git-committer | Yes | Yes | No | No | No | No | Git commit |
