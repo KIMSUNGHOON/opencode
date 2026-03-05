@@ -1,5 +1,5 @@
 ---
-description: "Code quality check (standalone)"
+description: "Code quality check (standalone — equivalent to /code-qa STEP 6)"
 model: qwen/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |

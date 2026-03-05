@@ -1,5 +1,5 @@
 ---
-description: "Lint/Format auto-fix (standalone)"
+description: "Lint/Format auto-fix (standalone — equivalent to /code-qa STEP 3)"
 model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |

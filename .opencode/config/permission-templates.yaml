@@ -351,6 +351,8 @@ agent_permissions:
       - conda_env
       - dangerous_commands_deny
 
+  # DEPRECATED: workspace-analyzer is a legacy fallback in analyze command.
+  # Prefer workspace-scanner + module-analyzer pipeline.
   workspace-analyzer:
     extends:
       - base_exploration

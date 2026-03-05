@@ -95,6 +95,10 @@ permission:
     "git push *": deny
     "git reset *": deny
   read: allow
+  # edit: deny — intentional. File modifications happen through linter --fix
+  # commands via bash (e.g., ruff check --fix, eslint --fix). The Edit tool
+  # is denied to prevent the agent from making manual code changes beyond
+  # what the linter auto-fix produces.
   edit: deny
   glob: allow
   grep: allow

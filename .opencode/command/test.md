@@ -1,5 +1,5 @@
 ---
-description: "Function test (standalone)"
+description: "Function test (standalone — equivalent to /code-qa STEP 8)"
 model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |

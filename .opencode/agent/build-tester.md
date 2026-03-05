@@ -12,9 +12,6 @@ permission:
   bash:
     # Environment status check (STEP 0)
     "echo *": allow
-    "echo $SHELL": allow
-    "echo $CONDA_DEFAULT_ENV": allow
-    "echo $VIRTUAL_ENV": allow
     "python --version": allow
     "python3 --version": allow
     "node --version": allow
@@ -78,7 +75,6 @@ permission:
     # Kotlin build
     "kotlinc *": allow
     # Common utility commands
-    "echo *": allow
     "pwd": allow
     "cat *": allow
     "head *": allow

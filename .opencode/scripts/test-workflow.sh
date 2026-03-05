@@ -262,7 +262,7 @@ test_model_ids() {
 
     # Extract expected model IDs from workflow-settings.yaml
     THINKING_MODEL=$(grep "^  thinking:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
-    CODER_MODEL=$(grep "^  coder:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
+    INSTRUCT_MODEL=$(grep "^  instruct:" "$SETTINGS_FILE" | sed 's/.*"\(.*\)"/\1/')
 
     if [ -n "$THINKING_MODEL" ]; then
         log_success "Thinking model defined: $THINKING_MODEL"
@@ -270,10 +270,10 @@ test_model_ids() {
         log_fail "Thinking model not defined in workflow-settings.yaml"
     fi
 
-    if [ -n "$CODER_MODEL" ]; then
-        log_success "Coder model defined: $CODER_MODEL"
+    if [ -n "$INSTRUCT_MODEL" ]; then
+        log_success "Instruct model defined: $INSTRUCT_MODEL"
     else
-        log_fail "Coder model not defined in workflow-settings.yaml"
+        log_fail "Instruct model not defined in workflow-settings.yaml"
     fi
 
     # Validate Thinking agents use Thinking model
@@ -289,26 +289,26 @@ test_model_ids() {
         fi
     done
 
-    # Validate Coder agents use Coder model
-    CODER_AGENTS=("env-setup" "git-input" "workspace-analyzer" "file-input" "pre-checker" "code-fixer" "build-tester" "function-tester" "git-committer" "git-pusher")
-    for agent in "${CODER_AGENTS[@]}"; do
+    # Validate Instruct agents use Instruct model
+    INSTRUCT_AGENTS=("env-setup" "git-input" "workspace-analyzer" "file-input" "pre-checker" "code-fixer" "build-tester" "function-tester" "git-committer" "git-pusher")
+    for agent in "${INSTRUCT_AGENTS[@]}"; do
         if [ -f ".opencode/agent/${agent}.md" ]; then
             AGENT_MODEL=$(grep "^model:" ".opencode/agent/${agent}.md" | sed 's/model: *//')
-            if [ "$AGENT_MODEL" = "$CODER_MODEL" ]; then
-                log_success "${agent}: model matches Coder ($AGENT_MODEL)"
+            if [ "$AGENT_MODEL" = "$INSTRUCT_MODEL" ]; then
+                log_success "${agent}: model matches Instruct ($AGENT_MODEL)"
             else
-                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$CODER_MODEL')"
+                log_fail "${agent}: model mismatch (got '$AGENT_MODEL', expected '$INSTRUCT_MODEL')"
             fi
         fi
     done
 
-    # Validate orchestrator uses Coder model (switched from Thinking for tool call stability)
+    # Validate orchestrator uses Instruct model (switched from Thinking for tool call stability)
     if [ -f ".opencode/mode/code-qa.md" ]; then
         ORCH_MODEL=$(grep "^model:" ".opencode/mode/code-qa.md" | sed 's/model: *//')
-        if [ "$ORCH_MODEL" = "$CODER_MODEL" ]; then
-            log_success "orchestrator (mode): model matches Coder ($ORCH_MODEL)"
+        if [ "$ORCH_MODEL" = "$INSTRUCT_MODEL" ]; then
+            log_success "orchestrator (mode): model matches Instruct ($ORCH_MODEL)"
         else
-            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$CODER_MODEL')"
+            log_fail "orchestrator (mode): model mismatch (got '$ORCH_MODEL', expected '$INSTRUCT_MODEL')"
         fi
     fi
 }

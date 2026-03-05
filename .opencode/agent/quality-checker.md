@@ -1,5 +1,5 @@
 ---
-description: Code Quality Score Checker
+description: Tool-based quality scoring (linters, type checkers, complexity metrics). Runs external tools and calculates a numeric score. Does NOT manually read code for issues — see code-reviewer for issue discovery.
 mode: subagent
 model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#F39C12"

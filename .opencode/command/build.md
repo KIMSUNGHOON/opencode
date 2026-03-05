@@ -1,5 +1,5 @@
 ---
-description: "Build test (standalone)"
+description: "Build test (standalone — equivalent to /code-qa STEP 7)"
 model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |

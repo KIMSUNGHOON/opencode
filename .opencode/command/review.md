@@ -1,5 +1,5 @@
 ---
-description: "Code review (standalone)"
+description: "Code review (standalone — equivalent to /code-qa STEP 4)"
 model: qwen/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |

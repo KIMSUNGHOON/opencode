@@ -69,12 +69,13 @@ prompt: |
   Extract SCAN_DATA JSON from result. Store as `scan_result`.
   If FAILED → fall back to legacy workspace-analyzer (STEP 2b).
 
-  **STEP 2b: Legacy Fallback**
-  If scanner fails, call the original workspace-analyzer:
+  **STEP 2b: Legacy Fallback (DEPRECATED)**
+  If scanner fails, call the original workspace-analyzer as last resort:
   - subagent_type: "workspace-analyzer"
-  - description: "Workspace analysis (legacy)"
+  - description: "Workspace analysis (legacy fallback)"
   - prompt: "Analyze current workspace. Output CACHE_DATA JSON."
   Save to analysis.json and end (no module-level cache).
+  NOTE: This fallback should rarely trigger. If it does frequently, investigate scanner failures.
 
   ### STEP 3: Tiered Module Analysis
 
@@ -286,7 +287,7 @@ prompt: |
 
   ## Error Handling
 
-  - Scanner failure → fall back to legacy workspace-analyzer
+  - Scanner failure → fall back to legacy workspace-analyzer (deprecated, investigate if frequent)
   - Individual module-analyzer failure → skip that module, note in cache-meta
   - All module-analyzers fail → use scanner results only (L1 without L2)
   - JSON parsing failure → log error, continue with available data

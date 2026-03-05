@@ -1,5 +1,5 @@
 ---
-description: Deep Code Analysis Expert (Chain-of-Thought)
+description: Issue discovery via manual code reading (Chain-of-Thought). Finds security, bugs, performance, and maintainability issues by reading source. Does NOT run external tools — see quality-checker for tool-based scoring.
 mode: subagent
 model: qwen/Qwen3.5-122B-A10B-FP8
 color: "#E74C3C"

@@ -1,5 +1,5 @@
 ---
-description: "Auto-fix code issues (standalone)"
+description: "Auto-fix code issues (standalone — equivalent to /code-qa STEP 5)"
 model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 subtask: true
 prompt: |
