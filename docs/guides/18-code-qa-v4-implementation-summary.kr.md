@@ -84,20 +84,20 @@
 
 | 에이전트 | 파일 | 언어 | 모델 | 용도 |
 |----------|------|------|------|------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 오케스트레이터 (Coder 모델, tool call 안정성) |
-| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 코드 리뷰 (CoT) |
-| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 품질 검증 (CoT) |
-| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | 최종 요약 (CoT) |
-| env-setup | `.opencode/agent/env-setup.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 환경 설정 |
-| git-input | `.opencode/agent/git-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git diff 수집 |
-| file-input | `.opencode/agent/file-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 직접 파일 입력 |
-| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 작업공간 분석 |
-| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 사전 검사 |
-| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 자동 이슈 수정 (SWE-Bench) |
-| build-tester | `.opencode/agent/build-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 빌드 테스트 |
-| function-tester | `.opencode/agent/function-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | 기능 테스트 |
-| git-committer | `.opencode/agent/git-committer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git 커밋 |
-| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git 푸시 |
+| code-qa | `.opencode/mode/code-qa.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 오케스트레이터 (Instruct 모드, tool call 안정성) |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | 수동 코드 리딩으로 이슈 발견 (CoT) |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | 도구 기반 품질 점수 산출 (CoT) |
+| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | 최종 요약 (CoT) |
+| env-setup | `.opencode/agent/env-setup.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 환경 설정 |
+| git-input | `.opencode/agent/git-input.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git diff 수집 |
+| file-input | `.opencode/agent/file-input.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 직접 파일 입력 |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 작업공간 분석 (DEPRECATED — legacy fallback) |
+| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 사전 검사 |
+| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 자동 이슈 수정 (SWE-Bench) |
+| build-tester | `.opencode/agent/build-tester.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 빌드 테스트 |
+| function-tester | `.opencode/agent/function-tester.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | 기능 테스트 |
+| git-committer | `.opencode/agent/git-committer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git 커밋 |
+| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git 푸시 |
 
 ### 3.2 결과 토큰 패턴
 
@@ -187,16 +187,18 @@ PUSH_RESULT: FAIL
 │                    Dual Model Characteristics                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8, SGLang port 8000):  │
-│    - 자기 추론 능력 (CoT)                                                │
-│    - 4개 에이전트: Orchestrator, code-reviewer, quality-checker,        │
-│      summary-reporter                                                   │
+│  Qwen3.5-122B-A10B-FP8 (SGLang port 8000, 단일 서버)                  │
+│  요청별 thinking 제어 via chat_template_kwargs                          │
 │                                                                         │
-│  Coder Model (Qwen3-Coder-Next-FP8, vLLM port 8001):                  │
-│    - Non-thinking, 빠른 코드 생성 (SWE-Bench 70.6%)                     │
-│    - 10개 에이전트: env-setup, git-input, file-input,                   │
-│      workspace-analyzer, pre-checker, code-fixer, build-tester,        │
-│      function-tester, git-committer, git-pusher                        │
+│  Thinking Mode (enable_thinking=true):                                 │
+│    - 자기 추론 능력 (CoT)                                                │
+│    - 3개 에이전트: code-reviewer, quality-checker, summary-reporter     │
+│                                                                         │
+│  Instruct Mode (enable_thinking=false):                                │
+│    - Non-thinking, 빠른 코드 생성                                       │
+│    - 11개 에이전트: Orchestrator, env-setup, git-input, file-input,     │
+│      pre-checker, code-fixer, build-tester, function-tester,           │
+│      git-committer, git-pusher                                         │
 │                                                                         │
 │  로컬 추론:                                                              │
 │    - 토큰 비용: 해당 없음 (로컬 서빙)                                     │

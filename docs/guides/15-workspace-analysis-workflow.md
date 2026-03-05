@@ -454,7 +454,7 @@ graph:
 ---
 description: Fast workspace scanner
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 tools: [Glob, Read, Bash]
 permission: read-only
 ---
@@ -501,7 +501,7 @@ permission: read-only
 ---
 description: Deep module analyzer
 mode: subagent
-model: qwen-coder/Qwen3-Coder-Next-FP8
+model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 tools: [Glob, Grep, Read]
 permission: read-only
 ---

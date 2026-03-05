@@ -82,20 +82,20 @@ This document summarizes all implementation work completed for the Code QA v4 wo
 
 | Agent | File | Language | Model | Purpose |
 |-------|------|----------|-------|---------|
-| code-qa | `.opencode/mode/code-qa.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Orchestrator (Coder for tool call stability) |
-| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Issue discovery via manual code reading (CoT) |
-| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Tool-based quality scoring (CoT) |
-| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3-Next-80B-A3B-Thinking-FP8 | Final summary (CoT) |
-| env-setup | `.opencode/agent/env-setup.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Environment setup |
-| git-input | `.opencode/agent/git-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git diff collection |
-| file-input | `.opencode/agent/file-input.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Direct file input |
-| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Workspace analysis (DEPRECATED — legacy fallback) |
-| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Pre-review checks |
-| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Auto-fix issues (SWE-Bench) |
-| build-tester | `.opencode/agent/build-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Build test |
-| function-tester | `.opencode/agent/function-tester.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Function testing |
-| git-committer | `.opencode/agent/git-committer.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git commit |
-| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-coder/Qwen3-Coder-Next-FP8 | Git push |
+| code-qa | `.opencode/mode/code-qa.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Orchestrator (Instruct for tool call stability) |
+| code-reviewer | `.opencode/agent/code-reviewer.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | Issue discovery via manual code reading (CoT) |
+| quality-checker | `.opencode/agent/quality-checker.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | Tool-based quality scoring (CoT) |
+| summary-reporter | `.opencode/agent/summary-reporter.md` | English | qwen/Qwen3.5-122B-A10B-FP8 | Final summary (CoT) |
+| env-setup | `.opencode/agent/env-setup.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Environment setup |
+| git-input | `.opencode/agent/git-input.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git diff collection |
+| file-input | `.opencode/agent/file-input.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Direct file input |
+| workspace-analyzer | `.opencode/agent/workspace-analyzer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Workspace analysis (DEPRECATED — legacy fallback) |
+| pre-checker | `.opencode/agent/pre-checker.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Pre-review checks |
+| code-fixer | `.opencode/agent/code-fixer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Auto-fix issues (SWE-Bench) |
+| build-tester | `.opencode/agent/build-tester.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Build test |
+| function-tester | `.opencode/agent/function-tester.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Function testing |
+| git-committer | `.opencode/agent/git-committer.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git commit |
+| git-pusher | `.opencode/agent/git-pusher.md` | English | qwen-instruct/Qwen3.5-122B-A10B-FP8 | Git push |
 
 ### 3.2 Result Token Patterns
 
@@ -185,14 +185,16 @@ PUSH_RESULT: FAIL
 │                    Dual Model Characteristics                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8, SGLang port 8000):  │
-│    - Self-reasoning capability (CoT)                                    │
-│    - 4 agents: Orchestrator, code-reviewer, quality-checker,           │
-│      summary-reporter                                                   │
+│  Qwen3.5-122B-A10B-FP8 (SGLang port 8000, single server)              │
+│  Per-request thinking control via chat_template_kwargs                 │
 │                                                                         │
-│  Coder Model (Qwen3-Coder-Next-FP8, vLLM port 8001):                  │
-│    - Non-thinking, fast code generation (SWE-Bench 70.6%)              │
-│    - 10 agents: env-setup, git-input, file-input, workspace-analyzer,  │
+│  Thinking Mode (enable_thinking=true):                                 │
+│    - Self-reasoning capability (CoT)                                    │
+│    - 3 agents: code-reviewer, quality-checker, summary-reporter        │
+│                                                                         │
+│  Instruct Mode (enable_thinking=false):                                │
+│    - Non-thinking, fast code generation                                │
+│    - 11 agents: Orchestrator, env-setup, git-input, file-input,        │
 │      pre-checker, code-fixer, build-tester, function-tester,           │
 │      git-committer, git-pusher                                         │
 │                                                                         │

@@ -1,8 +1,10 @@
-# Dual Model Strategy Report: Qwen3-Coder-Next-FP8 Endpoint 추가 전략
+# Dual Model Strategy Report: Qwen3.5-122B-A10B Hybrid Thinking/Instruct 전략
 
 ## 1. Executive Summary
 
-현재 Code QA v4 워크플로우는 **Qwen3-Next-Thinking-80B-A3B-FP8** 단일 모델로 오케스트레이터 + 11개 서브 에이전트를 운영하고 있다. 본 리포트는 **Qwen3-Coder-Next-FP8** 모델 엔드포인트를 추가하여 듀얼 모델 전략을 수립하기 위한 분석과 제안을 담고 있다.
+Code QA v4 워크플로우는 **Qwen3.5-122B-A10B-FP8** 단일 모델을 하나의 SGLang 서버에서 서빙하며, `chat_template_kwargs`의 `enable_thinking` 플래그로 요청별 Thinking/Instruct 모드를 전환하는 **하이브리드 전략**을 사용하고 있다. 이전의 듀얼 모델(Thinking+Coder) → 듀얼 엔드포인트 → 현재 단일 서버 방식으로 발전했다.
+
+> **Note**: 이 문서는 원래 Qwen3-Coder-Next-FP8 추가를 위해 작성되었으나, 이후 Qwen3.5-122B-A10B-FP8 하이브리드 모드로 전환되었다. 아래 분석은 역사적 맥락을 포함하며, 현재 설정은 `opencode.jsonc`와 `workflow-settings.yaml`을 참조.
 
 ---
 
@@ -137,13 +139,11 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                        듀얼 모델 할당 전략                                             │
+│              Qwen3.5-122B-A10B-FP8 하이브리드 모드 할당 전략                          │
+│              (단일 SGLang 서버, per-request enable_thinking 제어)                     │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                      │
-│  ┌─ Qwen3-Next-Thinking-80B (추론 모델) ─────────────────────────────────────────┐  │
-│  │                                                                                │  │
-│  │  [Orchestrator] code-qa 오케스트레이터                                          │  │
-│  │    이유: 워크플로우 상태 관리, 조건 분기, 회귀 판단 등 복잡한 추론 필요             │  │
+│  ┌─ Thinking Mode (enable_thinking=true) ────────────────────────────────────────┐  │
 │  │                                                                                │  │
 │  │  [Phase 2] code-reviewer  ★ 핵심 추론 에이전트                                 │  │
 │  │    이유: 보안 취약점, 논리적 오류, 코드 품질 문제를 깊이 있게 분석                   │  │
@@ -159,7 +159,10 @@ Phase 5     Phase 6     Phase 7     Phase 8     Phase 9
 │  │                                                                                │  │
 │  └────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                      │
-│  ┌─ Qwen3-Coder-Next-FP8 (코드 모델) ───────────────────────────────────────────┐  │
+│  ┌─ Instruct Mode (enable_thinking=false) ───────────────────────────────────────┐  │
+│  │                                                                                │  │
+│  │  [Orchestrator] code-qa 오케스트레이터                                          │  │
+│  │    이유: 도구 호출 안정성을 위해 Instruct 모드 사용                                │  │
 │  │                                                                                │  │
 │  │  [Phase 3] code-fixer  ★ 핵심 코드 에이전트                                    │  │
 │  │    이유: SWE-Bench 70.6% 성능 → 실제 코드 수정/버그 픽스에 최적                   │  │

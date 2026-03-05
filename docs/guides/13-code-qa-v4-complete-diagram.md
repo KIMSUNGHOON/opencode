@@ -74,17 +74,17 @@ This document provides an integrated diagram of the complete **Code QA v4 Workfl
 
 | Phase | Agent | Model | Role | Execution Environment |
 |-------|-------|-------|------|----------------------|
-| **-1** | `@env-setup` | Qwen3-Coder-Next | Shell/conda/venv environment detection | Host |
-| **0** | `@git-input` | Qwen3-Coder-Next | Git diff extraction, changed file list | Host |
-| **1** | `@pre-checker` | Qwen3-Coder-Next | Auto-fix (lint --fix, format) | Host |
-| **2** | `@code-reviewer` | Qwen3-Next-Thinking | Issue discovery via manual code reading (CoT) | Host |
-| **3** | `@code-fixer` | Qwen3-Coder-Next | Fix discovered issues (SWE-Bench) | Host |
-| **4** | `@quality-checker` | Qwen3-Next-Thinking | Tool-based quality scoring (≥70%) | Host |
-| **5** | `@build-tester` | Qwen3-Coder-Next | Build test (GPU) | **Sandbox** |
-| **6** | `@function-tester` | Qwen3-Coder-Next | Function test (GPU) | **Sandbox** |
-| **7** | `@git-committer` | Qwen3-Coder-Next | Commit or Amend | Host |
-| **8** | `@summary-reporter` | Qwen3-Next-Thinking | Markdown result report (CoT) | Host |
-| **9** | `@git-pusher` | Qwen3-Coder-Next | Push & PR creation | Host |
+| **-1** | `@env-setup` | Qwen3.5 Instruct | Shell/conda/venv environment detection | Host |
+| **0** | `@git-input` | Qwen3.5 Instruct | Git diff extraction, changed file list | Host |
+| **1** | `@pre-checker` | Qwen3.5 Instruct | Auto-fix (lint --fix, format) | Host |
+| **2** | `@code-reviewer` | Qwen3.5 Thinking | Issue discovery via manual code reading (CoT) | Host |
+| **3** | `@code-fixer` | Qwen3.5 Instruct | Fix discovered issues (SWE-Bench) | Host |
+| **4** | `@quality-checker` | Qwen3.5 Thinking | Tool-based quality scoring (≥70%) | Host |
+| **5** | `@build-tester` | Qwen3.5 Instruct | Build test (GPU) | **Sandbox** |
+| **6** | `@function-tester` | Qwen3.5 Instruct | Function test (GPU) | **Sandbox** |
+| **7** | `@git-committer` | Qwen3.5 Instruct | Commit or Amend | Host |
+| **8** | `@summary-reporter` | Qwen3.5 Thinking | Markdown result report (CoT) | Host |
+| **9** | `@git-pusher` | Qwen3.5 Instruct | Push & PR creation | Host |
 
 > ⚠️ **Note**: code-reviewer has Read permission only (Glob/Grep/Bash disabled). It discovers issues by manually reading code — does NOT run external tools. See quality-checker for tool-based scoring.
 >
@@ -94,21 +94,24 @@ This document provides an integrated diagram of the complete **Code QA v4 Workfl
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Dual Model Strategy                                          │
+│                   Single Server + Per-Request Thinking Control                            │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
+│  SGLang (port 8000): Qwen3.5-122B-A10B-FP8                                              │
+│  --reasoning-parser qwen3 --tool-call-parser qwen3_coder                                │
+│                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  [Thinking] Qwen3-Next-80B-A3B-Thinking-FP8 (SGLang, port 8000)               │   │
+│  │  [Thinking] chat_template_kwargs: enable_thinking=true                         │   │
 │  │  ──────────────────────────────────────────────────                             │   │
-│  │  • Thinking Mode + CoT reasoning specialized (4 agents)                        │   │
-│  │  • Applied: Orchestrator, code-reviewer, quality-checker, summary-reporter     │   │
+│  │  • Thinking Mode + CoT reasoning specialized (3 agents)                        │   │
+│  │  • Applied: code-reviewer, quality-checker, summary-reporter                   │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│  │  [Coder] Qwen3-Coder-Next-FP8 (vLLM, port 8001)                               │   │
+│  │  [Instruct] chat_template_kwargs: enable_thinking=false                        │   │
 │  │  ──────────────────────────────────────────────────                             │   │
 │  │  • Tool Calling + code generation/modification specialized (10 agents)         │   │
-│  │  • Applied: env-setup, git-input, file-input, workspace-analyzer, pre-checker, │   │
+│  │  • Applied: Orchestrator, env-setup, git-input, file-input, pre-checker,       │   │
 │  │    code-fixer, build-tester, function-tester, git-committer, git-pusher        │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
@@ -116,11 +119,11 @@ This document provides an integrated diagram of the complete **Code QA v4 Workfl
 │                                                                                          │
 │   Phase -1  Phase 0   Phase 1   Phase 2   Phase 3   Phase 4   Phase 5-6   Phase 7-9   │
 │   ┌─────┐  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌───────┐   ┌───────┐   │
-│   │Coder│  │Coder│   │Coder│   │Think│   │Coder│   │Think│   │ Coder │   │ Mixed │   │
-│   │     │→ │     │ → │     │ → │ ing │ → │     │ → │ ing │ → │       │ → │       │   │
+│   │Instr│  │Instr│   │Instr│   │Think│   │Instr│   │Think│   │ Instr │   │ Mixed │   │
+│   │ uct │→ │ uct │ → │ uct │ → │ ing │ → │ uct │ → │ ing │ → │  uct  │ → │       │   │
 │   └─────┘  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘   └───────┘   └───────┘   │
 │    env      git       pre      review     fix      quality   build/test  commit/     │
-│   setup    input     check      (CoT)    (SWE)    check      (Coder)    summary     │
+│   setup    input     check      (CoT)    (SWE)    check      (Instruct) summary     │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```

@@ -26,10 +26,10 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 
 ### 1.2 Key Features
 
-- **Dual Model Strategy**:
-  - **Thinking Model**: Qwen3-Next-80B-A3B-Thinking-FP8 (reasoning + tool calling) — code-reviewer, quality-checker, summary-reporter
-  - **Instruct Model**: Qwen3-Coder-Next-FP8 (code generation + tool calling) — Orchestrator (code-qa), env-setup, git-input, file-input, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
-    - Note: Config key renamed from `coder` to `instruct` in `workflow-settings.yaml`. workspace-analyzer is deprecated (legacy fallback only).
+- **Dual Model Strategy** (Single Server + Per-Request Thinking Control):
+  - **Thinking Mode**: Qwen3.5-122B-A10B-FP8 (`enable_thinking: true`) — code-reviewer, quality-checker, summary-reporter
+  - **Instruct Mode**: Qwen3.5-122B-A10B-FP8 (`enable_thinking: false`) — Orchestrator (code-qa), env-setup, git-input, file-input, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher
+  - Note: Same model served from one SGLang server (port 8000). Thinking/Instruct controlled per-request via `chat_template_kwargs`. workspace-analyzer is deprecated (legacy fallback only).
 - **User Confirmation Steps**: Required at env-setup, git-input, build-tester, function-tester, git-committer, git-pusher
 - **Docker Sandbox**: Isolated Build/Test environment (CUDA 13.0, Python 3.12)
 - **Regression Loop**: Per-source independent retry counters (quality/build/test: max 3 each, total cap: 5)
@@ -40,24 +40,25 @@ Code QA v4 is an automated code quality workflow with 13 specialized agents orch
 
 ### 1.3 Model Specifications
 
-| Item | Thinking Model | Coder Model |
-|------|---------------|-------------|
-| **Model** | Qwen3-Next-80B-A3B-Thinking-FP8 | Qwen3-Coder-Next-FP8 |
-| **Serving Engine** | SGLang (port 8000) | SGLang (port 8001) |
+| Item | Thinking Mode | Instruct Mode |
+|------|---------------|---------------|
+| **Model** | Qwen3.5-122B-A10B-FP8 | Qwen3.5-122B-A10B-FP8 (same model) |
+| **Serving Engine** | SGLang (port 8000) | SGLang (port 8000, same server) |
+| **Per-Request Control** | `chat_template_kwargs: {"enable_thinking": true}` | `chat_template_kwargs: {"enable_thinking": false}` |
 | **Context Window** | 256K | 256K |
-| **Output Limit** | 32K | 65K (requires `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=65536`) |
+| **Output Limit** | 32K | 32K |
 | **Reasoning** | Yes (thinking mode) | No |
 | **Tool Calling** | Yes | Yes |
-| **Agents** | code-reviewer, quality-checker, summary-reporter | Orchestrator (code-qa), env-setup, git-input, file-input, workspace-analyzer, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
+| **Agents** | code-reviewer, quality-checker, summary-reporter | Orchestrator (code-qa), env-setup, git-input, file-input, pre-checker, code-fixer, build-tester, function-tester, git-committer, git-pusher |
 
-### 1.4 Official Sampling Parameters
+### 1.4 Official Sampling Parameters (Qwen3.5)
 
 ```
-Thinking Model (Qwen3-Next-80B-A3B-Thinking-FP8):
+Thinking Mode (qwen/Qwen3.5-122B-A10B-FP8):
   Temperature: 0.6, TopP: 0.95, TopK: 20, MinP: 0
 
-Coder Model (Qwen3-Coder-Next-FP8):
-  Temperature: 1.0, TopP: 0.95, TopK: 40
+Instruct Mode (qwen-instruct/Qwen3.5-122B-A10B-FP8):
+  Temperature: 0.7, TopP: 0.8, TopK: 20, MinP: 0
 ```
 
 ---
@@ -88,45 +89,22 @@ nvidia-docker --version  # For GPU usage
 
 ### 2.3 Model Server Launch
 
-**Thinking Model — SGLang (port 8000):**
+**Single Server — SGLang (port 8000), both Thinking and Instruct via per-request control:**
 
 ```bash
-# Serve Qwen3-Next-80B-A3B-Thinking-FP8 with SGLang
+# Serve Qwen3.5-122B-A10B-FP8 with SGLang (single server, hybrid mode)
 python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --tp 2 \
+    --model-path Qwen/Qwen3.5-122B-A10B-FP8 \
+    --tp-size 8 \
+    --mem-fraction-static 0.8 \
     --context-length 262144 \
-    --port 8000 \
-    --host 0.0.0.0
-```
-
-**With NEXTN Speculative Decoding (~30% performance boost):**
-```bash
-python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --served-model-name Qwen3-Next-80B-A3B-Thinking-FP8 \
-    --tp 2 \
-    --context-length 262144 \
-    --speculative-algorithm NEXTN \
-    --speculative-num-draft-tokens 3 \
-    --port 8000 \
-    --host 0.0.0.0
-```
-
-**Coder Model — SGLang (port 8001):**
-
-```bash
-# Serve Qwen3-Coder-Next-FP8 with SGLang
-python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-Coder-Next-FP8 \
-    --served-model-name Qwen3-Coder-Next-FP8 \
-    --tp 2 \
-    --context-length 262144 \
+    --reasoning-parser qwen3 \
     --tool-call-parser qwen3_coder \
-    --port 8001 \
+    --port 8000 \
     --host 0.0.0.0
 ```
+
+> **Note**: Thinking/Instruct mode is controlled per-request via `chat_template_kwargs` in the request body (`enable_thinking: true/false`), configured in `opencode.jsonc` provider options. No need for a second server.
 
 ---
 
@@ -239,9 +217,10 @@ Copy and use the following content:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  // Single SGLang server (port 8000), per-request thinking control
   "provider": {
     "qwen": {
-      "name": "Qwen3-Next-Thinking (Reasoning)",
+      "name": "Qwen3.5-122B-A10B Thinking",
       "npm": "@ai-sdk/openai-compatible",
       "api": "http://localhost:8000/v1",
       "env": [],
@@ -250,59 +229,67 @@ Copy and use the following content:
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "Qwen3-Next-80B-A3B-Thinking-FP8": {
-          "name": "Qwen3-Next-80B-A3B-Thinking-FP8",
-          "id": "Qwen3-Next-80B-A3B-Thinking-FP8",
+        "Qwen3.5-122B-A10B-FP8": {
+          "name": "Qwen3.5-122B-A10B-FP8",
+          "id": "Qwen3.5-122B-A10B-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": true,
           "attachment": false,
           "modalities": { "input": ["text"], "output": ["text"] },
-          "limit": { "context": 262144, "output": 16384 },
+          "limit": { "context": 262144, "output": 32768 },
+          "options": {
+            "temperature": 0.6, "top_p": 0.95, "top_k": 20,
+            "chat_template_kwargs": { "enable_thinking": true }
+          },
           "cost": { "input": 0, "output": 0 }
         }
       }
     },
-    "qwen-coder": {
-      "name": "Qwen3-Coder-Next (Code)",
+    "qwen-instruct": {
+      "name": "Qwen3.5-122B-A10B Instruct",
       "npm": "@ai-sdk/openai-compatible",
-      "api": "http://localhost:8001/v1",
+      "api": "http://localhost:8000/v1",
       "env": [],
       "options": {
         "apiKey": "dummy",
-        "baseURL": "http://localhost:8001/v1"
+        "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "Qwen3-Coder-Next-FP8": {
-          "name": "Qwen3-Coder-Next-FP8",
-          "id": "Qwen3-Coder-Next-FP8",
+        "Qwen3.5-122B-A10B-FP8": {
+          "name": "Qwen3.5-122B-A10B-FP8",
+          "id": "Qwen3.5-122B-A10B-FP8",
           "tool_call": true,
           "temperature": true,
           "reasoning": false,
           "attachment": false,
           "modalities": { "input": ["text"], "output": ["text"] },
-          "limit": { "context": 262144, "output": 16384 },
+          "limit": { "context": 262144, "output": 32768 },
+          "options": {
+            "temperature": 0.7, "top_p": 0.8, "top_k": 20,
+            "chat_template_kwargs": { "enable_thinking": false }
+          },
           "cost": { "input": 0, "output": 0 }
         }
       }
     }
   },
   "agent": {
-    // Thinking Model agents (temp=0.6, top_k=20)
+    // Thinking Mode agents (temp=0.6, top_p=0.95, top_k=20)
     "code-reviewer": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
     "quality-checker": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
     "summary-reporter": { "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0 },
-    // Coder Model agents (temp=1.0, top_k=40)
-    "env-setup": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "workspace-analyzer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "file-input": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "pre-checker": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "code-fixer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "build-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "function-tester": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-committer": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 },
-    "git-pusher": { "temperature": 1.0, "top_p": 0.95, "top_k": 40 }
+    // Instruct Mode agents (temp=0.7, top_p=0.8, top_k=20)
+    "env-setup": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "workspace-analyzer": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "git-input": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "file-input": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "pre-checker": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "code-fixer": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "build-tester": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "function-tester": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "git-committer": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 },
+    "git-pusher": { "temperature": 0.7, "top_p": 0.8, "top_k": 20 }
   },
   "experimental": {
     "chatMaxRetries": 5
