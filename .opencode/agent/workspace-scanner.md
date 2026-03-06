@@ -180,7 +180,6 @@ WORKSPACE_SCAN_RESULT: COMPLETE
 SCAN_DATA:
 ```json
 {
-  "project_root": "/absolute/path",
   "project_name": "name",
   "project_type": "python|node|go|rust|java|cpp|ruby|php|monorepo|unknown",
   "languages": ["python", "shell"],

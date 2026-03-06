@@ -105,7 +105,6 @@ git branch --show-current 2>/dev/null
 {
   "version": "1.0",
   "analyzed_at": "ISO8601",
-  "project_root": "ABSOLUTE_PATH",
   "project": {"name": "", "type": "", "languages": [], "frameworks": []},
   "structure": {"directories": [], "total_files": 0, "total_directories": 0},
   "files": {"by_type": {}, "entry_points": [], "config_files": [], "test_files": []},

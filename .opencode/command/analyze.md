@@ -172,7 +172,6 @@ prompt: |
   ```yaml
   version: "2.0"
   analyzed_at: "{ISO8601}"
-  project_root: "{absolute_path}"
 
   project:
     name: "{name}"
@@ -402,7 +401,7 @@ Analyzes workspace with 3-level progressive cache for efficient context loading.
 └── .cache-meta.json          # Document mtimes for incremental updates
 ```
 
-**L1 (project-map.yaml):** Always included in system prompt. Contains project type, module list with 1-line summaries, build commands, entry points. ~500-1K tokens.
+**L1 (project-map.yaml):** Always included in system prompt. Contains project type, module list with 1-line summaries, build commands, entry points. ~500-1K tokens. All paths are **relative to project root** (the directory containing `.opencode/`) for portability across environments.
 
 **L2 (modules/*.yaml):** Loaded on-demand when working on a specific module. Contains file inventory, exports, imports, patterns. ~2-5K tokens per module.
 

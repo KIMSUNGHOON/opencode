@@ -84,7 +84,7 @@ description: "Project domain knowledge — {brief description}. Load when workin
 ## Domain Knowledge (Inlined Summaries)
 
 ### {Category}: {Title}
-> Source: `{absolute_path}` — **Read this file for full details**
+> Source: `{relative_path}` — **Read this file for full details** (resolve with project root at runtime)
 
 {3-5 sentence summary with key decisions, constraints, and rules.}
 
@@ -96,7 +96,7 @@ When working on tasks related to this project:
 
 1. **This file gives you the overview** — summaries and index are already loaded
 2. **Identify relevant documents** from the Document Index
-3. **Use the Read tool** to load full documents at the absolute paths listed
+3. **Use the Read tool** to load full documents — resolve relative paths with `PROJECT_ROOT` (from `pwd` or `git rev-parse --show-toplevel`)
 4. **Cross-reference** the Key Concepts table for domain terminology
 
 ### Quick Reference: Which Document to Read
@@ -113,7 +113,7 @@ When working on tasks related to this project:
 - Summaries must contain **actual content** — decisions, patterns, rules — not just topic descriptions
 - Key Concepts must have **real definitions**, not placeholders
 - Keep total SKILL.md **under 4000 tokens** to stay within context budget
-- All document paths must be **absolute** for the Read tool
+- All document paths must be **relative to project root** for portability. Agents resolve to absolute paths at runtime using `pwd` or `PROJECT_ROOT`
 - Group documents by category for easier navigation
 
 ### 5. Cache Freshness

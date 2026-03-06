@@ -94,11 +94,13 @@ ls -la
 
 Core variables:
 ```
-PROJECT_ROOT = ""     # Absolute path from pwd
+PROJECT_ROOT = ""     # Absolute path from pwd (runtime only, NOT stored in cache)
 PROJECT_NAME = ""     # Directory name
 SRC_DIR = ""          # Source directory path
 ENV_STATE = { SHELL_TYPE, ENV_TYPE, ENV_NAME, ENV_PATH, ACTIVATE_CMD, PYTHON_PATH, PYTHON_VERSION, CUDA_VERSION }
 ```
+
+**Path convention:** Workspace cache (`project-map.yaml`, `modules/*.yaml`) stores all paths **relative to project root** for portability across environments. When passing paths to agents, resolve to absolute: `PROJECT_ROOT + "/" + relative_path`.
 
 Nested structure detection: if subdirectory matches PROJECT_NAME (e.g. `torch_aim/torch_aim/src`), set `SRC_DIR = PROJECT_ROOT/PROJECT_NAME/src`. Otherwise `SRC_DIR = PROJECT_ROOT/src` or `PROJECT_ROOT`.
 
