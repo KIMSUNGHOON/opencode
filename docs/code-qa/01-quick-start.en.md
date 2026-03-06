@@ -22,7 +22,7 @@ This document provides installation, configuration, and usage instructions for t
 
 ### 1.1 What is Code QA v4?
 
-Code QA v4 is an automated code quality workflow with 13 specialized agents orchestrated by a central coordinator.
+Code QA v4 is an automated code quality workflow with 22 specialized agents (13 Code QA pipeline + 4 workspace analysis + 2 DeepWiki + 3 utility) orchestrated by a central coordinator.
 
 ### 1.2 Key Features
 
@@ -160,22 +160,40 @@ export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ~/.config/opencode/
 ├── opencode.json                    # Provider, Model, Agent sampling params
 └── .opencode/
-    ├── agent/                       # Code QA Agents (13)
-    │   ├── env-setup.md             # STEP 1: Environment setup (user input required)
-    │   ├── workspace-analyzer.md    # STEP 0B: Workspace analysis (cache)
+    ├── agent/                       # 22 Agents (13 pipeline + 4 analysis + 2 wiki + 3 utility)
+    │   ├── ── Code QA Pipeline (13) ──
+    │   ├── env-setup.md             # STEP 1: Environment setup
     │   ├── git-input.md             # STEP 2: Git changed file extraction
-    │   ├── file-input.md            # STEP 0C: File input parser (non-Git)
+    │   ├── file-input.md            # STEP 2 alt: File input parser (non-Git)
     │   ├── pre-checker.md           # STEP 3: Lint/Format auto-fix
-    │   ├── code-reviewer.md         # STEP 4: Deep code analysis
+    │   ├── code-reviewer.md         # STEP 4: Code review (domain-aware)
     │   ├── code-fixer.md            # STEP 5: Issue fixing
     │   ├── quality-checker.md       # STEP 6: Quality score check
-    │   ├── build-tester.md          # STEP 7: Build test (user confirm required)
-    │   ├── function-tester.md       # STEP 8: Function test (user confirm required)
+    │   ├── build-tester.md          # STEP 7: Build test
+    │   ├── function-tester.md       # STEP 8: Function test
     │   ├── git-committer.md         # STEP 9: Git commit
     │   ├── summary-reporter.md      # STEP 10: Summary report
-    │   └── git-pusher.md            # STEP 11: Push and PR
-    ├── command/
-    │   └── code-qa.md               # /code-qa command
+    │   ├── git-pusher.md            # STEP 11: Push and PR
+    │   ├── ── Workspace Analysis (4) ──
+    │   ├── analyze.md               # /analyze orchestrator
+    │   ├── workspace-scanner.md     # Fast project scan
+    │   ├── module-analyzer.md       # Per-module deep analysis
+    │   ├── workspace-analyzer.md    # Legacy fallback (DEPRECATED)
+    │   ├── ── DeepWiki (2) ──
+    │   ├── deepwiki.md              # /deepwiki orchestrator
+    │   ├── wiki-page-generator.md   # Wiki page generation
+    │   ├── ── Utility (3) ──
+    │   ├── docs.md, translator.md, duplicate-pr.md, triage.md
+    │   └──
+    ├── command/                     # 15 Commands
+    │   ├── code-qa.md               # Full QA pipeline
+    │   ├── analyze.md, deepwiki.md  # Analysis & wiki
+    │   ├── env.md .. test.md        # 7 standalone agents
+    │   └── commit.md, issues.md, ai-deps.md, rmslop.md, spellcheck.md
+    ├── skills/                      # 6 Skills (knowledge bases)
+    │   ├── code-review/, code-quality/, build-test/
+    │   ├── wiki-generation/, translation/
+    │   └── doc-indexer/             # Docs → project-knowledge
     └── mode/
         └── code-qa.md               # Code QA orchestrator mode
 
@@ -679,33 +697,61 @@ so it can choose a **different** fix strategy (see `context-schema.md` for JSON 
 ~/.config/opencode/
 ├── opencode.json                           Provider, Agent settings
 └── .opencode/
-    ├── agent/                              (13 Agents)
+    ├── agent/                              (22 Agents)
+    │   ├── ── Code QA Pipeline (13) ──
     │   ├── env-setup.md                    Environment setup
-    │   ├── workspace-analyzer.md           Workspace analysis (cache)
-    │   ├── git-input.md                    Git input parser
+    │   ├── git-input.md                    Git changed file extraction
     │   ├── file-input.md                   File input parser (Non-Git)
-    │   ├── pre-checker.md                  Lint/Format
-    │   ├── code-reviewer.md                Code review
+    │   ├── pre-checker.md                  Lint/Format auto-fix
+    │   ├── code-reviewer.md                Code review (domain-aware)
     │   ├── code-fixer.md                   Code fixing
     │   ├── quality-checker.md              Quality check
     │   ├── build-tester.md                 Build testing
     │   ├── function-tester.md              Function testing
     │   ├── git-committer.md                Git commit
     │   ├── summary-reporter.md             Result report
-    │   └── git-pusher.md                   Push/PR
-    ├── command/                            (8 Commands)
-    │   ├── code-qa.md                      Full workflow
+    │   ├── git-pusher.md                   Push/PR
+    │   ├── ── Workspace Analysis (4) ──
+    │   ├── analyze.md                      /analyze orchestrator
+    │   ├── workspace-scanner.md            Fast project scan
+    │   ├── module-analyzer.md              Per-module deep analysis
+    │   ├── workspace-analyzer.md           Legacy fallback (DEPRECATED)
+    │   ├── ── DeepWiki (2) ──
+    │   ├── deepwiki.md                     /deepwiki orchestrator
+    │   ├── wiki-page-generator.md          Wiki page generation
+    │   ├── ── Utility (3) ──
+    │   ├── docs.md                         Documentation writing
+    │   ├── translator.md                   Translation
+    │   ├── duplicate-pr.md                 Duplicate PR detection
+    │   └── triage.md                       GitHub issue triage
+    ├── command/                            (15 Commands)
+    │   ├── code-qa.md                      Full QA pipeline
+    │   ├── analyze.md                      Workspace analysis + doc indexing
+    │   ├── deepwiki.md                     Wiki generation
     │   ├── env.md                          /env - Environment
     │   ├── lint.md                         /lint - Lint/Format
     │   ├── review.md                       /review - Code review
     │   ├── fix.md                          /fix - Code fixing
     │   ├── quality.md                      /quality - Quality check
     │   ├── build.md                        /build - Build test
-    │   └── test.md                         /test - Function test
+    │   ├── test.md                         /test - Function test
+    │   ├── commit.md                       /commit - Git commit & push
+    │   ├── issues.md                       /issues - GitHub issue search
+    │   ├── ai-deps.md                      /ai-deps - AI SDK dep bumps
+    │   ├── rmslop.md                       /rmslop - AI slop removal
+    │   └── spellcheck.md                   /spellcheck - Markdown spellcheck
+    ├── skills/                             (6 Knowledge Bases)
+    │   ├── code-review/                    Review checklists per language
+    │   ├── code-quality/                   Scoring rules & lint mappings
+    │   ├── build-test/                     Build patterns per project type
+    │   ├── wiki-generation/                Wiki page templates & diagrams
+    │   ├── translation/                    Locale glossary & preserve rules
+    │   └── doc-indexer/                    Docs → project-knowledge generator
     ├── config/                             (Configuration)
     │   ├── workflow-settings.yaml          Timeout, retry, quality, model settings
     │   ├── context-schema.md               JSON schemas for structured context passing
-    │   └── permission-templates.yaml       Agent permission templates
+    │   ├── permission-templates.yaml       Agent permission templates
+    │   └── logging-format.md               Unified log format
     └── mode/
         └── code-qa.md                      QA orchestrator
 ```

@@ -182,6 +182,12 @@ Workspace Analysis is a workflow that pre-analyzes a project's structure, module
 │   └── workspace-analyzer.md   # (Legacy) v1 analysis agent
 ├── mode/
 │   └── code-qa.md              # STEP 0 cache integration
+├── skills/
+│   ├── doc-indexer/            # Documentation indexing skill
+│   │   └── SKILL.md
+│   └── project-knowledge/      # Auto-generated domain knowledge (output)
+│       ├── SKILL.md            #   Summaries, glossary, doc index
+│       └── .cache-meta.json    #   Document mtimes for incremental updates
 ├── config/
 │   └── workflow-settings.yaml  # Agent timeout/model settings
 └── workspace-cache/            # Cache storage directory
@@ -194,6 +200,8 @@ Workspace Analysis is a workflow that pre-analyzes a project's structure, module
     ├── .cache-meta.json        # Cache metadata
     └── analysis.json           # Legacy compatibility (v1 format)
 ```
+
+> **Path Convention:** All paths stored in cache files are **relative to project root** (the directory containing `.opencode/`). Agents resolve them to absolute paths at runtime using `pwd` or `git rev-parse --show-toplevel`.
 
 ### 3.3 Data Flow
 
@@ -248,12 +256,11 @@ Workspace Analysis is a workflow that pre-analyzes a project's structure, module
 
 ### 4.1 Level 1: project-map.yaml (~500-1K tokens)
 
-The entire project map, always included in the system prompt.
+The entire project map, always included in the system prompt. All paths are **relative to project root** for portability across environments — agents resolve to absolute paths at runtime via `pwd`.
 
 ```yaml
 version: "2.0"
 analyzed_at: "2025-01-15T10:30:00Z"
-project_root: "/home/user/myproject"
 
 project:
   name: "myproject"
@@ -671,16 +678,21 @@ Exclusion rules are applied at all 3 layers:
 
 ## 8. Code-QA Integration
 
-### 8.1 STEP 0 Flow
+### 8.1 STEP 0 Flow (Phase A → B → C)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      Code-QA STEP 0: Workspace Cache                     │
+│                      Code-QA STEP 0: Workspace Cache + Domain Knowledge │
 └─────────────────────────────────────────────────────────────────────────┘
 
   /code-qa execution
       │
       ▼
+  ═══ Phase A: Project Root Detection ═══
+  pwd, basename, ls -la
+      │
+      ▼
+  ═══ Phase B: Workspace Cache ═══
   mkdir -p .opencode/workspace-cache/modules
       │
       ▼
@@ -693,14 +705,14 @@ Exclusion rules are applied at all 3 layers:
   ┌──────────────┐   ┌─────────────────────────────┐
   │ Use L1 cache │   │ analysis.json exists + valid?│
   │ Proceed to   │   └──────────┬─────────┬────────┘
-  │ STEP 1       │              │         │
+  │ Phase C      │              │         │
   └──────────────┘          YES │     NO  │
                                 ▼         ▼
                    ┌──────────────┐   ┌──────────────────────┐
                    │ Use legacy   │   │ Run analysis          │
                    │ cache        │   │ Scanner → Analyzer×N  │
-                   │ Proceed to   │   │ → Merge → STEP 1     │
-                   │ STEP 1       │   └──────────────────────┘
+                   │ Proceed to   │   │ → Merge → Phase C    │
+                   │ Phase C      │   └──────────────────────┘
                    └──────────────┘              │
                                                  │ (if Scanner fails)
                                                  ▼
@@ -708,16 +720,80 @@ Exclusion rules are applied at all 3 layers:
                                          │ Legacy fallback       │
                                          │ workspace-analyzer   │
                                          └──────────────────────┘
+      │
+      ▼
+  ═══ Phase C: Domain Knowledge Loading ═══
+  ┌─────────────────────────────────────────────────┐
+  │ .opencode/skills/project-knowledge/SKILL.md     │
+  │ exists?                                         │
+  └───────────┬────────────────────┬────────────────┘
+          YES │                NO  │
+              ▼                    ▼
+  ┌───────────────────┐   ┌──────────────────┐
+  │ Parse & store:    │   │ domain_knowledge │
+  │ - overview        │   │ = null           │
+  │ - glossary        │   │ Proceed to       │
+  │ - doc_index       │   │ STEP 1           │
+  │ → domain_knowledge│   └──────────────────┘
+  │ Proceed to STEP 1 │
+  └───────────────────┘
 ```
 
-### 8.2 Cache Usage in Code-QA
+### 8.2 Cache & Domain Knowledge Usage in Code-QA
 
-| Phase | Cache Used | Purpose |
+| Phase | Data Used | Purpose |
 |-------|-----------|---------|
-| STEP 0 | project-map.yaml | Understand project structure |
-| STEP 4 (Review) | modules/*.yaml | Context for modules under review |
-| STEP 5 (Build) | project-map.yaml → build_command | Build command reference |
-| STEP 6 (Test) | project-map.yaml → test_command | Test command reference |
+| STEP 0 (Phase B) | project-map.yaml | Understand project structure |
+| STEP 0 (Phase C) | project-knowledge/SKILL.md | Load domain glossary, overview, doc index |
+| STEP 4 (Review) | modules/*.yaml + **domain_knowledge** | Module context + domain-aware business logic review |
+| STEP 5 (Fix) | review_result + **domain_knowledge** | Domain-aligned fix intent |
+| STEP 7 (Build) | project-map.yaml → build_command | Build command reference |
+| STEP 8 (Test) | project-map.yaml → test_command | Test command reference |
+| STEP 10 (Summary) | ALL context_store + **domain_knowledge** | Domain-enriched summary report |
+
+### 8.3 Documentation Indexing (STEP 5 of /analyze)
+
+The `/analyze` command includes a documentation indexing step that generates domain knowledge for downstream agents.
+
+```
+/analyze execution
+    │
+    ▼
+  STEP 1-4: Workspace scan + module analysis + merge cache
+    │
+    ▼
+  ═══ STEP 5: Documentation Indexing ═══
+  ┌────────────────────────────────────────┐
+  │ docs/ directory exists?               │
+  │ (or wiki/, documentation/, doc/)      │
+  └──────────┬─────────────┬──────────────┘
+         YES │         NO  │
+             ▼             ▼
+  ┌──────────────────┐  ┌──────────────┐
+  │ doc-indexer skill │  │ Skip STEP 5  │
+  │ ─────────────────│  │ (no docs)    │
+  │ Scan *.md files  │  └──────────────┘
+  │ Read each file   │
+  │ Extract:         │
+  │  - summaries     │
+  │  - key concepts  │
+  │  - glossary      │
+  │ Generate:        │
+  │  project-        │
+  │  knowledge/      │
+  │  SKILL.md        │
+  └──────────────────┘
+```
+
+**Output:** `.opencode/skills/project-knowledge/SKILL.md` containing:
+- **Project Overview**: Synthesized from all docs
+- **Document Index**: Table with relative paths, categories, summaries
+- **Key Concepts & Glossary**: Domain terms with definitions
+- **Inlined Summaries**: Per-doc summaries grouped by category
+
+**Options:**
+- `--no-docs`: Skip documentation indexing
+- `--docs-path wiki`: Use `wiki/` instead of auto-detected `docs/`
 
 ---
 
@@ -855,6 +931,7 @@ analysis:
 | 1.0 | 2024-01-15 | Initial design document (v1: single workspace-analyzer) |
 | 2.0 | 2025-02-12 | v2 full revision: 3-Level Cache, parallel execution, directory exclusion rules |
 | 2.1 | 2026-02-12 | Tiered Priority + Batched Parallel + Incremental Cache |
+| 2.2 | 2026-03-06 | Remove absolute project_root from cache (relative paths), add Documentation Indexing (STEP 5), add Phase C (domain knowledge loading), add project-knowledge skill |
 
 ---
 

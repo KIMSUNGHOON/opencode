@@ -404,28 +404,56 @@ sequenceDiagram
 ```
 project-root/
 ├── .opencode/
-│   ├── agent/                     # 13 Agents
-│   │   ├── env-setup.md           # Phase -1: Environment setup
-│   │   ├── workspace-analyzer.md  # Phase 0B: Workspace analysis (cache)
-│   │   ├── git-input.md           # Phase 0: Git input
-│   │   ├── file-input.md          # Non-Git: File input parser
-│   │   ├── pre-checker.md         # Phase 1: Auto-fix
-│   │   ├── code-reviewer.md       # Phase 2: Code review
-│   │   ├── code-fixer.md          # Phase 3: Issue fixing
-│   │   ├── quality-checker.md     # Phase 4: Quality check
-│   │   ├── build-tester.md        # Phase 5: Build test
-│   │   ├── function-tester.md     # Phase 6: Function test
-│   │   ├── git-committer.md       # Phase 7: Commit
-│   │   ├── summary-reporter.md    # Phase 8: Report
-│   │   └── git-pusher.md          # Phase 9: Push & PR
+│   ├── agent/                     # 22 Agents
+│   │   ├── ── Code QA Pipeline ──
+│   │   ├── env-setup.md           # STEP 1: Environment setup
+│   │   ├── git-input.md           # STEP 2: Git changed file extraction
+│   │   ├── file-input.md          # STEP 2 alt: File input parser (non-Git)
+│   │   ├── pre-checker.md         # STEP 3: Lint/Format auto-fix
+│   │   ├── code-reviewer.md       # STEP 4: Code review (domain-aware)
+│   │   ├── code-fixer.md          # STEP 5: Issue fixing
+│   │   ├── quality-checker.md     # STEP 6: Quality check
+│   │   ├── build-tester.md        # STEP 7: Build test
+│   │   ├── function-tester.md     # STEP 8: Function test
+│   │   ├── git-committer.md       # STEP 9: Git commit
+│   │   ├── summary-reporter.md    # STEP 10: Summary report
+│   │   ├── git-pusher.md          # STEP 11: Push & PR
+│   │   ├── ── Workspace Analysis ──
+│   │   ├── workspace-scanner.md   # Fast project scan
+│   │   ├── module-analyzer.md     # Per-module deep analysis
+│   │   ├── workspace-analyzer.md  # Legacy fallback (DEPRECATED)
+│   │   ├── analyze.md             # /analyze orchestrator
+│   │   ├── ── DeepWiki ──
+│   │   ├── deepwiki.md            # /deepwiki orchestrator
+│   │   ├── wiki-page-generator.md # Wiki page generation
+│   │   ├── ── Utility Agents ──
+│   │   ├── docs.md                # Documentation writing
+│   │   ├── translator.md          # Translation
+│   │   ├── duplicate-pr.md        # Duplicate PR detection
+│   │   └── triage.md              # GitHub issue triage
 │   │
-│   ├── command/
-│   │   └── code-qa.md             # /code-qa command
+│   ├── command/                   # 15 Commands
+│   │   ├── code-qa.md             # /code-qa (full pipeline)
+│   │   ├── analyze.md             # /analyze (workspace analysis + doc indexing)
+│   │   ├── deepwiki.md            # /deepwiki (wiki generation)
+│   │   ├── env.md, lint.md, review.md, fix.md   # Standalone agents
+│   │   ├── quality.md, build.md, test.md         # Standalone agents
+│   │   ├── commit.md, issues.md                  # Git/GitHub
+│   │   └── ai-deps.md, rmslop.md, spellcheck.md # Utility commands
 │   │
-│   ├── config/                    # Configuration files
-│   │   ├── workflow-settings.yaml # Timeout, retry, quality, model settings
-│   │   ├── context-schema.md      # JSON schemas for structured context
-│   │   └── permission-templates.yaml # Agent permission templates
+│   ├── skills/                    # 6 Skills (knowledge bases)
+│   │   ├── code-review/           # Review checklists per language
+│   │   ├── code-quality/          # Scoring rules & lint mappings
+│   │   ├── build-test/            # Build patterns per project type
+│   │   ├── wiki-generation/       # Wiki page templates & diagrams
+│   │   ├── translation/           # Locale glossary & preserve rules
+│   │   └── doc-indexer/           # Docs → project-knowledge generator
+│   │
+│   ├── config/
+│   │   ├── workflow-settings.yaml # Timeout, retry, quality settings
+│   │   ├── context-schema.md      # JSON schemas for context passing
+│   │   ├── permission-templates.yaml # Agent permission templates
+│   │   └── logging-format.md      # Unified log format
 │   │
 │   ├── docker/
 │   │   └── Dockerfile.sandbox     # Docker Sandbox image
@@ -433,7 +461,11 @@ project-root/
 │   ├── mode/
 │   │   └── code-qa.md             # QA orchestrator mode
 │   │
-│   └── env-config.yaml            # Environment config file
+│   ├── glossary/                  # 16 locale translation glossaries
+│   │
+│   └── workspace-cache/           # Auto-generated (gitignored)
+│       ├── project-map.yaml       # L1: Project overview (~1K tokens)
+│       └── modules/*.yaml         # L2: Per-module details
 │
 └── src/
     └── ...
