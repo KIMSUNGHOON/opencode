@@ -53,6 +53,8 @@ prompt: |
   - `$ARGUMENTS` contains `--modules-only` → skip scanner, re-analyze modules only
   - `$ARGUMENTS` contains `--all` → analyze ALL modules regardless of tier limit
   - `$ARGUMENTS` contains `--batch-size N` → override default batch size (default: 10)
+  - `$ARGUMENTS` contains `--no-docs` → skip documentation indexing (STEP 5)
+  - `$ARGUMENTS` contains `--docs-path PATH` → use PATH instead of `docs/` for doc indexing
 
   **Cache Validity (unless --force):**
   Read `.opencode/workspace-cache/project-map.yaml`:
@@ -255,11 +257,62 @@ prompt: |
   ```
   If any file is missing, re-run the Write tool for that file.
 
-  ### STEP 5: Output Summary
+  ### STEP 5: Documentation Indexing (unless --no-docs)
+
+  **Skip conditions:**
+  - `--no-docs` flag is set → skip entirely
+  - No documentation directory found → skip with info message
+
+  **Detect docs directory:**
+  ```bash
+  DOCS_DIR=""
+  # Check --docs-path argument first
+  # Then check common locations in order
+  for dir in docs wiki documentation doc; do
+    if [ -d "{PROJECT_ROOT}/$dir" ]; then
+      DOCS_DIR="{PROJECT_ROOT}/$dir"
+      break
+    fi
+  done
+  ```
+
+  If DOCS_DIR is found:
+
+  **Check if project-knowledge skill needs update:**
+  ```bash
+  SKILL_FILE=".opencode/skills/project-knowledge/SKILL.md"
+  if [ -f "$SKILL_FILE" ]; then
+    # Check if any doc was modified after the skill was generated
+    find {DOCS_DIR} -type f -name "*.md" -newer "$SKILL_FILE" | head -1
+    # If empty → docs unchanged, skip regeneration
+    # If has output → docs changed, regenerate
+  fi
+  ```
+
+  If skill needs generation or update:
+
+  1. Load the `doc-indexer` skill instructions (from `.opencode/skills/doc-indexer/SKILL.md`)
+  2. Follow the doc-indexer procedure:
+     - Scan all `.md` files in DOCS_DIR
+     - Read each file, extract title, category, summary, key concepts
+     - Generate `.opencode/skills/project-knowledge/SKILL.md` with:
+       - Project overview (synthesized from all docs)
+       - Document index table with absolute paths
+       - Key concepts & glossary
+       - Inlined summaries per document
+       - Explicit Read instructions for AI agents
+     - Save `.opencode/skills/project-knowledge/.cache-meta.json` with document mtimes
+
+  **Output directory setup:**
+  ```bash
+  mkdir -p .opencode/skills/project-knowledge
+  ```
+
+  ### STEP 6: Output Summary
 
   ```
   ═══════════════════════════════════════════════════════════════
-  WORKSPACE_ANALYSIS: COMPLETE (3-Level Cache)
+  WORKSPACE_ANALYSIS: COMPLETE (3-Level Cache + Docs)
   ═══════════════════════════════════════════════════════════════
 
   Project: {name} ({type})
@@ -276,11 +329,17 @@ prompt: |
   Modules Reused (unchanged): {reused_count}
   Modules Skipped (Tier 3):   {skipped_count}
 
+  Documentation Index:
+  → Source: {DOCS_DIR}/ ({doc_count} documents)
+  → Skill: .opencode/skills/project-knowledge/SKILL.md
+  → Status: {generated|updated|unchanged|skipped}
+
   Cache Files:
   → .opencode/workspace-cache/project-map.yaml      (L1: always loaded)
   → .opencode/workspace-cache/modules/*.yaml         (L2: on-demand)
   → .opencode/workspace-cache/dependency-graph.yaml
   → .opencode/workspace-cache/analysis.json          (legacy compat)
+  → .opencode/skills/project-knowledge/SKILL.md      (domain knowledge)
 
   ═══════════════════════════════════════════════════════════════
   ```
@@ -297,10 +356,12 @@ prompt: |
   | Option | Description |
   |--------|-------------|
   | (none) | Skip if cache valid (< 24h), analyze if missing/stale. Incremental: skip unchanged modules |
-  | --force | Ignore existing cache and force full re-analysis of all modules |
+  | --force | Ignore existing cache and force full re-analysis of all modules and docs |
   | --modules-only | Re-analyze modules only (reuse scanner results) |
   | --all | Include Tier 3 (peripheral) modules in analysis (default: skip T3) |
   | --batch-size N | Override batch size for large projects (default: 10) |
+  | --no-docs | Skip documentation indexing (STEP 5) |
+  | --docs-path PATH | Use PATH instead of auto-detected docs directory |
 
 ---
 
@@ -314,11 +375,13 @@ Analyzes workspace with 3-level progressive cache for efficient context loading.
 
 ```bash
 /analyze                  # Run if cache missing or stale (incremental, skip unchanged)
-/analyze --force          # Force full re-analysis of all modules
+/analyze --force          # Force full re-analysis of all modules + docs
 /analyze --modules-only   # Re-analyze modules only (reuse scanner results)
 /analyze --all            # Include Tier 3 (peripheral) modules
 /analyze --all --force    # Full deep analysis of ALL modules
 /analyze --batch-size 5   # Smaller batches (for slower servers)
+/analyze --no-docs        # Skip documentation indexing
+/analyze --docs-path wiki # Index wiki/ instead of docs/
 ```
 
 ## Cache Structure (3 Levels)
@@ -333,6 +396,10 @@ Analyzes workspace with 3-level progressive cache for efficient context loading.
 ├── dependency-graph.yaml     # Module dependency graph
 ├── .cache-meta.json          # Cache metadata
 └── analysis.json             # Legacy compatibility
+
+.opencode/skills/project-knowledge/
+├── SKILL.md                  # Auto-generated domain knowledge index
+└── .cache-meta.json          # Document mtimes for incremental updates
 ```
 
 **L1 (project-map.yaml):** Always included in system prompt. Contains project type, module list with 1-line summaries, build commands, entry points. ~500-1K tokens.
@@ -347,6 +414,7 @@ Analyzes workspace with 3-level progressive cache for efficient context loading.
    - Small projects (≤15 modules): all T1 in one parallel batch
    - Large projects: T1 batch → T2 batches (10/batch) → T3 optional
 4. **Merge & save**: Combines results into 3-level cache files
+5. **Docs indexing** (doc-indexer skill): Scans `docs/`, generates `project-knowledge` skill with summaries + Read instructions
 
 ## Relationship with Other Workflows
 
@@ -354,3 +422,4 @@ Analyzes workspace with 3-level progressive cache for efficient context loading.
 - General coding tasks can read `project-map.yaml` for context
 - Agents can read `modules/{name}.yaml` for specific module details
 - Any workflow can reference the dependency graph for understanding module relationships
+- Agents can load `project-knowledge` skill for domain knowledge (auto-generated from `docs/`)
