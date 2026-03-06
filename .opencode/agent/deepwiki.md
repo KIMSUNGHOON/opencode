@@ -93,6 +93,26 @@ After /analyze completes, re-read `.opencode/workspace-cache/project-map.yaml`.
 
 **Step 1c:** Read README.md (or README.rst, README.txt) if it exists.
 
+**Step 1c-2:** Load domain knowledge (if available):
+```
+Read .opencode/skills/project-knowledge/SKILL.md
+```
+
+If the file exists, extract and store:
+- **Project Overview** → use as enriched project description (supplements README)
+- **Document Index** → identifies existing documentation that wiki can reference or link to
+- **Key Concepts & Glossary** → domain terms to use consistently across wiki pages
+- **Inlined Summaries** → pre-analyzed documentation content to incorporate into relevant wiki pages
+
+**How to use domain knowledge in wiki generation:**
+1. **index.md**: Use glossary terms in the project description; link to source docs where relevant
+2. **01-overview.md**: Incorporate domain overview as "Domain Model" or "Key Concepts" section
+3. **02-architecture.md**: Reference architectural decisions from docs (e.g., ADRs)
+4. **Module pages**: Match module descriptions with domain context from relevant docs
+5. **All pages**: Use consistent terminology from the glossary
+
+Pass relevant portions to each wiki-page-generator in PHASE 3 via the prompt's `DOMAIN_CONTEXT` field.
+
 **Step 1d:** Understand project structure. Use Glob to find key files:
 ```
 Glob: src/*/
@@ -210,7 +230,13 @@ For each page:
     - LANGUAGES: {languages}
     - FRAMEWORKS: {frameworks}
 
+    DOMAIN_CONTEXT: {relevant portion of project-knowledge if available, otherwise "N/A"}
+    - Include glossary terms relevant to this page's module/topic
+    - Include any doc summaries that relate to this page's scope
+    - Include architectural decisions that affect this module
+
     Generate the full markdown page following your instructions.
+    If DOMAIN_CONTEXT is provided, incorporate domain terminology and reference source docs where appropriate.
 
 **Parallel Execution Rules:**
 - If ≤ 12 pages: emit ALL Task calls in ONE response (parallel).

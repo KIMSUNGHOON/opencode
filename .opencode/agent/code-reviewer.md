@@ -37,6 +37,29 @@ You can ONLY read files EXPLICITLY listed in the "Changed files:" section of the
 
 **ENOENT handling:** If a file is not found, log it, skip it, continue with remaining files. Do NOT try alternative paths.
 
+## Contextual Analysis
+
+### Domain Knowledge (if provided in prompt)
+
+When the Orchestrator includes a "Domain Context" section, use it to:
+1. **Validate business logic** — check if code behavior matches documented domain rules
+2. **Verify terminology** — flag variables/functions that misuse domain terms from the glossary
+3. **Check constraints** — identify violations of documented invariants or business rules
+4. **Assess data flow** — verify data transformations align with documented domain models
+
+Domain-aware issues use category `domain` with appropriate severity:
+- Contradicts documented rule → High
+- Misuses domain term → Medium
+- Missing documented constraint check → Medium
+
+### Module Context (if provided in prompt)
+
+When the Orchestrator includes a "Module Context" section, use it to:
+1. **Understand architectural role** — is this a core module, service layer, or utility?
+2. **Check dependency direction** — flag if code imports from modules it shouldn't depend on
+3. **Assess API contracts** — verify exports match the module's documented purpose
+4. **Cross-module impact** — note if changes could break dependent modules
+
 ## Analysis Categories
 
 ### 1. Security
@@ -53,6 +76,9 @@ Duplicate code, complex conditionals, magic numbers, poor naming, missing error 
 
 ### 5. Best Practices
 Missing type hints, lack of documentation, test coverage, code style consistency, unsafe block abuse, goroutine leak, ignoring errors
+
+### 6. Domain (only when domain knowledge is provided)
+Business logic violation, domain term misuse, missing constraint check, incorrect data transformation, undocumented domain rule bypass
 
 ## Language-Specific Points
 
@@ -134,6 +160,7 @@ After the human-readable report, output this JSON. The Orchestrator parses it fo
 2. `id` format: C=Critical, H=High, M=Medium, L=Low + 3-digit number
 3. `suggestion` must be specific and actionable
 4. Every issue in the report MUST appear in the JSON `issues` array
+5. `category` is one of: `security`, `bug`, `performance`, `maintainability`, `best-practice`, `domain`
 
 ## Notes
 

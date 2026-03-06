@@ -43,7 +43,7 @@ This document contains templates like `{changed_files}`, `{review_issues}`, `{EN
 These are NOT auto-replaced. YOU must replace them with ACTUAL values collected from previous steps.
 
 State variables to track after each STEP:
-- STEP 0: PROJECT_ROOT, PROJECT_NAME, SRC_DIR, PROJECT_TYPE, BUILD_CMD (from `.opencode/build-config.yaml` or $ARGUMENTS --cmd, if any)
+- STEP 0: PROJECT_ROOT, PROJECT_NAME, SRC_DIR, PROJECT_TYPE, BUILD_CMD (from `.opencode/build-config.yaml` or $ARGUMENTS --cmd, if any), domain_knowledge (from project-knowledge skill, if exists)
 - STEP 1 (env-setup): ENV_STATE (ACTIVATE_CMD, PYTHON_PATH, ENV_TYPE, ENV_NAME, etc.)
 - STEP 2 (git-input): changed_files array
 - STEP 4 (code-reviewer): review_issues / context_store.review_result
@@ -137,7 +137,7 @@ regression_history = []
 # Each entry: { attempt, source, issues_or_errors, fix_result, files_modified }
 
 context_store = {
-    workspace_cache, env_state, file_list, pre_check_result,
+    workspace_cache, domain_knowledge, env_state, file_list, pre_check_result,
     review_result, fix_result, quality_result, build_result,
     test_result, commit_result, push_result
 }   # All initially null
@@ -196,13 +196,13 @@ Extract JSON from agent output, store in `context_store`, pass to downstream age
 | Agent | Receives |
 |-------|----------|
 | pre-checker | file_list |
-| code-reviewer | env_state, file_list, workspace_cache |
-| code-fixer | review_result.issues, file_list, regression_history |
+| code-reviewer | env_state, file_list, workspace_cache, **domain_knowledge** (glossary + overview, if available) |
+| code-fixer | review_result.issues, file_list, regression_history, **domain_knowledge** (overview, if available) |
 | quality-checker | file_list, fix_result.files_modified |
 | build-tester | env_state, file_list |
 | function-tester | env_state, file_list |
 | git-committer | file_list, fix_result.files_modified (agent uses git status/diff directly, context is for reference) |
-| summary-reporter | ALL of context_store + regression_history |
+| summary-reporter | ALL of context_store + regression_history (**includes domain_knowledge**) |
 | git-pusher | commit_result (agent uses git log directly, context is for reference) |
 
 ### Regression Context for code-fixer
@@ -252,11 +252,11 @@ mkdir -p .opencode/workspace-cache/modules
 Check for 3-level cache first, then fall back to legacy:
 
 **3-Level Cache Check:** Read `.opencode/workspace-cache/project-map.yaml`:
-- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to STEP 1
+- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to Phase C
 - Otherwise → check legacy cache
 
 **Legacy Cache Check:** Read `.opencode/workspace-cache/analysis.json`:
-- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to STEP 1
+- If exists and `analyzed_at` is within 24 hours → use it as workspace_cache, proceed to Phase C
 - Otherwise → run analysis
 
 **Analysis (if cache stale/missing):**
@@ -282,9 +282,35 @@ If scanner fails → fall back to legacy workspace-analyzer:
 
 Do NOT copy this instruction text into the prompt. Write a short directive for the agent.
 
-Handle: COMPLETE→save cache, TIMEOUT (>60s)→use partial data as-is, EMPTY→set workspace_cache=null, FAILED→set workspace_cache=null. Always proceed to STEP 1 regardless of outcome.
+Handle: COMPLETE→save cache, TIMEOUT (>60s)→use partial data as-is, EMPTY→set workspace_cache=null, FAILED→set workspace_cache=null. Always proceed to Phase C regardless of outcome.
 
 Note: `.opencode/` is excluded from git and code analysis (see `workflow-settings.yaml` filter.exclude). The workspace cache is ephemeral and safe to delete.
+
+**Phase C: Domain Knowledge Loading** (skip if --skip-cache)
+
+Check for project-knowledge skill:
+```
+Read .opencode/skills/project-knowledge/SKILL.md
+```
+
+- If exists → parse and store as `domain_knowledge`:
+  - Extract "Project Overview" section → `domain_knowledge.overview`
+  - Extract "Key Concepts & Glossary" table → `domain_knowledge.glossary`
+  - Extract "Document Index" table → `domain_knowledge.doc_index`
+  - Store full content as `domain_knowledge.raw`
+- If not found → set `domain_knowledge = null`
+
+**Usage:** `domain_knowledge` is passed to these agents as additional context:
+- **code-reviewer** (STEP 4): Domain glossary + overview help identify business logic bugs and incorrect domain term usage
+- **code-fixer** (STEP 5): Domain overview helps understand the *intent* of code being fixed
+- **summary-reporter** (STEP 10): Domain context produces more meaningful summaries
+
+Update `context_store`:
+```
+context_store.domain_knowledge = domain_knowledge  # null if not found
+```
+
+Always proceed to STEP 1 regardless of outcome.
 
 ### STEP 1: Environment Setup (User Input Required)
 - subagent_type = env-setup
@@ -339,6 +365,22 @@ Store PRE_CHECK_RESULT (SUCCESS/PARTIAL). If no result token → treat as PARTIA
 - description = Code review
 - prompt = build dynamically: list changed_files as absolute paths; optionally include workspace_cache context; request structured JSON output
 
+**Domain knowledge injection:** If `domain_knowledge` is not null, append to the prompt:
+```
+Domain Context (from project docs):
+- Overview: {domain_knowledge.overview}
+- Key terms: {domain_knowledge.glossary}
+Use this to understand business logic intent. Flag issues where code contradicts documented domain rules or misuses domain terminology.
+```
+
+**Module context injection:** If `workspace_cache` has module info for the changed files, append:
+```
+Module Context:
+- Module: {module_name} — {module_summary}
+- Dependencies: {module_dependencies}
+```
+This helps the reviewer understand the architectural role of the code being reviewed.
+
 IMPORTANT: code-reviewer has ONLY Read tool. All paths must be absolute.
 
 Store: context_store.review_result (JSON) and review_issues (text). If no ISSUE_LIST and no JSON after 2 retries → proceed with empty issues.
@@ -351,6 +393,13 @@ Store: context_store.review_result (JSON) and review_issues (text). If no ISSUE_
 **First run** (regression_history empty): include review_result issues, changed_files as absolute paths, request structured JSON fix output.
 
 **Regression** (regression_history not empty): include attempt number, trigger source, full regression_history JSON, original review_result, changed_files. Instruct agent to try DIFFERENT approach and NOT repeat previous fixes.
+
+**Domain knowledge injection:** If `domain_knowledge` is not null, append to the prompt:
+```
+Domain Context:
+{domain_knowledge.overview}
+Use this to understand the intended behavior when fixing issues. Ensure fixes align with documented domain rules and patterns.
+```
 
 Store context_store.fix_result.
 
