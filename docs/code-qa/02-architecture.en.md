@@ -404,8 +404,8 @@ sequenceDiagram
 ```
 project-root/
 ├── .opencode/
-│   ├── agent/                     # 22 Agents
-│   │   ├── ── Code QA Pipeline ──
+│   ├── agent/                     # 24 Agents
+│   │   ├── ── Code QA Pipeline (13) ──
 │   │   ├── env-setup.md           # STEP 1: Environment setup
 │   │   ├── git-input.md           # STEP 2: Git changed file extraction
 │   │   ├── file-input.md          # STEP 2 alt: File input parser (non-Git)
@@ -418,19 +418,21 @@ project-root/
 │   │   ├── git-committer.md       # STEP 9: Git commit
 │   │   ├── summary-reporter.md    # STEP 10: Summary report
 │   │   ├── git-pusher.md          # STEP 11: Push & PR
-│   │   ├── ── Workspace Analysis ──
+│   │   ├── ── Workspace Analysis (4) ──
 │   │   ├── workspace-scanner.md   # Fast project scan
 │   │   ├── module-analyzer.md     # Per-module deep analysis
 │   │   ├── workspace-analyzer.md  # Legacy fallback (DEPRECATED)
 │   │   ├── analyze.md             # /analyze orchestrator
-│   │   ├── ── DeepWiki ──
+│   │   ├── ── DeepWiki (2) ──
 │   │   ├── deepwiki.md            # /deepwiki orchestrator
 │   │   ├── wiki-page-generator.md # Wiki page generation
-│   │   ├── ── Utility Agents ──
+│   │   ├── ── Utility (5) ──
 │   │   ├── docs.md                # Documentation writing
 │   │   ├── translator.md          # Translation
 │   │   ├── duplicate-pr.md        # Duplicate PR detection
-│   │   └── triage.md              # GitHub issue triage
+│   │   ├── triage.md              # GitHub issue triage
+│   │   ├── test-runner.md         # Standalone test runner & report generator
+│   │   └── session-checkpoint.md  # Session context preservation & resumption
 │   │
 │   ├── command/                   # 15 Commands
 │   │   ├── code-qa.md             # /code-qa (full pipeline)
@@ -441,13 +443,15 @@ project-root/
 │   │   ├── commit.md, issues.md                  # Git/GitHub
 │   │   └── ai-deps.md, rmslop.md, spellcheck.md # Utility commands
 │   │
-│   ├── skills/                    # 6 Skills (knowledge bases)
+│   ├── skills/                    # 8 Skills (knowledge bases)
 │   │   ├── code-review/           # Review checklists per language
 │   │   ├── code-quality/          # Scoring rules & lint mappings
 │   │   ├── build-test/            # Build patterns per project type
 │   │   ├── wiki-generation/       # Wiki page templates & diagrams
 │   │   ├── translation/           # Locale glossary & preserve rules
-│   │   └── doc-indexer/           # Docs → project-knowledge generator
+│   │   ├── doc-indexer/           # Docs → project-knowledge generator
+│   │   ├── test-runner/           # Test execution & report generation
+│   │   └── session-checkpoint/    # Context preservation & resumption
 │   │
 │   ├── config/
 │   │   ├── workflow-settings.yaml # Timeout, retry, quality settings

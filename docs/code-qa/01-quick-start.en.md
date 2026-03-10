@@ -22,7 +22,7 @@ This document provides installation, configuration, and usage instructions for t
 
 ### 1.1 What is Code QA v4?
 
-Code QA v4 is an automated code quality workflow with 22 specialized agents (13 Code QA pipeline + 4 workspace analysis + 2 DeepWiki + 3 utility) orchestrated by a central coordinator.
+Code QA v4 is an automated code quality workflow with 24 specialized agents (13 Code QA pipeline + 4 workspace analysis + 2 DeepWiki + 5 utility) orchestrated by a central coordinator.
 
 ### 1.2 Key Features
 
@@ -160,7 +160,7 @@ export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
 ~/.config/opencode/
 ├── opencode.json                    # Provider, Model, Agent sampling params
 └── .opencode/
-    ├── agent/                       # 22 Agents (13 pipeline + 4 analysis + 2 wiki + 3 utility)
+    ├── agent/                       # 24 Agents (13 pipeline + 4 analysis + 2 wiki + 5 utility)
     │   ├── ── Code QA Pipeline (13) ──
     │   ├── env-setup.md             # STEP 1: Environment setup
     │   ├── git-input.md             # STEP 2: Git changed file extraction
@@ -182,18 +182,21 @@ export QWEN_CODER_BASE_URL="http://localhost:8001/v1"
     │   ├── ── DeepWiki (2) ──
     │   ├── deepwiki.md              # /deepwiki orchestrator
     │   ├── wiki-page-generator.md   # Wiki page generation
-    │   ├── ── Utility (3) ──
+    │   ├── ── Utility (5) ──
     │   ├── docs.md, translator.md, duplicate-pr.md, triage.md
-    │   └──
+    │   ├── test-runner.md           # Standalone test suite runner & report generator
+    │   └── session-checkpoint.md    # Session context preservation & resumption
     ├── command/                     # 15 Commands
     │   ├── code-qa.md               # Full QA pipeline
     │   ├── analyze.md, deepwiki.md  # Analysis & wiki
     │   ├── env.md .. test.md        # 7 standalone agents
     │   └── commit.md, issues.md, ai-deps.md, rmslop.md, spellcheck.md
-    ├── skills/                      # 6 Skills (knowledge bases)
+    ├── skills/                      # 8 Skills (knowledge bases)
     │   ├── code-review/, code-quality/, build-test/
     │   ├── wiki-generation/, translation/
-    │   └── doc-indexer/             # Docs → project-knowledge
+    │   ├── doc-indexer/             # Docs → project-knowledge
+    │   ├── test-runner/             # Test execution & report generation
+    │   └── session-checkpoint/      # Context preservation & resumption
     └── mode/
         └── code-qa.md               # Code QA orchestrator mode
 
@@ -740,13 +743,15 @@ so it can choose a **different** fix strategy (see `context-schema.md` for JSON 
     │   ├── ai-deps.md                      /ai-deps - AI SDK dep bumps
     │   ├── rmslop.md                       /rmslop - AI slop removal
     │   └── spellcheck.md                   /spellcheck - Markdown spellcheck
-    ├── skills/                             (6 Knowledge Bases)
+    ├── skills/                             (8 Knowledge Bases)
     │   ├── code-review/                    Review checklists per language
     │   ├── code-quality/                   Scoring rules & lint mappings
     │   ├── build-test/                     Build patterns per project type
     │   ├── wiki-generation/                Wiki page templates & diagrams
     │   ├── translation/                    Locale glossary & preserve rules
-    │   └── doc-indexer/                    Docs → project-knowledge generator
+    │   ├── doc-indexer/                    Docs → project-knowledge generator
+    │   ├── test-runner/                    Test execution & report generation
+    │   └── session-checkpoint/             Context preservation & resumption
     ├── config/                             (Configuration)
     │   ├── workflow-settings.yaml          Timeout, retry, quality, model settings
     │   ├── context-schema.md               JSON schemas for structured context passing
