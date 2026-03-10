@@ -1,6 +1,6 @@
 ---
 description: Test Suite Runner & Report Generator
-mode: agent
+mode: subagent
 model: qwen-instruct/Qwen3.5-122B-A10B-FP8
 color: "#2ECC71"
 tools:
