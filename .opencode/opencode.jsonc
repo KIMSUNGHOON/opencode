@@ -44,6 +44,15 @@
   // auto: automatically compact (summarize) conversation when context is full
   // prune: remove old tool outputs to free context space
   // Both default to true if omitted. Explicitly enabling for clarity.
+  // =============================================================================
+  // Instructions — Guide agents to use codebase navigation
+  // =============================================================================
+  "instructions": [
+    "When exploring a codebase or answering architecture questions, check if .opencode/workspace-cache/project-map.yaml exists. If it does, use the 3-layer navigation strategy: L1 (project-map) → L2 (module details) → L3 (source files). Load the codebase-navigator skill for detailed instructions.",
+    "Use @domain-router or /navigate for codebase exploration tasks. These use pre-indexed knowledge to minimize context usage.",
+    "When workspace-cache does not exist yet, run workspace-scanner then module-analyzer to generate it before deep code exploration."
+  ],
+
   "compaction": {
     "auto": true,
     "prune": true
